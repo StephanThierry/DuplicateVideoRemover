@@ -21,6 +21,15 @@ namespace deepduplicates
 
         public bool firstRun = false;
 
+        private static string lameJSONBeautifier(string json){
+            string[] postChars = {"{", ","};
+            string[] preChars = {"}"};
+            foreach(string c in postChars) json = json.Replace(c, c + Environment.NewLine);
+            foreach(string c in preChars) json = json.Replace(c, Environment.NewLine + c);
+
+            return(json);
+        }
+
         private static void InitConfig(FileHandler instance)
         {
             string settingsPath = Path.Combine(appFolder, "settings.json");
@@ -37,7 +46,7 @@ namespace deepduplicates
                 instance.settings.minVideoLength = 3;
                 instance.settings.contentFolders = new string[] { @"c:\" };
                 instance.settings.logInterval = 100;
-                File.WriteAllText(settingsPath, JsonSerializer.Serialize(instance.settings));
+                File.WriteAllText(settingsPath, lameJSONBeautifier(JsonSerializer.Serialize(instance.settings)));
                 instance.firstRun = true;
             }
 
@@ -65,6 +74,7 @@ namespace deepduplicates
             Console.WriteLine ("Checking for latest version of FFmpeg in " + ffmpegFolder);
             await Xabe.FFmpeg.FFmpeg.GetLatestVersion();
             Console.WriteLine ("Done.");
+            if (instance.firstRun) return(instance);
 
             instance.screenshotFolder = Path.Combine(appFolder, "_screens");
             Directory.CreateDirectory(instance.screenshotFolder);
