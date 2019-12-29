@@ -14,7 +14,9 @@ namespace deepduplicates
             VideoInfoContext db = new VideoInfoContext();
             db.Database.EnsureCreated(); 
 
-            FileHandler fileHandler = new FileHandler();
+            FileHandler fileHandler = await FileHandler.CreateInstance();
+            if (fileHandler.firstRun) return;
+
             VideoHandler videoHandler = new VideoHandler(fileHandler);
             ImageHandler imageHandler = new ImageHandler();
 

@@ -13,14 +13,12 @@ Review the report before running the batch file to delete, the algorithms are ab
 All settings are located in: `settings.json`  - run the program once to create this.  
 
 ### To run
-Install ffmpeg (free): https://www.ffmpeg.org/download.html  
 `dotnet restore`  
 `dotnet run` (First time it's just to create the settings file)   
 Edit `settings.json`  
-* Set `ffmpegFolder` to the bin folder of the installed ffmpeg - fx: "C:\\dev\\ffmpeg\\bin"   
 * Set `contentFolders` to the folders you want to index  
 * Set `minVideoLength` - default 2 sec
-Now you can start the program:   
+Now you can re-start the program:   
 `dotnet run` 
 
 ### How it works
@@ -32,3 +30,8 @@ It's recommneded to place DuplicateVideoRemover on an SSD disk since it executes
 2. All videos that match other videos in duration will processed again and 2 screenshots of each of these will be taken.  
 
 3. After all screenshots are taken, checksums are calculated, compared and a .bat file and an HTML report is made.  
+
+**Dependencies**
+Xabe.FFmpeg  
+FFmpeg (Xabe will automaticalæly download it)  
+SQLite  

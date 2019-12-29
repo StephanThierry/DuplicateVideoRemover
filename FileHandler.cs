@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Threading.Tasks;
 using Xabe.FFmpeg.Enums;
 
 namespace deepduplicates
@@ -15,61 +16,81 @@ namespace deepduplicates
         public IEnumerable<string> allFiles { get; set; }
         public int allFilesCount { get; set; }
 
-        private string appFolder = Directory.GetCurrentDirectory();
-
+        private static string appFolder = Directory.GetCurrentDirectory();
         public Settings settings = null;
 
-        private void InitConfig()
+        public bool firstRun = false;
+
+        private static void InitConfig(FileHandler instance)
         {
-            
             string settingsPath = Path.Combine(appFolder, "settings.json");
             string settings_json = "";
-            try {
-                 settings_json = System.IO.File.ReadAllText(settingsPath);
-            } catch {
-                // Presumably settings.json do not exist - set default values and save
-                Console.WriteLine("Can't open 'settings.json' - creating new with default values.");
-                this.settings = new Settings();
-                this.settings.minVideoLength = 3;
-                this.settings.contentFolders = new string[] { @"c:\" };
-                this.settings.logInterval = 100;
-                this.settings.ffmpegFolder = @"C:\dev\ffmpeg\bin";
-                File.WriteAllText(settingsPath, JsonSerializer.Serialize(this.settings));
+            try
+            {
+                settings_json = System.IO.File.ReadAllText(settingsPath);
             }
-            
-            if (this.settings == null) this.settings = JsonSerializer.Deserialize<Settings>(settings_json);
+            catch
+            {
+                // Presumably settings.json do not exist - set default values and save
+                Console.WriteLine("Creating 'settings.json' - edit these settings and run again.");
+                instance.settings = new Settings();
+                instance.settings.minVideoLength = 3;
+                instance.settings.contentFolders = new string[] { @"c:\" };
+                instance.settings.logInterval = 100;
+                File.WriteAllText(settingsPath, JsonSerializer.Serialize(instance.settings));
+                instance.firstRun = true;
+            }
+
+            if (instance.settings == null) instance.settings = JsonSerializer.Deserialize<Settings>(settings_json);
         }
 
-        public string screenshotPath(VideoInfo item, int prefix){
-            return(Path.Combine(this.screenshotFolder, item.id + "_" + prefix + FileExtensions.Png));
-        }
-        public FileHandler()
+        public string screenshotPath(VideoInfo item, int prefix)
         {
-            InitConfig();
+            return (Path.Combine(this.screenshotFolder, item.id + "_" + prefix + FileExtensions.Png));
+        }
 
-            this.screenshotFolder = Path.Combine(this.appFolder, "_screens");
-            Directory.CreateDirectory(this.screenshotFolder);
+        private FileHandler(){
+            // Block non-async object creation
+        }
 
-            this.outputFolder = Path.Combine(this.appFolder, "output");
-            Directory.CreateDirectory(this.outputFolder);
+        public static async Task<FileHandler> CreateInstance()
+        {
+            FileHandler instance = new FileHandler();
 
-            this.allFiles = null;
-            foreach (string contentFolder in settings.contentFolders)
+            InitConfig(instance);
+
+            string ffmpegFolder = Path.Combine(appFolder, "ffmpeg");
+            Directory.CreateDirectory(ffmpegFolder);
+            Xabe.FFmpeg.FFmpeg.ExecutablesPath = ffmpegFolder;
+            Console.WriteLine ("Checking for latest version of FFmpeg in " + ffmpegFolder);
+            await Xabe.FFmpeg.FFmpeg.GetLatestVersion();
+            Console.WriteLine ("Done.");
+
+            instance.screenshotFolder = Path.Combine(appFolder, "_screens");
+            Directory.CreateDirectory(instance.screenshotFolder);
+
+            instance.outputFolder = Path.Combine(appFolder, "output");
+            Directory.CreateDirectory(instance.outputFolder);
+
+            instance.allFiles = null;
+            foreach (string contentFolder in instance.settings.contentFolders)
             {
                 Console.WriteLine("Indexing all files in: " + contentFolder + "...");
-                IEnumerable<string> files = GetFiles(contentFolder, new[] { ".avi", ".divx", ".mp4", ".m4v", ".mov" });
-                if (allFiles == null)
+                IEnumerable<string> files = instance.GetFiles(contentFolder, new[] { ".avi", ".divx", ".mp4", ".m4v", ".mov" });
+                if (instance.allFiles == null)
                 {
-                    allFiles = files;
+                    instance.allFiles = files;
                 }
                 else
                 {
-                    allFiles = allFiles.Concat(files);
+                    instance.allFiles = instance.allFiles.Concat(files);
                 }
 
-                Console.WriteLine("Found a total of " + allFiles.Count() + " video files.");
+                Console.WriteLine("Found a total of " + instance.allFiles.Count() + " video files.");
             }
-            this.allFilesCount = allFiles.Count();
+            instance.allFilesCount = instance.allFiles.Count();
+
+            return(instance);
         }
 
         public long GetFileSize(string fullPath)
@@ -104,7 +125,8 @@ namespace deepduplicates
                         queue.Enqueue(subDir);
                     }
                 }
-                catch (UnauthorizedAccessException){
+                catch (UnauthorizedAccessException)
+                {
                     // Ignore this error
                 }
                 catch (Exception ex)
@@ -116,7 +138,8 @@ namespace deepduplicates
                 {
                     files = Directory.GetFiles(path);
                 }
-                catch (UnauthorizedAccessException){
+                catch (UnauthorizedAccessException)
+                {
                     // ignore this error
                 }
                 catch (Exception ex)
@@ -158,8 +181,8 @@ namespace deepduplicates
                     {
                         int orgSize = (int)(org.fileSize / (1024 * 1024));
                         outputFile.WriteLine("ORIGINAL: " + org.path + "  (" + orgSize + " MB )<br>");
-                        outputFile.WriteLine("<img src='file:///" + screenshotPath(org,1) + "'>");
-                        outputFile.WriteLine("<img src='file:///" + screenshotPath(org,2) + "'><br>");
+                        outputFile.WriteLine("<img src='file:///" + screenshotPath(org, 1) + "'>");
+                        outputFile.WriteLine("<img src='file:///" + screenshotPath(org, 2) + "'><br>");
 
                     }
                     else
@@ -168,8 +191,8 @@ namespace deepduplicates
                     }
                     int dupeSize = (int)(item.fileSize / (1024 * 1024));
                     outputFile.WriteLine("DELETE: " + item.path + "  (" + dupeSize + " MB )<br>");
-                    outputFile.WriteLine("<img src='file:///" + screenshotPath(item,1) + "'>");
-                    outputFile.WriteLine("<img src='file:///" + screenshotPath(item,2) + "'><br>");
+                    outputFile.WriteLine("<img src='file:///" + screenshotPath(item, 1) + "'>");
+                    outputFile.WriteLine("<img src='file:///" + screenshotPath(item, 2) + "'><br>");
                     outputFile.WriteLine("<b>" + item.reason + "</b><br>");
                     outputFile.WriteLine("<hr>");
                 }

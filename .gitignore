@@ -2,6 +2,7 @@ _screens/**
 output/**
 obj/**
 bin/**
+ffmpeg/**
 .vscode/**
 deepdupes.db
 deepdupes.db-shm

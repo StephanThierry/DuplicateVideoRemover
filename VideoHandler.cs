@@ -4,8 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Xabe.FFmpeg;
-using Xabe.FFmpeg.Enums;
-using Xabe.FFmpeg.Model;
+
 
 namespace deepduplicates
 {
@@ -31,8 +30,8 @@ namespace deepduplicates
 
             Console.WriteLine("Found: " + fullTableScan.Count());
 
-
-            Xabe.FFmpeg.FFmpeg.ExecutablesPath = fileHandler.settings.ffmpegFolder;
+            //await Xabe.FFmpeg.FFmpeg.GetLatestVersion();
+            //Xabe.FFmpeg.FFmpeg.ExecutablesPath = fileHandler.settings.ffmpegFolder;
 
             int index = 0;
             foreach (string path in fileHandler.allFiles)
