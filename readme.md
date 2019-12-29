@@ -25,10 +25,10 @@ Now you can re-start the program:
 `dotnet run` 
 
 ### How it works
-1. The program first indexes all video-files in the folders specified in "contentFolders" in settings.json and reads the video metadata (size and duratation)  
-Each entry is saved in a SQLite DB so you can stop the program at any time and it will resume where it left off within a few seconds or minutes, depending on the hardware and the amount of files in the indexed folders.  
+1. The program first indexes all video-files in the folders specified in "contentFolders" in settings.json and reads the video metadata (size and duration)  
+Each entry is saved in a SQLite DB so you can stop the program at any time, it will resume where it left off within a few seconds or minutes, depending on the hardware and the amount of files in the indexed folders.  It will remember each file it indexs on the path so you have to delete the .db file to reset the program to zero. If you do, you must also delete the content of the "_screens" folder, since it will not match the indexes of a new database.
 
-It's recommneded to place DuplicateVideoRemover on an SSD disk since it executes a lot of local read/write operations to update the state of the program. The free space should be aprox. 360 Kb pr video, so if you plan on running the program om 20.000 videos, make sure your SSD has more than 7 GB of free space.   
+It's recommneded to place DuplicateVideoRemover on an SSD disk since it executes a lot of local read/write operations to update the state of the program. The free space should be aprox. 260 Kb pr video, so if you plan on running the program om a NAS with 42.000 videos, make sure your SSD has more than 10 GB of free space.   
 
 2. All videos that match other videos in duration will processed again and 2 screenshots of each of these will be taken.  
 
