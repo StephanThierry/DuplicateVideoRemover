@@ -1,0 +1,9 @@
+_screens/**
+output/**
+obj/**
+bin/**
+.vscode/**
+deepdupes.db
+deepdupes.db-shm
+deepdupes.db-wal
+settings.json
