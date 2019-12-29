@@ -10,7 +10,7 @@ An HTML report of the findings are made and placed in the output folder.
 
 Review the report before running the batch file to delete, the algorithms are about 99.2% accurate - so 2-3 in each 1000 videos will likely be a false positive.   
 
-All settings are located in: ´settings.json´  - run the program once to create this.  
+All settings are located in: `settings.json`  - run the program once to create this.  
 
 ### To run
 `dotnet restore`  
