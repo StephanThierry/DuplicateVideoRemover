@@ -13,8 +13,8 @@ Review the report before running the batch file to delete, the algorithms are ab
 All settings are located in: ´settings.json´  - run the program once to create this.  
 
 ### To run
-`dotnet restore`
-`dotnet run`
+`dotnet restore`  
+`dotnet run`  
 
 ### How it works
 1. The program first indexes all video-files in the folders specified in "contentFolders" in settings.json and reads the video metadata (size and duratation)  
