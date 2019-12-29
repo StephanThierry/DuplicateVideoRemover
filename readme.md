@@ -15,12 +15,13 @@ All settings are located in: `settings.json`  - run the program once to create t
 ### To run
 Install ffmpeg (free): https://www.ffmpeg.org/download.html  
 `dotnet restore`  
-`dotnet run`  
+`dotnet run` (First time it's just to create the settings file)   
 Edit `settings.json`  
 * Set `ffmpegFolder` to the bin folder of the installed ffmpeg - fx: "C:\\dev\\ffmpeg\\bin"   
 * Set `contentFolders` to the folders you want to index  
 * Set `minVideoLength` - default 2 sec
-
+Now you can start the program:   
+`dotnet run` 
 
 ### How it works
 1. The program first indexes all video-files in the folders specified in "contentFolders" in settings.json and reads the video metadata (size and duratation)  
