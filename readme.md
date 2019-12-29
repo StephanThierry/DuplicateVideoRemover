@@ -36,5 +36,5 @@ It's recommneded to place DuplicateVideoRemover on an SSD disk since it executes
 
 **Dependencies**  
 Xabe.FFmpeg  
-FFmpeg (Xabe will automaticalæly download it)  
+FFmpeg (Program will automatically download the latest version)  
 SQLite  
