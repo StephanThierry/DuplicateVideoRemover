@@ -40,8 +40,8 @@ namespace deepduplicates
             }
             catch
             {
-                // Presumably settings.json do not exist - set default values and save
-                Console.WriteLine("Creating 'settings.json' - edit these settings and run again.");
+                // Presumably settings.json does not exist - set default values and save
+                Console.WriteLine("Creating 'settings.json' - edit settings and run again.");
                 instance.settings = new Settings();
                 instance.settings.minVideoLength = 3;
                 instance.settings.contentFolders = new string[] { @"c:\" };

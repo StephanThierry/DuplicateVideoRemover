@@ -37,6 +37,8 @@ namespace deepduplicates
 
             Console.WriteLine("Generating HTML report...");
             fileHandler.generateReport(mediaList);
+            Console.WriteLine("Check ./output directory");
+
 
             Console.WriteLine("Done!");
         }
