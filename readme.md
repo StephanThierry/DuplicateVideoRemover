@@ -17,7 +17,7 @@ All settings are located in: `settings.json`  - run the program once to create t
 `dotnet run` (First time it's just to create the settings file)   
 Edit `settings.json`  
 * Set `contentFolders` to the folders you want to index  
-* Set `minVideoLength` - default 2 sec
+* Set `minVideoLength` - default 2 sec  
 Now you can re-start the program:   
 `dotnet run` 
 
