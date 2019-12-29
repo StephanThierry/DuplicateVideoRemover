@@ -34,7 +34,7 @@ It's recommneded to place DuplicateVideoRemover on an SSD disk since it executes
 
 3. After all screenshots are taken, checksums are calculated, compared and a .bat file and an HTML report is made.  
 
-**Dependencies**
+**Dependencies**  
 Xabe.FFmpeg  
 FFmpeg (Xabe will automaticalæly download it)  
 SQLite  
