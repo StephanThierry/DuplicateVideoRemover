@@ -13,12 +13,14 @@ Review the report before running the batch file to delete, the algorithms are ab
 All settings are located in: `settings.json`  - run the program once to create this.  
 
 ### To run
+Requires .NET Core 3.0 (or higher) https://dotnet.microsoft.com/download - so install that first.  
 `dotnet restore`  
 `dotnet run` (First time it's just to create the settings file)   
 Edit `settings.json`  
 * Set `contentFolders` to the folders you want to index - notice on windows blackslashes must be double  
   so `d:\user\videos` must be written `d:\\user\\videos` - if not, the JSON will be invalid.   
 * Set `minVideoLength` - default 2 sec  
+
 Now you can re-start the program:   
 `dotnet run` 
 
