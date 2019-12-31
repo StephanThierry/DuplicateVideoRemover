@@ -86,7 +86,7 @@ namespace deepduplicates
             foreach (string contentFolder in instance.settings.contentFolders)
             {
                 Console.WriteLine("Indexing all files in: " + contentFolder + "...");
-                IEnumerable<string> files = instance.GetFiles(contentFolder, new[] { ".avi", ".divx", ".mp4", ".m4v", ".mov" });
+                IEnumerable<string> files = instance.GetFiles(contentFolder, new[] { ".avi", ".divx", ".mp4", ".m4v", ".mov", ".wmv", ".mpg", ".mpeg", ".flv", ".mkv"  });
                 if (instance.allFiles == null)
                 {
                     instance.allFiles = files;
