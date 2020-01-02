@@ -4,14 +4,15 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Xabe.FFmpeg;
-
+using Xabe.FFmpeg.Model;
 
 namespace deepduplicates
 {
     public class VideoHandler
     {
         private FileHandler fileHandler;
-        public VideoHandler(FileHandler fileHandler){
+        public VideoHandler(FileHandler fileHandler)
+        {
             this.fileHandler = fileHandler;
         }
 
@@ -123,23 +124,31 @@ namespace deepduplicates
                         await db.SaveChangesAsync();
                         Console.WriteLine("Created screenshots for: " + index + "/" + screenshotListLength + " - " + item);
                     }
+                    catch (Xabe.FFmpeg.Exceptions.UnknownDecoderException e)
+                    {
+                        item.reason = "Screenshot failed! UnknownDecoderException - The most likey reason is that Ffmpeg does not support this codec-variant. The video will be disregarded in the rest of the process.";
+                    }
+                    catch (Xabe.FFmpeg.Exceptions.ConversionException e)
+                    {
+                        item.remove = true;
+                        item.reason = "Screenshot failed! ConversionException - Most likely caused by an invalid or incomplete video. Attempt to open the video in an appropriate videoplayer to confirm this before deleting.";
+                    }
                     catch (Exception e)
                     {
-                        int showFirst = 60;
-                        if (e.Message.Length < showFirst) showFirst = e.Message.Length;
-                        string msg = "Screenshot failed! item.duration: " + item.duration + " point1: " + point1 + " point2: " + point2 + "  \nMsg:" + e.Message.Substring(0, showFirst);
                         if (e.Message.Contains("Seek can not be greater than video"))
                         {
                             Console.WriteLine("For some reason - Xabe is unable to create screenshot for this video. It seems to be a bug so we will ignore this error.");
                         }
                         else
                         {
+                            int showFirst = 150;
+                            if (e.Message.Length < showFirst) showFirst = e.Message.Length;
+                            string msg = "Screenshot failed! Generic error, details: " + e.Message.Substring(0, showFirst);
+                            Console.WriteLine(msg);
                             item.remove = true;
                             item.reason = msg;
                         }
-                        Console.WriteLine(msg);
                     }
-
                 }
                 else
                 {

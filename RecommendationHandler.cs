@@ -57,6 +57,8 @@ namespace deepduplicates
         {
             try
             {
+                if (checksum1 == null || checksum2 == null ) return(100);
+
                 return (Math.Round(Math.Abs((double)(checksum1 - checksum2) / (double)((checksum1 + checksum2) / 2)) * 100, 2));
             }
             catch
