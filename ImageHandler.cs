@@ -29,7 +29,9 @@ namespace deepduplicates
 
                         long profile1 = 0;
                         for (int n = 0; n < rgbValues1.Length; n++) profile1 += rgbValues1[n];
-
+                        
+                        // Release the unmanaged memory manually - GC will not do it
+                        image.UnlockBits(bitmapData); 
                         return (profile1);
                     }
                 }
@@ -38,6 +40,8 @@ namespace deepduplicates
 
         public byte[] ImageHashToByteArray(List<bool> imagehash)
         {
+            if (imagehash.Count() != 256) return (null); // We are expecting 16x16 
+
             bool[] imagehash_temp = imagehash.ToArray();
             Array.Reverse(imagehash_temp);
             BitArray bits = new BitArray(imagehash_temp);

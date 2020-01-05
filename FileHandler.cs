@@ -170,11 +170,11 @@ namespace deepduplicates
         {
             string filepath = Path.Combine(this.outputFolder, "delete_all_dupes.bat");
             string filetext = "chcp 65001" + Environment.NewLine;
-            foreach (VideoInfo item in mediaList.Where(x => x.remove))
+            foreach (VideoInfo item in mediaList.Where(x => (x.remove ?? false)))
             {
                 filetext += "DEL \"" + item.path + "\"" + Environment.NewLine;
             }
-            File.WriteAllText(filepath, filetext, Encoding.UTF8);
+            File.WriteAllText(filepath, filetext);
         }
 
         public void generateReport(List<VideoInfo> mediaList)
@@ -183,7 +183,7 @@ namespace deepduplicates
             {
                 long spaceSaved = 0;
                 outputFile.WriteLine("<h3>Delete report</h3>");
-                foreach (VideoInfo item in mediaList.Where(x => x.remove).OrderBy(p => p.triggerId))
+                foreach (VideoInfo item in mediaList.Where(x => (x.remove ?? false)).OrderBy(p => p.triggerId))
                 {
                     spaceSaved += item.fileSize ?? 0;
                     VideoInfo org = mediaList.Where(x => x.id == item.triggerId).FirstOrDefault();
@@ -192,7 +192,8 @@ namespace deepduplicates
                         int orgSize = (int)(org.fileSize / (1024 * 1024));
                         outputFile.WriteLine("ORIGINAL: " + org.path + "  (" + orgSize + " MB )<br>");
                         outputFile.WriteLine("<img src='file:///" + screenshotPath(org, 1) + "'>");
-                        outputFile.WriteLine("<img src='file:///" + screenshotPath(org, 2) + "'><br>");
+                        outputFile.WriteLine("<img src='file:///" + screenshotPath(org, 2) + "'>");
+                        outputFile.WriteLine("<img src='file:///" + screenshotPath(org, 3) + "'><br>");
 
                     }
                     else
@@ -202,7 +203,8 @@ namespace deepduplicates
                     int dupeSize = (int)(item.fileSize / (1024 * 1024));
                     outputFile.WriteLine("DELETE: " + item.path + "  (" + dupeSize + " MB )<br>");
                     outputFile.WriteLine("<img src='file:///" + screenshotPath(item, 1) + "'>");
-                    outputFile.WriteLine("<img src='file:///" + screenshotPath(item, 2) + "'><br>");
+                    outputFile.WriteLine("<img src='file:///" + screenshotPath(item, 2) + "'>");
+                    outputFile.WriteLine("<img src='file:///" + screenshotPath(item, 3) + "'><br>");
                     outputFile.WriteLine("<b>" + item.reason + "</b><br>");
                     outputFile.WriteLine("<hr>");
                 }

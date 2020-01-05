@@ -1,0 +1,90 @@
+{
+  "runtimeTarget": {
+    "name": ".NETStandard,Version=v2.0/",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETStandard,Version=v2.0": {},
+    ".NETStandard,Version=v2.0/": {
+      "Xabe.FFmpeg/1.0.0": {
+        "dependencies": {
+          "Dotnet.CodeFormatter.BuildTask.Fork": "0.0.2",
+          "Microsoft.Net.Compilers": "2.10.0",
+          "Microsoft.VisualStudio.Threading.Analyzers": "15.8.209",
+          "NETStandard.Library": "2.0.3",
+          "Newtonsoft.Json": "12.0.3"
+        },
+        "runtime": {
+          "Xabe.FFmpeg.dll": {}
+        }
+      },
+      "Dotnet.CodeFormatter.BuildTask.Fork/0.0.2": {},
+      "Microsoft.Net.Compilers/2.10.0": {},
+      "Microsoft.NETCore.Platforms/1.1.0": {},
+      "Microsoft.VisualStudio.Threading.Analyzers/15.8.209": {},
+      "NETStandard.Library/2.0.3": {
+        "dependencies": {
+          "Microsoft.NETCore.Platforms": "1.1.0"
+        }
+      },
+      "Newtonsoft.Json/12.0.3": {
+        "runtime": {
+          "lib/netstandard2.0/Newtonsoft.Json.dll": {
+            "assemblyVersion": "12.0.0.0",
+            "fileVersion": "12.0.3.23909"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Xabe.FFmpeg/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Dotnet.CodeFormatter.BuildTask.Fork/0.0.2": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-t0rC5dYSIP4IP2Ase1JkNXNdDDCZZlPG7T/6mGw28H6ERLPOT/4+R0Wzrupx685FivgiIrvYz2/PIFN10vv1EQ==",
+      "path": "dotnet.codeformatter.buildtask.fork/0.0.2",
+      "hashPath": "dotnet.codeformatter.buildtask.fork.0.0.2.nupkg.sha512"
+    },
+    "Microsoft.Net.Compilers/2.10.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-IsOvl2e3xhNG00P7pS0FYp6Ej4zKjGCB00tfY4XXm2lU7kd6GKmHj5R8hPUKHoP0PO4ahB2ZQ8HH5AdUlFqJAA==",
+      "path": "microsoft.net.compilers/2.10.0",
+      "hashPath": "microsoft.net.compilers.2.10.0.nupkg.sha512"
+    },
+    "Microsoft.NETCore.Platforms/1.1.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-kz0PEW2lhqygehI/d6XsPCQzD7ff7gUJaVGPVETX611eadGsA3A877GdSlU0LRVMCTH/+P3o2iDTak+S08V2+A==",
+      "path": "microsoft.netcore.platforms/1.1.0",
+      "hashPath": "microsoft.netcore.platforms.1.1.0.nupkg.sha512"
+    },
+    "Microsoft.VisualStudio.Threading.Analyzers/15.8.209": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-YdgmE14rpAPUxUx3xf/zewCFpTCVnAGjeJmXBGwuIDMeG2g3mhIxpqZcCrd00vAItmjimx3lIMr9AcWdvqwLoA==",
+      "path": "microsoft.visualstudio.threading.analyzers/15.8.209",
+      "hashPath": "microsoft.visualstudio.threading.analyzers.15.8.209.nupkg.sha512"
+    },
+    "NETStandard.Library/2.0.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-st47PosZSHrjECdjeIzZQbzivYBJFv6P2nv4cj2ypdI204DO+vZ7l5raGMiX4eXMJ53RfOIg+/s4DHVZ54Nu2A==",
+      "path": "netstandard.library/2.0.3",
+      "hashPath": "netstandard.library.2.0.3.nupkg.sha512"
+    },
+    "Newtonsoft.Json/12.0.3": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-6mgjfnRB4jKMlzHSl+VD+oUc1IebOZabkbyWj2RiTgWwYPPuaK1H97G1sHqGwPlS5npiF5Q0OrxN1wni2n5QWg==",
+      "path": "newtonsoft.json/12.0.3",
+      "hashPath": "newtonsoft.json.12.0.3.nupkg.sha512"
+    }
+  }
+}

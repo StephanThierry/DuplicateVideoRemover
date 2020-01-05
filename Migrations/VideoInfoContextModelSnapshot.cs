@@ -31,6 +31,9 @@ namespace deepduplicates.Migrations
                     b.Property<long?>("fileSize")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("formatNotSupported")
+                        .HasColumnType("INTEGER");
+
                     b.Property<long?>("image1Checksum")
                         .HasColumnType("INTEGER");
 
@@ -43,8 +46,20 @@ namespace deepduplicates.Migrations
                     b.Property<byte[]>("image2hash_blob")
                         .HasColumnType("BLOB");
 
+                    b.Property<long?>("image3Checksum")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<byte[]>("image3hash_blob")
+                        .HasColumnType("BLOB");
+
                     b.Property<string>("path")
                         .HasColumnType("TEXT");
+
+                    b.Property<string>("reason")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("remove")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("id");
 

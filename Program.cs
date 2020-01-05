@@ -1,14 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-
 //https://xabe.net/net-video-converter-toturial/
 
 namespace deepduplicates
 {
     class Program
     {
-        // Accuracy tested to 99,8% - so check the report for false positives - in every 1000 matches aprox. 2-3 are likely wrong!
+        // Accuracy tested to 99.99% - so check the report for false positives. On average there is aprox. 1 i every 10000 files.
         static async Task Main(string[] args)
         {
             VideoInfoContext db = new VideoInfoContext();
@@ -16,18 +15,14 @@ namespace deepduplicates
 
             FileHandler fileHandler = await FileHandler.CreateInstance();
             if (fileHandler.firstRun) return;
-
-            VideoHandler videoHandler = new VideoHandler(fileHandler);
             ImageHandler imageHandler = new ImageHandler();
 
-            List<VideoInfo> mediaList = await videoHandler.getVideoMetadata(db);
+            VideoHandler videoHandler = new VideoHandler(fileHandler, imageHandler);
+            List<VideoInfo> mediaList = await videoHandler.saveVideoMetadataAndScreenshots(db);
             
             RecommendationHandler recommendationHandler = new RecommendationHandler();
-            Console.WriteLine("Marking all invalid or too-short videos for removal..."); 
-            // We do this before making screenshots so these will be skipped
-            mediaList = recommendationHandler.removingShortVideos(mediaList, fileHandler.settings.minVideoLength); 
-
-            await videoHandler.generateAllScreenshotsAsync(mediaList, imageHandler, db);
+            Console.WriteLine("Marking incomplete videos for removal...");
+            mediaList = recommendationHandler.removingIncompleteVideos(mediaList); 
 
             Console.WriteLine("Performing checksum validation...");
             mediaList = recommendationHandler.checkCheckSumofAllSimilarVideos(mediaList);
@@ -38,8 +33,6 @@ namespace deepduplicates
             Console.WriteLine("Generating HTML report...");
             fileHandler.generateReport(mediaList);
             Console.WriteLine("Check ./output directory");
-
-
             Console.WriteLine("Done!");
         }
     }
