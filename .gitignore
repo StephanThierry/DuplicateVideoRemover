@@ -3,7 +3,6 @@ output/**
 obj/**
 bin/**
 ffmpeg/**
-.vscode/**
 deepdupes.db
 deepdupes.db-shm
 deepdupes.db-wal
