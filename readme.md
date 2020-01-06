@@ -19,7 +19,7 @@ Requires .NET Core 3.1 (or higher) https://dotnet.microsoft.com/download - so in
 Edit `settings.json`  
 * Set `contentFolders` to the folders you want to index - notice on windows blackslashes must be double  
   so `d:\user\videos` must be written `d:\\user\\videos` - if not, the JSON will be invalid.   
-* Set `minVideoLength` - default 2 sec. It will add all videos that are 2 sec or less in duration to the delete-list.    
+* Set `minVideoLength` - default 3 sec. It will add all videos that are 2 sec or less in duration to the delete-list.    
 
 Now you can re-start the program:   
 `dotnet run` 
