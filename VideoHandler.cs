@@ -54,9 +54,9 @@ namespace deepduplicates
             List<TimeSpan> timediag = new List<TimeSpan>();
             int index = 0;
             //Stopwatch stopWatch = new Stopwatch();
-            //Stopwatch stopWatch_total = new Stopwatch();
-            //stopWatch_total.Start();
-            //int fullProcessedItems = 0;
+            Stopwatch stopWatch_total = new Stopwatch();
+            stopWatch_total.Start();
+            int fullProcessedItems = 0;
 
             foreach (string path in fileHandler.allFiles)
             {
@@ -100,7 +100,7 @@ namespace deepduplicates
                         int duration = (int)Math.Round(info.Duration.TotalSeconds, 0);
                         item.duration = duration;
                         //ShowTimeStamp(stopWatch, "Get metadata: ");
-                        //fullProcessedItems++;
+                        fullProcessedItems++;
                     }
                     catch
                     {
@@ -112,7 +112,7 @@ namespace deepduplicates
 
                     if (item.image1Checksum == null && info != null && !(item.remove ?? false))
                     {
-                        Console.WriteLine("Generating screenshots");
+                        //Console.WriteLine("Generating screenshots");
                         if (item.id == 0) await db.SaveChangesAsync(); // Must save before screenshots so image has ID
                         await generateOneSetOfScreenshotsAsync(item, info, imageHandler);
                         //ShowTimeStamp(stopWatch, "Get Screenshots: ");
@@ -133,6 +133,7 @@ namespace deepduplicates
                     if (index % 20 == 0)
                     {
                         await db.SaveChangesAsync();
+                        ShowTimeStamp(stopWatch_total, "All full process items: " + fullProcessedItems + " took a total of: ");
                         //ShowTimeStamp(stopWatch, "Save last 20 items to db.");
                     }
                     //ShowTimeStamp(stopWatch, "Item Complete: ");
@@ -146,11 +147,11 @@ namespace deepduplicates
                     if (item.image2hash_blob != null) item.image2hash = imageHandler.ByteArrayToImageHash(item.image2hash_blob);
                     if (item.image3hash_blob != null) item.image3hash = imageHandler.ByteArrayToImageHash(item.image3hash_blob);
                 }
-
+                
             }
             await db.SaveChangesAsync();
             Console.WriteLine("Video mediaList length: " + mediaList.Count());
-            //ShowTimeStamp(stopWatch_total, "All full process items: " + fullProcessedItems + " took a total of: ");
+            ShowTimeStamp(stopWatch_total, "All full process items: " + fullProcessedItems + " took a total of: ");
             return (mediaList);
         }
 
