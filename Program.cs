@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-//https://xabe.net/net-video-converter-toturial/
+// Publish single trimmed executable: 	
+// dotnet publish -r win-x64 -c Release /p:PublishSingleFile=true /p:PublishTrimmed=true
 
 namespace deepduplicates
 {
