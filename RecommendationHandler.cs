@@ -42,13 +42,13 @@ namespace deepduplicates
             return (item);
         }
 
-        public List<VideoInfo> checkCheckSumofAllSimilarVideos(List<VideoInfo> mediaList)
+        public List<VideoInfo> checkCheckSumofAllSimilarVideos(List<VideoInfo> mediaList, string[] priorityFolders)
         {
             // Make delete recommendataions
             List<int?> lengthDubes = mediaList.Where(x => !(x.remove ?? false)).GroupBy(x => x.duration).Where(g => g.Count() > 1).Select(y => y.Key).ToList();
             foreach (int dupeKey in lengthDubes)
             {
-                List<VideoInfo> dupGroup = mediaList.Where(p => p.duration == dupeKey && !(p.remove ?? false)).OrderBy(p => p.fileSize).ToList();
+                List<VideoInfo> dupGroup = mediaList.Where(p => p.path != null && p.path.Length > 1 && p.duration == dupeKey && !(p.remove ?? false)).OrderByDescending(p => priorityFolders.Any(x => p.path.StartsWith(x))).ThenBy(p => p.fileSize).ToList();
                 int dupeCount = dupGroup.Count();
                 for (int i = 0; i < dupeCount - 1; i++) // from first to secound-last
                 {

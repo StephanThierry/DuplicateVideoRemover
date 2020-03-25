@@ -21,13 +21,14 @@ namespace deepduplicates
 
         public bool firstRun = false;
 
-        private static string lameJSONBeautifier(string json){
-            string[] postChars = {"{", ","};
-            string[] preChars = {"}"};
-            foreach(string c in postChars) json = json.Replace(c, c + Environment.NewLine);
-            foreach(string c in preChars) json = json.Replace(c, Environment.NewLine + c);
+        private static string lameJSONBeautifier(string json)
+        {
+            string[] postChars = { "{", "," };
+            string[] preChars = { "}" };
+            foreach (string c in postChars) json = json.Replace(c, c + Environment.NewLine);
+            foreach (string c in preChars) json = json.Replace(c, Environment.NewLine + c);
 
-            return(json);
+            return (json);
         }
 
         private static void InitConfig(FileHandler instance)
@@ -58,7 +59,8 @@ namespace deepduplicates
             return (Path.Combine(this.screenshotFolder, item.id + "_" + prefix + FileExtensions.Png));
         }
 
-        private FileHandler(){
+        private FileHandler()
+        {
             // Block non-async object creation
         }
 
@@ -71,10 +73,10 @@ namespace deepduplicates
             string ffmpegFolder = Path.Combine(appFolder, "ffmpeg");
             Directory.CreateDirectory(ffmpegFolder);
             Xabe.FFmpeg.FFmpeg.ExecutablesPath = ffmpegFolder;
-            Console.WriteLine ("Checking for latest version of FFmpeg in " + ffmpegFolder);
+            Console.WriteLine("Checking for latest version of FFmpeg in " + ffmpegFolder);
             await Xabe.FFmpeg.FFmpeg.GetLatestVersion();
-            Console.WriteLine ("Done.");
-            if (instance.firstRun) return(instance);
+            Console.WriteLine("Done.");
+            if (instance.firstRun) return (instance);
 
             instance.screenshotFolder = Path.Combine(appFolder, "_screens");
             Directory.CreateDirectory(instance.screenshotFolder);
@@ -86,7 +88,7 @@ namespace deepduplicates
             foreach (string contentFolder in instance.settings.contentFolders)
             {
                 Console.WriteLine("Indexing all files in: " + contentFolder + "...");
-                IEnumerable<string> files = instance.GetFiles(contentFolder, new[] { ".avi", ".divx", ".mp4", ".m4v", ".mov", ".wmv", ".mpg", ".mpeg", ".flv", ".mkv"  });
+                IEnumerable<string> files = instance.GetFiles(contentFolder, new[] { ".avi", ".divx", ".mp4", ".m4v", ".mov", ".wmv", ".mpg", ".mpeg", ".flv", ".mkv" }, instance.settings.excludeFolders);
                 if (instance.allFiles == null)
                 {
                     instance.allFiles = files;
@@ -100,7 +102,7 @@ namespace deepduplicates
             }
             instance.allFilesCount = instance.allFiles.Count();
 
-            return(instance);
+            return (instance);
         }
 
         public long GetFileSize(string fullPath)
@@ -120,8 +122,7 @@ namespace deepduplicates
                 return (-1);
             }
         }
-
-        private IEnumerable<string> GetFiles(string path, string[] ext)
+        private IEnumerable<string> GetFiles(string path, string[] ext, string[] excludeFolders)
         {
             Queue<string> queue = new Queue<string>();
             queue.Enqueue(path);
@@ -160,7 +161,7 @@ namespace deepduplicates
                 {
                     for (int i = 0; i < files.Length; i++)
                     {
-                        if (Array.IndexOf(ext, Path.GetExtension(files[i])) > -1) yield return files[i];
+                        if (Array.IndexOf(ext, Path.GetExtension(files[i])) > -1 && !excludeFolders.Any(x => files[i].StartsWith(x))) yield return files[i];
                     }
                 }
             }
@@ -170,7 +171,7 @@ namespace deepduplicates
         {
             string filepath = Path.Combine(this.outputFolder, "delete_all_dupes.bat");
             string filetext = "chcp 65001" + Environment.NewLine;
-            foreach (VideoInfo item in mediaList.Where(x => (x.remove ?? false)))
+            foreach (VideoInfo item in mediaList.Where(x => (x.remove ?? false)).OrderBy(p => p.triggerId))
             {
                 filetext += "DEL \"" + item.path + "\"" + Environment.NewLine;
             }
