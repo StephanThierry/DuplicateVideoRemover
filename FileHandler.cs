@@ -88,7 +88,7 @@ namespace deepduplicates
             foreach (string contentFolder in instance.settings.contentFolders)
             {
                 Console.WriteLine("Indexing all files in: " + contentFolder + "...");
-                IEnumerable<string> files = instance.GetFiles(contentFolder, new[] { ".avi", ".divx", ".mp4", ".m4v", ".mov", ".wmv", ".mpg", ".mpeg", ".flv", ".mkv" }, instance.settings.excludeFolders);
+                IEnumerable<string> files = instance.GetFiles(contentFolder, new[] { ".avi", ".divx", ".mp4", ".m4v", ".mov", ".wmv", ".mpg", ".mpeg", ".flv", ".mkv" }, instance.settings.excludePaths);
                 if (instance.allFiles == null)
                 {
                     instance.allFiles = files;
@@ -122,7 +122,7 @@ namespace deepduplicates
                 return (-1);
             }
         }
-        private IEnumerable<string> GetFiles(string path, string[] ext, string[] excludeFolders)
+        private IEnumerable<string> GetFiles(string path, string[] ext, string[] excludePaths)
         {
             Queue<string> queue = new Queue<string>();
             queue.Enqueue(path);
@@ -161,7 +161,7 @@ namespace deepduplicates
                 {
                     for (int i = 0; i < files.Length; i++)
                     {
-                        if (Array.IndexOf(ext, Path.GetExtension(files[i])) > -1 && !excludeFolders.Any(x => files[i].StartsWith(x))) yield return files[i];
+                        if (Array.IndexOf(ext, Path.GetExtension(files[i])) > -1 && !excludePaths.Any(x => files[i].StartsWith(x) || files[i].Equals(x))) yield return files[i];
                     }
                 }
             }
@@ -173,7 +173,7 @@ namespace deepduplicates
             string filetext = "chcp 65001" + Environment.NewLine;
             foreach (VideoInfo item in mediaList.Where(x => (x.remove ?? false)).OrderBy(p => p.triggerId))
             {
-                filetext += "DEL \"" + item.path + "\"" + Environment.NewLine;
+                filetext += "DEL \"" + item.path.Replace("%", "%%") + "\"" + Environment.NewLine;
             }
             File.WriteAllText(filepath, filetext);
         }
