@@ -173,6 +173,7 @@ namespace deepduplicates
             string filetext = "chcp 65001" + Environment.NewLine;
             foreach (VideoInfo item in mediaList.Where(x => (x.remove ?? false)).OrderBy(p => p.triggerId))
             {
+                // % needs to be escaped to %% to work in a .bat file
                 filetext += "DEL \"" + item.path.Replace("%", "%%") + "\"" + Environment.NewLine;
             }
             File.WriteAllText(filepath, filetext);
