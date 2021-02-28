@@ -171,7 +171,7 @@ namespace deepduplicates
         {
             string filepath = Path.Combine(this.outputFolder, "delete_all_dupes.bat");
             string filetext = "chcp 65001" + Environment.NewLine;
-            foreach (VideoInfo item in mediaList.Where(x => (x.remove ?? false)).OrderBy(p => p.triggerId))
+            foreach (VideoInfo item in mediaList.Where(x => (x.remove ?? false) && !String.IsNullOrEmpty(x.path)).OrderBy(p => p.triggerId))
             {
                 // % needs to be escaped to %% to work in a .bat file
                 filetext += "DEL \"" + item.path.Replace("%", "%%") + "\"" + Environment.NewLine;
