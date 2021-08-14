@@ -26,7 +26,7 @@ namespace deepduplicates
             mediaList = recommendationHandler.removingIncompleteVideos(mediaList); 
 
             Console.WriteLine("Performing checksum validation...");
-            mediaList = recommendationHandler.checkCheckSumofAllSimilarVideos(mediaList, fileHandler.settings.priorityFolders);
+            mediaList = recommendationHandler.checkCheckSumofAllSimilarVideos(mediaList, fileHandler.settings.priorityFolders, fileHandler.settings.switchPriority);
 
             Console.WriteLine("Generating batch-file...");
             fileHandler.generateBatchFile(mediaList);

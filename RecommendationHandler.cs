@@ -19,10 +19,12 @@ namespace deepduplicates
         {
             foreach (VideoInfo item in mediaList)
             {
-                if((item.image1Checksum == null || item.image2Checksum == null || item.image2Checksum == null) && !item.formatNotSupported){
+                if ((item.image1Checksum == null || item.image2Checksum == null || item.image2Checksum == null) && !item.formatNotSupported)
+                {
                     item.remove = true;
                 };
-                if((item.image1Checksum != null) && (item.image2Checksum == null || item.image2Checksum == null)){
+                if ((item.image1Checksum != null) && (item.image2Checksum == null || item.image2Checksum == null))
+                {
 
                     item.reason += " - Video is likely incomplete!";
                     item.remove = true;
@@ -42,12 +44,13 @@ namespace deepduplicates
             return (item);
         }
 
-        public List<VideoInfo> checkCheckSumofAllSimilarVideos(List<VideoInfo> mediaList, string[] priorityFolders)
+        public List<VideoInfo> checkCheckSumofAllSimilarVideos(List<VideoInfo> mediaList, string[] priorityFolders, switchPrioritySet[] switchPriority)
         {
             // Make delete recommendataions
             List<int?> lengthDubes = mediaList.Where(x => !(x.remove ?? false)).GroupBy(x => x.duration).Where(g => g.Count() > 1).Select(y => y.Key).ToList();
             foreach (int dupeKey in lengthDubes)
             {
+
                 List<VideoInfo> dupGroup = mediaList.Where(p => p.path != null && p.path.Length > 1 && p.duration == dupeKey && !(p.remove ?? false)).OrderByDescending(p => priorityFolders.Any(x => p.path.StartsWith(x))).ThenBy(p => p.fileSize).ToList();
                 int dupeCount = dupGroup.Count();
                 for (int i = 0; i < dupeCount - 1; i++) // from first to secound-last
@@ -79,11 +82,31 @@ namespace deepduplicates
                         {
                             double confidence = 100 - ((diff1 + diff2 + diff3) / 3);
                             dupGroup[n].remove = true;
-                            dupGroup[n].reason = "Matching length and 2 screenshots have a color difference of " + diff1 + "%, " + diff2 + "% and " + diff3 + "%  Diffhash of: " + diff1hash + ",  "+ diff2hash + " and  "+ diff3hash + ". - Based on color I'm " + confidence + "% confident this is a dupe.";
+                            dupGroup[n].reason = "Matching length. Screenshots have a color difference of " + Math.Round(diff1, 1) + "%, " + Math.Round(diff2, 1) + "% and " + Math.Round(diff3, 1) + "%  Diffhash of: " + Math.Round(diff1hash, 1) + ",  " + Math.Round(diff2hash, 1) + " and  " + Math.Round(diff3hash, 1) + ". - Based on the colormatch I'm " + Math.Round(confidence, 2) + "% confident this is a dupe.";
                             dupGroup[n].triggerId = dupGroup[i].id;
                         }
                     }
 
+                }
+
+                if (dupGroup.Any(p => p.remove ?? false))
+                {
+                    foreach (switchPrioritySet switchSet in switchPriority)
+                    {
+                            foreach(VideoInfo item in dupGroup.Where(p=>p.remove ?? false && p.path.IndexOf(switchSet.up)!=-1)){
+                                VideoInfo main = dupGroup.Where(p=>p.id == item.triggerId).First();
+                                double fileSizeDiff = Math.Round((double)(Math.Abs((double)(main.fileSize ?? 0)-(double)(item.fileSize ?? 0)) / (double)(main.fileSize)) * 100);
+                                if (main.path.IndexOf(switchSet.down) != -1 && item.path.IndexOf(switchSet.up)!= -1 && fileSizeDiff < 15) {
+                                    main.remove = true;
+                                    main.triggerId = item.id;
+                                    main.reason = "SWITCHED: "+ switchSet.up + "/" + switchSet.down + "  Sizediff: " + fileSizeDiff + " " + item.reason;
+                                    
+                                    item.remove = false;
+                                    break;
+                                }
+                            }
+
+                    }
                 }
             }
             return (mediaList);
