@@ -47,7 +47,7 @@ namespace deepduplicates
                 instance.settings.minVideoLength = 3;
                 instance.settings.contentFolders = new string[] { @"c:\" };
                 instance.settings.switchPriority = new switchPrioritySet[1];
-                instance.settings.switchPriority[0] = new switchPrioritySet(){up = "480", down = "SD" };
+                instance.settings.switchPriority[0] = new switchPrioritySet(){up = "480", down = "SD", triggerBelowPctSizeDiff: 15 };
                 instance.settings.logInterval = 100;
                 File.WriteAllText(settingsPath, lameJSONBeautifier(JsonSerializer.Serialize(instance.settings)));
                 instance.firstRun = true;

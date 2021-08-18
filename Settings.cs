@@ -14,5 +14,7 @@ namespace deepduplicates
     {
         public string up { get; set; }
         public string down { get; set; }
+        public int triggerBelowPctSizeDiff { get; set; }
+
     }
 }

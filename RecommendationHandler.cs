@@ -96,7 +96,7 @@ namespace deepduplicates
                             foreach(VideoInfo item in dupGroup.Where(p=>p.remove ?? false && p.path.IndexOf(switchSet.up)!=-1)){
                                 VideoInfo main = dupGroup.Where(p=>p.id == item.triggerId).First();
                                 double fileSizeDiff = Math.Round((double)(Math.Abs((double)(main.fileSize ?? 0)-(double)(item.fileSize ?? 0)) / (double)(main.fileSize)) * 100);
-                                if (main.path.IndexOf(switchSet.down) != -1 && item.path.IndexOf(switchSet.up)!= -1 && fileSizeDiff < 15) {
+                                if (main.path.IndexOf(switchSet.down) != -1 && item.path.IndexOf(switchSet.up)!= -1 && fileSizeDiff < switchSet.triggerBelowPctSizeDiff) {
                                     main.remove = true;
                                     main.triggerId = item.id;
                                     main.reason = "SWITCHED: "+ switchSet.up + "/" + switchSet.down + "  Sizediff: " + fileSizeDiff + " " + item.reason;
