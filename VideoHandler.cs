@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Xabe.FFmpeg;
 using Xabe.FFmpeg.Model;
+using Xabe.FFmpeg.Streams;
 
 namespace deepduplicates
 {
@@ -58,75 +59,86 @@ namespace deepduplicates
             stopWatch_total.Start();
             int fullProcessedItems = 0;
 
-            foreach (string path in fileHandler.allFiles)
+            var query = from path in fileHandler.allFiles
+                        join item in fullTableScan on path equals item.path into tmp
+                        from subItem in tmp.DefaultIfEmpty()
+                        select new VideoInfoWrapper { path = path, item = subItem };
+
+            foreach (VideoInfoWrapper wrapper in query)
             {
+
                 index++;
                 //stopWatch.Start();
-                if (index % fileHandler.settings.logInterval == 0) Console.WriteLine(index + "/" + fileHandler.allFilesCount + " checking: " + path);
+                if (index % fileHandler.settings.logInterval == 0) Console.WriteLine(index + "/" + fileHandler.allFilesCount + " checking: " + wrapper.path);
 
                 bool newItem = false;
-                VideoInfo item = fullTableScan.Where(vi => vi.path == path).FirstOrDefault();
-                if (item != null)
+                if (wrapper.item != null)
                 {
-                    mediaList.Add(item);
-                    if (item.remove ?? false || item.formatNotSupported) continue; // this has already finished processing
+                    mediaList.Add(wrapper.item);
+                    if (wrapper.item.remove ?? false || wrapper.item.formatNotSupported) continue; // this has already finished processing
                 }
                 else
                 {
-                    item = new VideoInfo();
+                    wrapper.item = new VideoInfo();
                     newItem = true;
-                    db.VideoInfos.Add(item);
-                    mediaList.Add(item);
+                    db.VideoInfos.Add(wrapper.item);
+                    mediaList.Add(wrapper.item);
                 }
 
-                if ((newItem || item.duration == -1 || item.image1Checksum == null || item.image1hash_blob == null) && item.formatNotSupported != true)
+                if ((newItem || wrapper.item.duration == -1 || wrapper.item.image1Checksum == null || wrapper.item.image1hash_blob == null) && wrapper.item.formatNotSupported != true)
                 {
                     // Console.WriteLine("Reading size ...");
-                    item.fileSize = fileHandler.GetFileSize(path);
-                    if (item.fileSize == -1)
+                    wrapper.item.fileSize = fileHandler.GetFileSize(wrapper.path);
+                    if (wrapper.item.fileSize == -1)
                     {
                         Console.WriteLine("Can't read file - skipping");
                         continue;
                     }
 
-                    item.path = path;
-                    item.duration = -1;
+                    wrapper.item.path = wrapper.path;
+                    wrapper.item.duration = -1;
 
                     //Console.WriteLine("Reading video duration...");
                     IMediaInfo info = null;
                     try
                     {
-                        info = await Xabe.FFmpeg.MediaInfo.Get(path);
+                        info = await Xabe.FFmpeg.MediaInfo.Get(wrapper.path);
                         int duration = (int)Math.Round(info.Duration.TotalSeconds, 0);
-                        item.duration = duration;
+                        foreach (IVideoStream stream in info.VideoStreams)
+                        {
+                            wrapper.item.bitrate = stream.Bitrate;  // same bitrate of last stream (usually there is only one)
+                            //wrapper.item.bitrate = Math.Round(stream.Bitrate / 8, 0);  // same bitrate of last stream (usually there is only one)
+
+                        }
+                        wrapper.item.duration = duration;
                         //ShowTimeStamp(stopWatch, "Get metadata: ");
                         fullProcessedItems++;
                     }
                     catch
                     {
-                        item.remove = true;
-                        item.reason = "Can't read videofile";
+                        wrapper.item.remove = true;
+                        wrapper.item.reason = "Can't read videofile";
                     }
 
-                    item = RecommendationHandler.removingShortVideo(item, fileHandler.settings.minVideoLength);
+                    wrapper.item = RecommendationHandler.removingShortVideo(wrapper.item, fileHandler.settings.minVideoLength);
 
-                    if (item.image1Checksum == null && info != null && !(item.remove ?? false))
+                    if (wrapper.item.image1Checksum == null && info != null && !(wrapper.item.remove ?? false))
                     {
                         //Console.WriteLine("Generating screenshots");
-                        if (item.id == 0) await db.SaveChangesAsync(); // Must save before screenshots so image has ID
-                        await generateOneSetOfScreenshotsAsync(item, info, imageHandler);
+                        if (wrapper.item.id == 0) await db.SaveChangesAsync(); // Must save before screenshots so image has ID
+                        await generateOneSetOfScreenshotsAsync(wrapper.item, info, imageHandler);
                         //ShowTimeStamp(stopWatch, "Get Screenshots: ");
                     }
 
-                    if (item.image1hash == null && !(item.remove ?? false))
+                    if (wrapper.item.image1hash == null && !(wrapper.item.remove ?? false))
                     {
-                        item.image1hash = imageHandler.ImageHash(fileHandler.screenshotPath(item, 1));
-                        item.image2hash = imageHandler.ImageHash(fileHandler.screenshotPath(item, 2));
-                        item.image3hash = imageHandler.ImageHash(fileHandler.screenshotPath(item, 3));
+                        wrapper.item.image1hash = imageHandler.ImageHash(fileHandler.screenshotPath(wrapper.item, 1));
+                        wrapper.item.image2hash = imageHandler.ImageHash(fileHandler.screenshotPath(wrapper.item, 2));
+                        wrapper.item.image3hash = imageHandler.ImageHash(fileHandler.screenshotPath(wrapper.item, 3));
 
-                        item.image1hash_blob = imageHandler.ImageHashToByteArray(item.image1hash);
-                        item.image2hash_blob = imageHandler.ImageHashToByteArray(item.image2hash);
-                        item.image3hash_blob = imageHandler.ImageHashToByteArray(item.image3hash);
+                        wrapper.item.image1hash_blob = imageHandler.ImageHashToByteArray(wrapper.item.image1hash);
+                        wrapper.item.image2hash_blob = imageHandler.ImageHashToByteArray(wrapper.item.image2hash);
+                        wrapper.item.image3hash_blob = imageHandler.ImageHashToByteArray(wrapper.item.image3hash);
                         //ShowTimeStamp(stopWatch, "Encode hash: ");
                     }
 
@@ -137,17 +149,17 @@ namespace deepduplicates
                         //ShowTimeStamp(stopWatch, "Save last 20 items to db.");
                     }
                     //ShowTimeStamp(stopWatch, "Item Complete: ");
-                    Console.WriteLine(index + "/" + fileHandler.allFilesCount + " - Video metadata retrieved. Saved to db: " + item);
+                    Console.WriteLine(index + "/" + fileHandler.allFilesCount + " - Video metadata retrieved. Saved to db: " + wrapper.item);
                     //stopWatch.Reset();
                 }
 
-                if (item.image1hash == null && item.image1hash_blob != null)
+                if (wrapper.item.image1hash == null && wrapper.item.image1hash_blob != null)
                 {
-                    item.image1hash = imageHandler.ByteArrayToImageHash(item.image1hash_blob);
-                    if (item.image2hash_blob != null) item.image2hash = imageHandler.ByteArrayToImageHash(item.image2hash_blob);
-                    if (item.image3hash_blob != null) item.image3hash = imageHandler.ByteArrayToImageHash(item.image3hash_blob);
+                    wrapper.item.image1hash = imageHandler.ByteArrayToImageHash(wrapper.item.image1hash_blob);
+                    if (wrapper.item.image2hash_blob != null) wrapper.item.image2hash = imageHandler.ByteArrayToImageHash(wrapper.item.image2hash_blob);
+                    if (wrapper.item.image3hash_blob != null) wrapper.item.image3hash = imageHandler.ByteArrayToImageHash(wrapper.item.image3hash_blob);
                 }
-                
+
             }
             await db.SaveChangesAsync();
             Console.WriteLine("Video mediaList length: " + mediaList.Count());
@@ -155,7 +167,7 @@ namespace deepduplicates
             return (mediaList);
         }
 
-        private async Task<long> saveScreenshotReturnChecksumAsync(IMediaInfo info, string screenshotPath, ImageHandler imageHandler, int point)
+        private async Task<rgb[]> saveScreenshotReturnChecksumAsync(IMediaInfo info, string screenshotPath, ImageHandler imageHandler, int point)
         {
             if (!File.Exists(screenshotPath)) await imageHandler.takeScreenshot(info, screenshotPath, TimeSpan.FromSeconds(point), 240, 160).Start();
             return (imageHandler.imageChecksum(screenshotPath));
@@ -171,9 +183,16 @@ namespace deepduplicates
 
             try
             {
-                item.image1Checksum = await saveScreenshotReturnChecksumAsync(info, fileHandler.screenshotPath(item, 1), imageHandler, point1);
-                item.image2Checksum = await saveScreenshotReturnChecksumAsync(info, fileHandler.screenshotPath(item, 2), imageHandler, point2);
-                item.image3Checksum = await saveScreenshotReturnChecksumAsync(info, fileHandler.screenshotPath(item, 3), imageHandler, point3);
+                List<Task<rgb[]>> tasks = new List<Task<rgb[]>>();
+                tasks.Add(saveScreenshotReturnChecksumAsync(info, fileHandler.screenshotPath(item, 1), imageHandler, point1));
+                tasks.Add(saveScreenshotReturnChecksumAsync(info, fileHandler.screenshotPath(item, 2), imageHandler, point2));
+                tasks.Add(saveScreenshotReturnChecksumAsync(info, fileHandler.screenshotPath(item, 3), imageHandler, point3));
+                
+                rgb[][] responses = await Task.WhenAll(tasks);
+                item.image1Checksum = responses[0];
+                item.image2Checksum = responses[1];
+                item.image3Checksum = responses[2];
+
             }
             catch (Xabe.FFmpeg.Exceptions.UnknownDecoderException)
             {
