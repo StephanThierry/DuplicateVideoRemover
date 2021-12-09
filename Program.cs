@@ -26,13 +26,17 @@ namespace deepduplicates
             mediaList = recommendationHandler.removingIncompleteVideos(mediaList); 
 
             Console.WriteLine("Performing checksum validation...");
-            mediaList = recommendationHandler.checkCheckSumofAllSimilarVideos(mediaList, fileHandler.settings.priorityFolders, fileHandler.settings.switchPriority);
+            mediaList = recommendationHandler.checkCheckSumofAllSimilarVideos(mediaList, fileHandler.settings);
 
             Console.WriteLine("Generating batch-file...");
             fileHandler.generateBatchFile(mediaList);
 
             Console.WriteLine("Generating HTML report...");
             fileHandler.generateReport(mediaList);
+
+            Console.WriteLine("Generating Encoding batch...");
+            fileHandler.generateEncoding(mediaList);
+
             Console.WriteLine("Check ./output directory");
             Console.WriteLine("Done!");
         }

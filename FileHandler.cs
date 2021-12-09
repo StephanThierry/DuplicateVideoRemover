@@ -47,7 +47,6 @@ namespace deepduplicates
                 instance.settings.minVideoLength = 3;
                 instance.settings.contentFolders = new string[] { @"c:\" };
                 instance.settings.switchPriority = new switchPrioritySet[1];
-                instance.settings.switchPriority[0] = new switchPrioritySet(){up = "480", down = "SD", triggerBelowPctSizeDiff: 15 };
                 instance.settings.logInterval = 100;
                 File.WriteAllText(settingsPath, lameJSONBeautifier(JsonSerializer.Serialize(instance.settings)));
                 instance.firstRun = true;
@@ -163,7 +162,7 @@ namespace deepduplicates
                 {
                     for (int i = 0; i < files.Length; i++)
                     {
-                        if (Array.IndexOf(ext, Path.GetExtension(files[i])) > -1 && !excludePaths.Any(x => files[i].StartsWith(x) || files[i].Equals(x))) yield return files[i];
+                        if (Array.IndexOf(ext, Path.GetExtension(files[i])) > -1 && !excludePaths.Any(x => files[i].Contains(x) || files[i].Equals(x))) yield return files[i];
                     }
                 }
             }
@@ -180,12 +179,46 @@ namespace deepduplicates
             }
             File.WriteAllText(filepath, filetext);
         }
+        public void generateEncoding(List<VideoInfo> mediaList)
+        {
+            using (StreamWriter outputFile = new StreamWriter(Path.Combine(this.outputFolder, "encoding-template.bat")))
+            {
+                outputFile.WriteLine("REM     This encoding template is a suggestion with highest bitrates at the top"); 
+                outputFile.WriteLine("REM     NOTE! Many files will NOT be valid to encode, the bitrate may be due to faulty 'duration'-mesaurements"); 
+                outputFile.WriteLine("REM     ------------------------------------------------------------------------------------------------------"); 
+                outputFile.WriteLine(""); 
+
+                // mpg/wmv have unreliable duration and are usually low bitrate
+                foreach (VideoInfo item in mediaList.Where(x=>x.duration != null && x.duration > 1 
+                        && !x.path.ToLower().EndsWith(".mpg") 
+                        && !x.path.ToLower().EndsWith(".mpeg") 
+                        && !x.path.ToLower().EndsWith(".wmv")).OrderByDescending(p => p.fileSize / p.duration))
+                {
+                    double bitrate = ((item.bitrate ?? 1000) / 1000) * 8;
+                    string modifiedPath = item.path.Insert(item.path.LastIndexOf("."), "_720p");;
+                    
+                    outputFile.WriteLine($"REM  Total bitrate: {bitrate} kbps"); 
+                    outputFile.WriteLine($"..\\ffmpeg\\ffmpeg -n -i \"{item.path}\" -c:v libx265 -vtag hvc1 -vf scale=1280:720 -crf 20 -c:a copy \"{modifiedPath}\"");
+                    outputFile.WriteLine();
+
+                }
+            }
+        }
+
+
+        public static string SpaceNotice(long space, string comment){
+                decimal mb = Math.Round((decimal)space / (1024 * 1024), 0);
+                decimal gb = Math.Round(mb / 1024, 1);
+                return($"<h4>{comment} {mb} MB  / {gb} GB </h4>");
+
+        }
 
         public void generateReport(List<VideoInfo> mediaList)
         {
             using (StreamWriter outputFile = new StreamWriter(Path.Combine(this.outputFolder, "report.html")))
             {
                 long spaceSaved = 0;
+                long spaceUsedByOriginals = 0;
                 outputFile.WriteLine("<h3>Delete report</h3>");
                 foreach (VideoInfo item in mediaList.Where(x => (x.remove ?? false)).OrderBy(p => p.triggerId))
                 {
@@ -193,6 +226,7 @@ namespace deepduplicates
                     VideoInfo org = mediaList.Where(x => x.id == item.triggerId).FirstOrDefault();
                     if (org != null)
                     {
+                        spaceUsedByOriginals += org.fileSize ?? 0;
                         int orgSize = (int)(org.fileSize / (1024 * 1024));
                         outputFile.WriteLine("ORIGINAL: " + org.path + "  (" + orgSize + " MB )<br>");
                         outputFile.WriteLine("<img src='file:///" + screenshotPath(org, 1) + "'>");
@@ -212,9 +246,8 @@ namespace deepduplicates
                     outputFile.WriteLine("<b>" + item.reason + "</b><br>");
                     outputFile.WriteLine("<hr>");
                 }
-                decimal mb = Math.Round((decimal)spaceSaved / (1024 * 1024), 0);
-                decimal gb = Math.Round(mb / 1024, 1);
-                outputFile.WriteLine("<h4>Space saved: " + mb + "MB  / " + gb + " GB </h4>");
+                outputFile.WriteLine(SpaceNotice(spaceUsedByOriginals, "Space used by originals: "));
+                outputFile.WriteLine(SpaceNotice(spaceSaved, "Space used by dupes: "));
             }
         }
 

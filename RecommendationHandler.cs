@@ -44,14 +44,13 @@ namespace deepduplicates
             return (item);
         }
 
-        public List<VideoInfo> checkCheckSumofAllSimilarVideos(List<VideoInfo> mediaList, string[] priorityFolders, switchPrioritySet[] switchPriority)
+        public List<VideoInfo> checkCheckSumofAllSimilarVideos(List<VideoInfo> mediaList, Settings settings)
         {
-            // Make delete recommendataions
-            List<int?> lengthDubes = mediaList.Where(x => !(x.remove ?? false)).GroupBy(x => x.duration).Where(g => g.Count() > 1).Select(y => y.Key).ToList();
+            // Make delete recommendataions duration is divided by 3 and rounded to nearest int so duration does not have to be hard equal 
+            List<int?> lengthDubes = mediaList.Where(x => !(x.remove ?? false)).GroupBy(x => x.duration/2).Where(g => g.Count() > 1).Select(y => y.Key).ToList();
             foreach (int dupeKey in lengthDubes)
             {
-
-                List<VideoInfo> dupGroup = mediaList.Where(p => p.path != null && p.path.Length > 1 && p.duration == dupeKey && !(p.remove ?? false)).OrderByDescending(p => priorityFolders.Any(x => p.path.StartsWith(x))).ThenBy(p => p.fileSize).ToList();
+                List<VideoInfo> dupGroup = mediaList.Where(p => p.path != null && p.path.Length > 1 && p.duration/2 == dupeKey && !(p.remove ?? false)).OrderByDescending(p => settings.priorityFolders.Any(x => p.path.StartsWith(x))).ThenBy(p => p.fileSize).ToList();
                 int dupeCount = dupGroup.Count();
                 for (int i = 0; i < dupeCount - 1; i++) // from first to secound-last
                 {
@@ -70,19 +69,28 @@ namespace deepduplicates
                         {
                             continue;
                         }
+                        rgb[] diff = new rgb[3];
+                        double[] diffHash = new double[3];
 
-                        double diff1 = imageChecksumDiff(dupGroup[i].image1Checksum, dupGroup[n].image1Checksum);
-                        double diff2 = imageChecksumDiff(dupGroup[i].image2Checksum, dupGroup[n].image2Checksum);
-                        double diff3 = imageChecksumDiff(dupGroup[i].image3Checksum, dupGroup[n].image3Checksum);
-                        double diff1hash = CompareImageHash(dupGroup[i].image1hash, dupGroup[n].image1hash);
-                        double diff2hash = CompareImageHash(dupGroup[i].image2hash, dupGroup[n].image2hash);
-                        double diff3hash = CompareImageHash(dupGroup[i].image3hash, dupGroup[n].image3hash);
+                        diff[0] = imageChecksumDiff(dupGroup[i].image1Checksum, dupGroup[n].image1Checksum);
+                        diff[1] = imageChecksumDiff(dupGroup[i].image2Checksum, dupGroup[n].image2Checksum);
+                        diff[2] = imageChecksumDiff(dupGroup[i].image3Checksum, dupGroup[n].image3Checksum);
+                        diffHash[0] = CompareImageHash(dupGroup[i].image1hash, dupGroup[n].image1hash);
+                        diffHash[1] = CompareImageHash(dupGroup[i].image2hash, dupGroup[n].image2hash);
+                        diffHash[2] = CompareImageHash(dupGroup[i].image3hash, dupGroup[n].image3hash);
 
-                        if (diff1 < 2.3 && diff2 < 2.3 && diff3 < 2.3 && diff1hash > 82 && diff2hash > 82 && diff3hash > 82)
+                        int score = 0;
+                        for(int count=0;count<3;count++){
+                            if (diff[count].r < settings.matchSettings.colorTolerance && 
+                                diff[count].g < settings.matchSettings.colorTolerance && 
+                                diff[count].b < settings.matchSettings.colorTolerance) score ++;
+                            if (diffHash[count] > settings.matchSettings.shapeMatch) score ++;
+                        }
+
+                        if (score >= 6 - settings.matchSettings.faultTolerance) // 6 = all elements match
                         {
-                            double confidence = 100 - ((diff1 + diff2 + diff3) / 3);
                             dupGroup[n].remove = true;
-                            dupGroup[n].reason = "Matching length. Screenshots have a color difference of " + Math.Round(diff1, 1) + "%, " + Math.Round(diff2, 1) + "% and " + Math.Round(diff3, 1) + "%  Diffhash of: " + Math.Round(diff1hash, 1) + ",  " + Math.Round(diff2hash, 1) + " and  " + Math.Round(diff3hash, 1) + ". - Based on the colormatch I'm " + Math.Round(confidence, 2) + "% confident this is a dupe.";
+                            dupGroup[n].reason = $"Matching length. Screenshots have a color difference of {diff[0].r},{diff[0].g},{diff[0].b} : {diff[1].r},{diff[1].g},{diff[1].b} : {diff[2].r},{diff[2].g},{diff[2].b} -   Diffhash of: " + Math.Round(diffHash[0], 1) + ",  " + Math.Round(diffHash[1], 1) + " and  " + Math.Round(diffHash[2], 1) + ".";
                             dupGroup[n].triggerId = dupGroup[i].id;
                         }
                     }
@@ -91,7 +99,7 @@ namespace deepduplicates
 
                 if (dupGroup.Any(p => p.remove ?? false))
                 {
-                    foreach (switchPrioritySet switchSet in switchPriority)
+                    foreach (switchPrioritySet switchSet in settings.switchPriority)
                     {
                             foreach(VideoInfo item in dupGroup.Where(p=>p.remove ?? false && p.path.IndexOf(switchSet.up)!=-1)){
                                 VideoInfo main = dupGroup.Where(p=>p.id == item.triggerId).First();
@@ -112,18 +120,29 @@ namespace deepduplicates
             return (mediaList);
         }
 
-        public double imageChecksumDiff(long? checksum1, long? checksum2)
+        public rgb imageChecksumDiff(rgb[] checksum1, rgb[] checksum2)
         {
+            rgb checksumTotal = new rgb();
+
             try
             {
-                if (checksum1 == null || checksum2 == null) return (100);
+                if (checksum1 == null || checksum2 == null) return (checksumTotal);
+                for(int i=0; i<checksum1.Length; i++){
+                    checksumTotal.r += (int) deviation(checksum1[i].r, checksum2[i].r);
+                    checksumTotal.g += (int) deviation(checksum1[i].g, checksum2[i].g);
+                    checksumTotal.b += (int) deviation(checksum1[i].b, checksum2[i].b);
+                }
 
-                return (Math.Round(Math.Abs((double)(checksum1 - checksum2) / (double)((checksum1 + checksum2) / 2)) * 100, 2));
+                return (checksumTotal);
             }
             catch
             {
-                return (100);
+                return (checksumTotal);
             }
+        }
+
+        private double deviation(int a, int b){
+            return((Math.Round(Math.Abs((double)(a - b) / (double)((a + b) / 2)) * 100, 2)));
         }
 
         public double CompareImageHash(List<bool> iHash1, List<bool> iHash2)

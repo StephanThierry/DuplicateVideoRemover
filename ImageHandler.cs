@@ -11,9 +11,11 @@ using Xabe.FFmpeg.Streams;
 
 namespace deepduplicates
 {
+
     public class ImageHandler
     {
-        public long imageChecksum(string path)
+        public static byte thumbnailDimensions = 32;
+        public rgb[] imageChecksum(string path)
         {
             using (FileStream pngStream = new FileStream(path, FileMode.Open, FileAccess.Read))
             {
@@ -21,18 +23,40 @@ namespace deepduplicates
                 {
                     using (var graphics = Graphics.FromImage(image))
                     {
-                        BitmapData bitmapData = image.LockBits(new Rectangle(0, 0, image.Width, image.Height), ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format16bppRgb555);
+                        BitmapData bitmapData = image.LockBits(new Rectangle(0, 0, image.Width, image.Height), ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
                         IntPtr ptr = bitmapData.Scan0;
                         int bytes = Math.Abs(bitmapData.Stride) * image.Height;
                         byte[] rgbValues1 = new byte[bytes];
                         System.Runtime.InteropServices.Marshal.Copy(ptr, rgbValues1, 0, bytes);
 
-                        long profile1 = 0;
-                        for (int n = 0; n < rgbValues1.Length; n++) profile1 += rgbValues1[n];
-                        
+                        //long profile1 = 0;
+                        int nbrOfSegments = 4;
+                        int segment = 0;
+                        rgb[] profile = new rgb[nbrOfSegments];
+                        int pixelPointer = 0;
+                        while(pixelPointer+2<bytes){
+                            if (profile[segment] == null) profile[segment] = new rgb();
+                            profile[segment].r += rgbValues1[pixelPointer];
+                            profile[segment].b += rgbValues1[pixelPointer+1];
+                            profile[segment].g += rgbValues1[pixelPointer+2];
+                            segment = pixelPointer / (bytes / nbrOfSegments);
+                            pixelPointer +=3;
+                        }
+                        for(int i=0;i<nbrOfSegments;i++){
+                            List<int> values = new List<int>();
+                            values.Add(profile[i].r);
+                            values.Add(profile[i].g);
+                            values.Add(profile[i].b);
+                            int smallestRatio = values.Min() / 100;
+                            if(smallestRatio == 0) smallestRatio = 1; 
+                            profile[i].r = profile[i].r / smallestRatio;
+                            profile[i].g = profile[i].g / smallestRatio;
+                            profile[i].b = profile[i].b / smallestRatio;
+                        }
+
                         // Release the unmanaged memory manually - GC will not do it
-                        image.UnlockBits(bitmapData); 
-                        return (profile1);
+                        image.UnlockBits(bitmapData);
+                        return (profile);
                     }
                 }
             }
@@ -40,24 +64,24 @@ namespace deepduplicates
 
         public byte[] ImageHashToByteArray(List<bool> imagehash)
         {
-            if (imagehash.Count() != 256) return (null); // We are expecting 16x16 
+            if (imagehash.Count() != thumbnailDimensions * thumbnailDimensions) return (null); // We are expecting an image of size: thumbnailDimensions x thumbnailDimensions 
 
             bool[] imagehash_temp = imagehash.ToArray();
             Array.Reverse(imagehash_temp);
             BitArray bits = new BitArray(imagehash_temp);
             byte[] bytes = new byte[bits.Length / 8];
             bits.CopyTo(bytes, 0);
-            return(bytes);
+            return (bytes);
         }
 
         public List<bool> ByteArrayToImageHash(byte[] imagehashBlob)
         {
             BitArray bits = new BitArray(imagehashBlob);
             bool[] bool_array = new bool[bits.Length];
-            bits.CopyTo(bool_array,0);
+            bits.CopyTo(bool_array, 0);
             List<bool> result = new List<bool>();
             result.AddRange(bool_array);
-            return(result);
+            return (result);
         }
 
         public List<bool> ImageHash(string path)
@@ -70,14 +94,24 @@ namespace deepduplicates
                 {
                     using (var image = new Bitmap(pngStream))
                     {
-                        //create new image with 16x16 pixel
-                        Bitmap bmpMin = new Bitmap(image, new Size(16, 16));
+                        Bitmap bmpMin = new Bitmap(image, new Size(thumbnailDimensions, thumbnailDimensions));
+                        float totalBrightness = 0;
                         for (int j = 0; j < bmpMin.Height; j++)
                         {
                             for (int i = 0; i < bmpMin.Width; i++)
                             {
                                 //reduce colors to true / false                
-                                lResult.Add(bmpMin.GetPixel(i, j).GetBrightness() < 0.5f);
+                                totalBrightness += bmpMin.GetPixel(i, j).GetBrightness(); 
+                            }
+                        }
+
+                        float avgBrightness = totalBrightness/(thumbnailDimensions*thumbnailDimensions);
+                        for (int j = 0; j < bmpMin.Height; j++)
+                        {
+                            for (int i = 0; i < bmpMin.Width; i++)
+                            {
+                                //reduce colors to true / false                
+                                lResult.Add(bmpMin.GetPixel(i, j).GetBrightness() < avgBrightness);
                             }
                         }
                     }
