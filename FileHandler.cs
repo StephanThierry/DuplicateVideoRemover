@@ -48,6 +48,11 @@ namespace deepduplicates
                 instance.settings.contentFolders = new string[] { @"c:\" };
                 instance.settings.switchPriority = new switchPrioritySet[1];
                 instance.settings.logInterval = 100;
+                instance.settings.matchSettings = new matchSettingsSet();
+                instance.settings.matchSettings.colorTolerance = 35;
+                instance.settings.matchSettings.shapeMatch = 280;
+                instance.settings.matchSettings.faultTolerance = 0;
+                
                 File.WriteAllText(settingsPath, lameJSONBeautifier(JsonSerializer.Serialize(instance.settings)));
                 instance.firstRun = true;
             }

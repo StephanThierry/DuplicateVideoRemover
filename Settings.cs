@@ -35,6 +35,7 @@ namespace deepduplicates
         public int shapeMatch { get; set; }
         /// <summary>
         /// faultTolerance. 0 (highest = none of the 6 indicators may fall outside bounds) - 3 (lowest = 3 of 6 indicators may fall outside bounds and still produce match). 
+        /// Values higher than 1 will produce many false positives, unless colorTolerance and shapeMatch values are very high.
         /// </summary>
         /// <value>Recommended value: 0</value>
         public int faultTolerance { get; set; }
