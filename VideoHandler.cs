@@ -51,7 +51,6 @@ namespace deepduplicates
             {
                 Console.WriteLine("Database is new");
             }
-            await Xabe.FFmpeg.FFmpeg.GetLatestVersion();
             List<TimeSpan> timediag = new List<TimeSpan>();
             int index = 0;
             //Stopwatch stopWatch = new Stopwatch();

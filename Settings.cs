@@ -5,6 +5,7 @@ namespace deepduplicates
         public string[] contentFolders { get; set; }
         public string[] excludePaths { get; set; }
         public string[] priorityFolders { get; set; }
+        public string[] retainStructure { get; set; }
         public switchPrioritySet[] switchPriority { get; set; }
         public int logInterval { get; set; }
         public int minVideoLength { get; set; }

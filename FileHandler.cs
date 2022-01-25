@@ -52,7 +52,7 @@ namespace deepduplicates
                 instance.settings.matchSettings.colorTolerance = 35;
                 instance.settings.matchSettings.shapeMatch = 280;
                 instance.settings.matchSettings.faultTolerance = 0;
-                
+
                 File.WriteAllText(settingsPath, lameJSONBeautifier(JsonSerializer.Serialize(instance.settings)));
                 instance.firstRun = true;
             }
@@ -79,8 +79,9 @@ namespace deepduplicates
             string ffmpegFolder = Path.Combine(appFolder, "ffmpeg");
             Directory.CreateDirectory(ffmpegFolder);
             Xabe.FFmpeg.FFmpeg.ExecutablesPath = ffmpegFolder;
-            Console.WriteLine("Checking for latest version of FFmpeg in " + ffmpegFolder);
-            await Xabe.FFmpeg.FFmpeg.GetLatestVersion();
+            // Fails: C:\dev\github.com\Xabe.FFmpeg\Xabe.FFmpeg\Downloader\FFMpegDownloaderBase.cs:line 52
+            //Console.WriteLine("Checking for latest version of FFmpeg in " + ffmpegFolder);
+            //await Xabe.FFmpeg.FFmpeg.GetLatestVersion();
             Console.WriteLine("Done.");
             if (instance.firstRun) return (instance);
 
@@ -173,14 +174,24 @@ namespace deepduplicates
             }
         }
 
+
+        public string batchPath(string path){
+            // % needs to be escaped to %% to work in a .bat file
+            return path.Replace("%", "%%");
+        }
         public void generateBatchFile(List<VideoInfo> mediaList)
         {
             string filepath = Path.Combine(this.outputFolder, "delete_all_dupes.bat");
             string filetext = "chcp 65001" + Environment.NewLine;
+            bool retainStructure = (settings.retainStructure.Length > 0);
             foreach (VideoInfo item in mediaList.Where(x => (x.remove ?? false) && !String.IsNullOrEmpty(x.path)).OrderBy(p => p.triggerId))
             {
-                // % needs to be escaped to %% to work in a .bat file
-                filetext += "DEL \"" + item.path.Replace("%", "%%") + "\"" + Environment.NewLine;
+                filetext += "DEL \"" + batchPath(item.path) + "\"" + Environment.NewLine;
+                if (retainStructure && settings.retainStructure.Where(p => item.path.ToLower().StartsWith(p.ToLower())).Any())
+                {
+                    VideoInfo org = mediaList.Where(x => x.id == item.triggerId).FirstOrDefault();
+                    filetext += "MOVE \"" + batchPath(org.path) + "\" \""+ batchPath(item.path) + "\"" + Environment.NewLine;
+                }
             }
             File.WriteAllText(filepath, filetext);
         }
@@ -188,21 +199,21 @@ namespace deepduplicates
         {
             using (StreamWriter outputFile = new StreamWriter(Path.Combine(this.outputFolder, "encoding-template.bat")))
             {
-                outputFile.WriteLine("REM     This encoding template is a suggestion with highest bitrates at the top"); 
-                outputFile.WriteLine("REM     NOTE! Many files will NOT be valid to encode, the bitrate may be due to faulty 'duration'-mesaurements"); 
-                outputFile.WriteLine("REM     ------------------------------------------------------------------------------------------------------"); 
-                outputFile.WriteLine(""); 
+                outputFile.WriteLine("REM     This encoding template is a suggestion with highest bitrates at the top");
+                outputFile.WriteLine("REM     NOTE! Many files will NOT be valid to encode, the bitrate may be due to faulty 'duration'-mesaurements");
+                outputFile.WriteLine("REM     ------------------------------------------------------------------------------------------------------");
+                outputFile.WriteLine("");
 
                 // mpg/wmv have unreliable duration and are usually low bitrate
-                foreach (VideoInfo item in mediaList.Where(x=>x.duration != null && x.duration > 1 
-                        && !x.path.ToLower().EndsWith(".mpg") 
-                        && !x.path.ToLower().EndsWith(".mpeg") 
+                foreach (VideoInfo item in mediaList.Where(x => x.duration != null && x.duration > 1
+                        && !x.path.ToLower().EndsWith(".mpg")
+                        && !x.path.ToLower().EndsWith(".mpeg")
                         && !x.path.ToLower().EndsWith(".wmv")).OrderByDescending(p => p.fileSize / p.duration))
                 {
                     double bitrate = ((item.bitrate ?? 1000) / 1000) * 8;
-                    string modifiedPath = item.path.Insert(item.path.LastIndexOf("."), "_720p");;
-                    
-                    outputFile.WriteLine($"REM  Total bitrate: {bitrate} kbps"); 
+                    string modifiedPath = item.path.Insert(item.path.LastIndexOf("."), "_720p"); ;
+
+                    outputFile.WriteLine($"REM  Total bitrate: {bitrate} kbps");
                     outputFile.WriteLine($"..\\ffmpeg\\ffmpeg -n -i \"{item.path}\" -c:v libx265 -vtag hvc1 -vf scale=1280:720 -crf 20 -c:a copy \"{modifiedPath}\"");
                     outputFile.WriteLine();
 
@@ -211,10 +222,11 @@ namespace deepduplicates
         }
 
 
-        public static string SpaceNotice(long space, string comment){
-                decimal mb = Math.Round((decimal)space / (1024 * 1024), 0);
-                decimal gb = Math.Round(mb / 1024, 1);
-                return($"<h4>{comment} {mb} MB  / {gb} GB </h4>");
+        public static string SpaceNotice(long space, string comment)
+        {
+            decimal mb = Math.Round((decimal)space / (1024 * 1024), 0);
+            decimal gb = Math.Round(mb / 1024, 1);
+            return ($"<h4>{comment} {mb} MB  / {gb} GB </h4>");
 
         }
 
