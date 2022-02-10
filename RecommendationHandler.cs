@@ -44,13 +44,34 @@ namespace deepduplicates
             return (item);
         }
 
+        public class dubeObject{
+            public int? duration;
+            public int count;
+        }        
+
         public List<VideoInfo> checkCheckSumofAllSimilarVideos(List<VideoInfo> mediaList, Settings settings)
         {
-            // Make delete recommendataions duration is divided by 3 and rounded to nearest int so duration does not have to be hard equal 
-            List<int?> lengthDubes = mediaList.Where(x => !(x.remove ?? false)).GroupBy(x => x.duration/2).Where(g => g.Count() > 1).Select(y => y.Key).ToList();
+            List<dubeObject> lengthGroups = mediaList.Where(x => !(x.remove ?? false)).GroupBy(x => x.duration).Where(g => g.Count() >= 1).Select(y => new dubeObject{duration = y.Key, count = y.Count()}).OrderBy(x => x.duration).ToList();
+            List<dubeObject> org_lengthGroups = mediaList.Where(x => !(x.remove ?? false)).GroupBy(x => x.duration).Where(g => g.Count() >1).Select(y => new dubeObject{duration = y.Key, count = y.Count()}).OrderBy(x => x.duration).ToList();
+            List<int?> lengthDubes = new List<int?>();
+
+            // Add all lengths to check with a +/- 1 sec tolerance
+            for(int i=0; i<lengthGroups.Count; i++){
+                if (lengthGroups[i].count>1) {
+                    lengthDubes.Add(lengthGroups[i].duration); 
+                } else {
+                    if (lengthGroups[i].count>0 && ( (i>0 && lengthGroups[i-1].duration == lengthGroups[i].duration-1) || (i<lengthGroups.Count-1 && lengthGroups[i+1].duration == lengthGroups[i].duration+1) )){
+                        lengthDubes.Add(lengthGroups[i].duration); 
+                    }
+                }
+            }
+
             foreach (int dupeKey in lengthDubes)
             {
-                List<VideoInfo> dupGroup = mediaList.Where(p => p.path != null && p.path.Length > 1 && p.duration/2 == dupeKey && !(p.remove ?? false)).OrderByDescending(p => settings.priorityFolders.Any(x => p.path.StartsWith(x))).ThenBy(p => p.fileSize).ToList();
+                // p.duration +/- 1 sec tolerance
+                List<VideoInfo> dupGroup = mediaList.Where(p => p.path != null && p.path.Length > 1 && 
+                    (p.duration == dupeKey || p.duration-1 == dupeKey || p.duration+1 == dupeKey) && 
+                    !(p.remove ?? false)).OrderByDescending(p => settings.priorityFolders.Any(x => p.path.StartsWith(x))).ThenBy(p => p.fileSize).ToList();
                 int dupeCount = dupGroup.Count();
                 for (int i = 0; i < dupeCount - 1; i++) // from first to secound-last
                 {
