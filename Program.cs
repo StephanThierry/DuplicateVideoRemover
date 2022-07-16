@@ -20,7 +20,7 @@ namespace deepduplicates
 
             VideoHandler videoHandler = new VideoHandler(fileHandler, imageHandler);
             List<VideoInfo> mediaList = await videoHandler.saveVideoMetadataAndScreenshots(db);
-            
+
             RecommendationHandler recommendationHandler = new RecommendationHandler();
             Console.WriteLine("Marking incomplete videos for removal...");
             mediaList = recommendationHandler.removingIncompleteVideos(mediaList); 

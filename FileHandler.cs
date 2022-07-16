@@ -192,9 +192,11 @@ namespace deepduplicates
                     VideoInfo org = mediaList.Where(x => x.id == item.triggerId).FirstOrDefault();
                     filetext += "MOVE \"" + batchPath(org.path) + "\" \""+ batchPath(item.path) + "\"" + Environment.NewLine;
                 }
+
             }
             File.WriteAllText(filepath, filetext);
         }
+
         public void generateEncoding(List<VideoInfo> mediaList)
         {
             using (StreamWriter outputFile = new StreamWriter(Path.Combine(this.outputFolder, "encoding-template.bat")))
@@ -230,12 +232,16 @@ namespace deepduplicates
 
         }
 
+
+
         public void generateReport(List<VideoInfo> mediaList)
         {
             using (StreamWriter outputFile = new StreamWriter(Path.Combine(this.outputFolder, "report.html")))
             {
                 long spaceSaved = 0;
                 long spaceUsedByOriginals = 0;
+                string renameDraft = "";
+                bool retainIncomingFilenames = (settings.retainIncomingFilenames.Length > 0);
                 outputFile.WriteLine("<h3>Delete report</h3>");
                 foreach (VideoInfo item in mediaList.Where(x => (x.remove ?? false)).OrderBy(p => p.triggerId))
                 {
@@ -250,6 +256,11 @@ namespace deepduplicates
                         outputFile.WriteLine("<img src='file:///" + screenshotPath(org, 2) + "'>");
                         outputFile.WriteLine("<img src='file:///" + screenshotPath(org, 3) + "'><br>");
 
+                        if (retainIncomingFilenames && settings.retainIncomingFilenames.Where(p => org.path.ToLower().StartsWith(p.ToLower())).Any())
+                        {
+                            renameDraft += "REM ** " + item.path + " ** " + Environment.NewLine; 
+                            renameDraft += "ren \"" + org.path + "\" \""+ org.path + "\"" + Environment.NewLine + Environment.NewLine;
+                        }
                     }
                     else
                     {
@@ -263,6 +274,11 @@ namespace deepduplicates
                     outputFile.WriteLine("<b>" + item.reason + "</b><br>");
                     outputFile.WriteLine("<hr>");
                 }
+
+                if (renameDraft!="") {
+                    File.WriteAllText(Path.Combine(this.outputFolder, "rename-draft.bat"), renameDraft);
+                }
+
                 outputFile.WriteLine(SpaceNotice(spaceUsedByOriginals, "Space used by originals: "));
                 outputFile.WriteLine(SpaceNotice(spaceSaved, "Space used by dupes: "));
             }
