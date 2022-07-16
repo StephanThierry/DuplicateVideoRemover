@@ -24,8 +24,8 @@ namespace deepduplicates
         {
             TimeSpan ts = stopWatch.Elapsed;
             string elapsedTime = String.Format("{0:00}:{1:00}:{2:00}.{3:00}",
-    ts.Hours, ts.Minutes, ts.Seconds,
-    ts.Milliseconds / 10);
+                ts.Hours, ts.Minutes, ts.Seconds,
+                ts.Milliseconds / 10);
             Console.WriteLine(comment + elapsedTime);
         }
 
@@ -40,6 +40,7 @@ namespace deepduplicates
 
             Console.WriteLine("Reading db...");
             List<VideoInfo> fullTableScan = db.VideoInfos.ToList();
+            Console.WriteLine("Db in memory");
             List<VideoInfo> mediaList = new List<VideoInfo>();
 
             int DBCount = fullTableScan.Count();
@@ -152,12 +153,9 @@ namespace deepduplicates
                     //stopWatch.Reset();
                 }
 
-                if (wrapper.item.image1hash == null && wrapper.item.image1hash_blob != null)
-                {
-                    wrapper.item.image1hash = imageHandler.ByteArrayToImageHash(wrapper.item.image1hash_blob);
-                    if (wrapper.item.image2hash_blob != null) wrapper.item.image2hash = imageHandler.ByteArrayToImageHash(wrapper.item.image2hash_blob);
-                    if (wrapper.item.image3hash_blob != null) wrapper.item.image3hash = imageHandler.ByteArrayToImageHash(wrapper.item.image3hash_blob);
-                }
+                if (wrapper.item.image1hash == null && wrapper.item.image1hash_blob != null) wrapper.item.image1hash = imageHandler.ByteArrayToImageHash(wrapper.item.image1hash_blob);
+                if (wrapper.item.image2hash == null && wrapper.item.image2hash_blob != null) wrapper.item.image2hash = imageHandler.ByteArrayToImageHash(wrapper.item.image2hash_blob);
+                if (wrapper.item.image3hash == null && wrapper.item.image3hash_blob != null) wrapper.item.image3hash = imageHandler.ByteArrayToImageHash(wrapper.item.image3hash_blob);
 
             }
             await db.SaveChangesAsync();
