@@ -80,8 +80,8 @@ namespace deepduplicates
             Directory.CreateDirectory(ffmpegFolder);
             Xabe.FFmpeg.FFmpeg.ExecutablesPath = ffmpegFolder;
             // Fails: C:\dev\github.com\Xabe.FFmpeg\Xabe.FFmpeg\Downloader\FFMpegDownloaderBase.cs:line 52
-            //Console.WriteLine("Checking for latest version of FFmpeg in " + ffmpegFolder);
-            //await Xabe.FFmpeg.FFmpeg.GetLatestVersion();
+            Console.WriteLine("Checking for latest version of FFmpeg in " + ffmpegFolder);
+            await Xabe.FFmpeg.FFmpeg.GetLatestVersion();
             Console.WriteLine("Done.");
             if (instance.firstRun) return (instance);
 
@@ -232,7 +232,13 @@ namespace deepduplicates
 
         }
 
-
+        public void deleteScreenshots(VideoInfo vi){
+            for(int i=1; i<=3; i++){
+                string path = screenshotPath(vi, i);
+                Console.WriteLine("DELETE: " + path);
+                if (File.Exists(path)) File.Delete(path);
+            }
+        }
 
         public void generateReport(List<VideoInfo> mediaList)
         {

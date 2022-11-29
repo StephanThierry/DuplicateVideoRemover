@@ -21,6 +21,12 @@ namespace deepduplicates
             VideoHandler videoHandler = new VideoHandler(fileHandler, imageHandler);
             List<VideoInfo> mediaList = await videoHandler.saveVideoMetadataAndScreenshots(db);
 
+            if (args.Length>0 && args[0].ToLower() == "clean") {
+                Console.WriteLine("Clean-mode enabled - DB entries and images are truncated based on current filesystem!");
+                CleanupHandler ch = new CleanupHandler(db, fileHandler);
+                await ch.runCleanup();
+            }
+
             RecommendationHandler recommendationHandler = new RecommendationHandler();
             Console.WriteLine("Marking incomplete videos for removal...");
             mediaList = recommendationHandler.removingIncompleteVideos(mediaList); 
