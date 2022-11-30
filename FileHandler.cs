@@ -268,17 +268,17 @@ namespace deepduplicates
                             renameDraft += "ren \"" + org.path + "\" \""+ org.path + "\"" + Environment.NewLine + Environment.NewLine;
                         }
                     }
-                    else
-                    {
-                        outputFile.WriteLine("<b>Original not found - check alternative reason</b><br>");
-                    }
+
                     int dupeSize = (int)(item.fileSize / (1024 * 1024));
-                    outputFile.WriteLine("DELETE: " + item.path + "  (" + dupeSize + " MB )<br>");
-                    outputFile.WriteLine("<img src='file:///" + screenshotPath(item, 1) + "'>");
-                    outputFile.WriteLine("<img src='file:///" + screenshotPath(item, 2) + "'>");
-                    outputFile.WriteLine("<img src='file:///" + screenshotPath(item, 3) + "'><br>");
-                    outputFile.WriteLine("<b>" + item.reason + "</b><br>");
-                    outputFile.WriteLine("<hr>");
+                    if (dupeSize>1) {
+                        if (org == null)     outputFile.WriteLine("<b>Original not found - check alternative reason</b><br>");
+                        outputFile.WriteLine("DELETE: " + item.path + "  (" + dupeSize + " MB )<br>");
+                        outputFile.WriteLine("<img src='file:///" + screenshotPath(item, 1) + "'>");
+                        outputFile.WriteLine("<img src='file:///" + screenshotPath(item, 2) + "'>");
+                        outputFile.WriteLine("<img src='file:///" + screenshotPath(item, 3) + "'><br>");
+                        outputFile.WriteLine("<b>" + item.reason + "</b><br>");
+                        outputFile.WriteLine("<hr>");
+                    }
                 }
 
                 if (renameDraft!="") {
