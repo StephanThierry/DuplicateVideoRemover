@@ -33,9 +33,9 @@ It's recommneded to place the program on an SSD disk since it executes a lot of 
 2. After the indexing process is over, checksums are calculated, compared and a .bat file and an HTML report is made.  
 
 **Cleaning the database and screenshots**  
-After running the program for a number of days, months you may have a lot of references in the database and screenshots in the `_screens` folder that are nolonger present, etither because they have been deleted or moved. You can clean up thoes entried by running the application with the `clean` parameter.  
+After running the program for a number of days (or months) you may have a lot of references in the database and screenshots in the `_screens` folder that are nolonger present, either because they have been deleted or moved. You can clean up thoes entried by running the application with the `clean` parameter.  
 Like so: `dotnet run -- clean`  
-Both entries in the db and screenshors stored in the file system that don't match with a file currently found in the filessystem will be permanemtly removed, so make sure you have access to all drive sources when you run the cleanup.  
+Both entries in the db and screenshors stored in the file system that don't match with a file currently found in the filessystem will be permanemtly deleted, so make sure you have access to all drive sources when you run the cleanup.  
 
 **Dependencies**  
 Xabe.FFmpeg - at the moment running on a custom build located in the `/components`-folder. After pending pull request will switch back to package (master).  
