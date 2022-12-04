@@ -37,7 +37,6 @@ namespace deepduplicates
         /// <returns>Colleciton of VideoInfo. All metadata from database. On the first run only video path and duration is present</returns>
         public async Task<List<VideoInfo>> saveVideoMetadataAndScreenshots(VideoInfoContext db)
         {
-
             Console.WriteLine("Reading db...");
             List<VideoInfo> fullTableScan = db.VideoInfos.ToList();
             Console.WriteLine("Db in memory");
@@ -66,7 +65,6 @@ namespace deepduplicates
 
             foreach (VideoInfoWrapper wrapper in query)
             {
-
                 index++;
                 //stopWatch.Start();
                 if (index % fileHandler.settings.logInterval == 0) Console.WriteLine(index + "/" + fileHandler.allFilesCount + " checking: " + wrapper.path);
@@ -107,7 +105,6 @@ namespace deepduplicates
                         foreach (IVideoStream stream in info.VideoStreams)
                         {
                             wrapper.item.bitrate = stream.Bitrate;  // same bitrate of last stream (usually there is only one)
-                            //wrapper.item.bitrate = Math.Round(stream.Bitrate / 8, 0);  // same bitrate of last stream (usually there is only one)
 
                         }
                         wrapper.item.duration = duration;
@@ -124,7 +121,7 @@ namespace deepduplicates
 
                     if (wrapper.item.image1Checksum == null && info != null && !(wrapper.item.remove ?? false))
                     {
-                        //Console.WriteLine("Generating screenshots");
+                        // Generating screenshots
                         if (wrapper.item.id == 0) await db.SaveChangesAsync(); // Must save before screenshots so image has ID
                         await generateOneSetOfScreenshotsAsync(wrapper.item, info, imageHandler);
                         //ShowTimeStamp(stopWatch, "Get Screenshots: ");
@@ -132,30 +129,22 @@ namespace deepduplicates
 
                     if (wrapper.item.image1hash == null && !(wrapper.item.remove ?? false))
                     {
-                        wrapper.item.image1hash = imageHandler.ImageHash(fileHandler.screenshotPath(wrapper.item, 1));
-                        wrapper.item.image2hash = imageHandler.ImageHash(fileHandler.screenshotPath(wrapper.item, 2));
-                        wrapper.item.image3hash = imageHandler.ImageHash(fileHandler.screenshotPath(wrapper.item, 3));
-
-                        wrapper.item.image1hash_blob = imageHandler.ImageHashToByteArray(wrapper.item.image1hash);
-                        wrapper.item.image2hash_blob = imageHandler.ImageHashToByteArray(wrapper.item.image2hash);
-                        wrapper.item.image3hash_blob = imageHandler.ImageHashToByteArray(wrapper.item.image3hash);
-                        //ShowTimeStamp(stopWatch, "Encode hash: ");
+                        wrapper.item.image1hash_blob = imageHandler.ImageHashToByteArray(imageHandler.ImageHash(fileHandler.screenshotPath(wrapper.item, 1)));
+                        wrapper.item.image2hash_blob = imageHandler.ImageHashToByteArray(imageHandler.ImageHash(fileHandler.screenshotPath(wrapper.item, 2)));
+                        wrapper.item.image3hash_blob = imageHandler.ImageHashToByteArray(imageHandler.ImageHash(fileHandler.screenshotPath(wrapper.item, 3)));
                     }
 
                     if (index % 20 == 0)
                     {
                         await db.SaveChangesAsync();
                         ShowTimeStamp(stopWatch_total, "All full process items: " + fullProcessedItems + " took a total of: ");
-                        //ShowTimeStamp(stopWatch, "Save last 20 items to db.");
                     }
-                    //ShowTimeStamp(stopWatch, "Item Complete: ");
                     Console.WriteLine(index + "/" + fileHandler.allFilesCount + " - Video metadata retrieved. Saved to db: " + wrapper.item);
-                    //stopWatch.Reset();
                 }
 
-                if (wrapper.item.image1hash == null && wrapper.item.image1hash_blob != null) wrapper.item.image1hash = imageHandler.ByteArrayToImageHash(wrapper.item.image1hash_blob);
-                if (wrapper.item.image2hash == null && wrapper.item.image2hash_blob != null) wrapper.item.image2hash = imageHandler.ByteArrayToImageHash(wrapper.item.image2hash_blob);
-                if (wrapper.item.image3hash == null && wrapper.item.image3hash_blob != null) wrapper.item.image3hash = imageHandler.ByteArrayToImageHash(wrapper.item.image3hash_blob);
+                if (wrapper.item.image1hash_blob != null) wrapper.item.image1hash = imageHandler.ByteArrayToImageHash(wrapper.item.image1hash_blob);
+                if (wrapper.item.image2hash_blob != null) wrapper.item.image2hash = imageHandler.ByteArrayToImageHash(wrapper.item.image2hash_blob);
+                if (wrapper.item.image3hash_blob != null) wrapper.item.image3hash = imageHandler.ByteArrayToImageHash(wrapper.item.image3hash_blob);
 
             }
             await db.SaveChangesAsync();
