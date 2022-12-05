@@ -29,6 +29,9 @@ namespace deepduplicates
                 
                 if (counter == 1 || counter % 100 == 0) Console.WriteLine(counter + "/"+ dbEntries + "  looking for: " + item.path);
 
+                // Deleting the "remove" bit from all files, ensuring that these are all re-processed
+                if (item.remove ?? false) item.remove = null;
+
                 string file = allFiles.FirstOrDefault(x =>x == item.path);
                 if (file == null)  {
                     Console.WriteLine("NOT FOUND: " + item.path);
