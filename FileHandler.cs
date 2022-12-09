@@ -124,8 +124,9 @@ namespace deepduplicates
                     return size;
                 }
             }
-            catch
+            catch(Exception e)
             {
+                Console.WriteLine("Can't read filesize: " + e.Message + " - " + fullPath);
                 return (-1);
             }
         }

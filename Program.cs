@@ -8,7 +8,7 @@ namespace deepduplicates
 {
     class Program
     {
-        // Accuracy tested to 99.99% - so check the report for false positives. On average there is aprox. 1 i every 10000 files.
+        // Accuracy tested to 99.99% with default settings - so check the report for false positives. On average there is aprox. 1 i every 10000 files.
         static async Task Main(string[] args)
         {
             VideoInfoContext db = new VideoInfoContext();

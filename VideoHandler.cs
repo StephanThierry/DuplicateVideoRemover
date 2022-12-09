@@ -72,8 +72,9 @@ namespace deepduplicates
                 bool newItem = false;
                 if (wrapper.item != null)
                 {
+                    wrapper.item.remove = false; // reprocess all files previously marked for removal
                     mediaList.Add(wrapper.item);
-                    if (wrapper.item.remove ?? false || wrapper.item.formatNotSupported) continue; // this has already finished processing
+                    //if (wrapper.item.remove ?? false || wrapper.item.formatNotSupported) continue; // this has already finished processing
                 }
                 else
                 {
