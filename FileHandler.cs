@@ -213,10 +213,10 @@ namespace deepduplicates
                         && !x.path.ToLower().EndsWith(".mpeg")
                         && !x.path.ToLower().EndsWith(".wmv")).OrderByDescending(p => p.fileSize / p.duration))
                 {
-                    double bitrate = ((item.bitrate ?? 1000) / 1000) * 8;
+                    double bitrateKbps = Math.Round(((item.bitrate ?? 1000) / 1000));
                     string modifiedPath = item.path.Insert(item.path.LastIndexOf("."), "_720p"); ;
 
-                    outputFile.WriteLine($"REM  Total bitrate: {bitrate} kbps");
+                    outputFile.WriteLine($"REM  Total bitrate: {bitrateKbps} kbps");
                     outputFile.WriteLine($"..\\ffmpeg\\ffmpeg -n -i \"{item.path}\" -c:v libx265 -vtag hvc1 -vf scale=1280:720 -crf 20 -c:a copy \"{modifiedPath}\"");
                     outputFile.WriteLine();
 
