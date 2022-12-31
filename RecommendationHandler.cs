@@ -6,11 +6,11 @@ namespace deepduplicates
 {
     public class RecommendationHandler
     {
-        public List<VideoInfo> removingShortVideos(List<VideoInfo> mediaList, int minVideoLength)
+        public List<VideoInfo> removingShortVideos(List<VideoInfo> mediaList, int minVideoLength, int minVideoSizeKb)
         {
             foreach (VideoInfo item in mediaList)
             {
-                removingShortVideo(item, minVideoLength);
+                removingShortVideo(item, minVideoLength, minVideoSizeKb);
             }
             return (mediaList);
         }
@@ -33,7 +33,7 @@ namespace deepduplicates
             return (mediaList);
         }
 
-        public static VideoInfo removingShortVideo(VideoInfo item, int minVideoLength)
+        public static VideoInfo removingShortVideo(VideoInfo item, int minVideoLength, int minVideoSizeKb)
         {
             if (item.duration <= minVideoLength)
             {
@@ -41,6 +41,7 @@ namespace deepduplicates
                 item.reason = "Duration " + minVideoLength + " sec or less";
             }
             if (item.duration == -1) item.reason = "Can't read videofile";
+            if (minVideoSizeKb>0 && item.fileSize < minVideoSizeKb) item.reason = "Filesize less than " + minVideoSizeKb + " Kb";
             return (item);
         }
 

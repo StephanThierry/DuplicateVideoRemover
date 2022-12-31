@@ -118,7 +118,7 @@ namespace deepduplicates
                         wrapper.item.reason = "Can't read videofile";
                     }
 
-                    wrapper.item = RecommendationHandler.removingShortVideo(wrapper.item, fileHandler.settings.minVideoLength);
+                    wrapper.item = RecommendationHandler.removingShortVideo(wrapper.item, fileHandler.settings.minVideoLength, fileHandler.settings.minVideoSizeKb);
 
                     if (wrapper.item.image1Checksum == null && info != null && !(wrapper.item.remove ?? false))
                     {

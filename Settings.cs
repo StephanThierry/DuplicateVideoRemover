@@ -10,6 +10,7 @@ namespace deepduplicates
         public switchPrioritySet[] switchPriority { get; set; }
         public int logInterval { get; set; }
         public int minVideoLength { get; set; }
+        public int minVideoSizeKb { get; set; }
 
         public matchSettingsSet matchSettings { get; set; }
     }
