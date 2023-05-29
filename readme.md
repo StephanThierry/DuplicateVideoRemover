@@ -17,8 +17,8 @@ Requires .NET Core 3.1 (or higher) https://dotnet.microsoft.com/download - so in
 `dotnet restore`  
 `dotnet run` (On first run it created the database, downloads Ffmpeg, creates the settings file and then exits the program)   
 Edit `settings.json`  
-* Set `contentFolders` to the folders you want to index - notice on windows blackslashes must be double  
-  so `d:\user\videos` must be written `d:\\user\\videos` - if not, the JSON will be invalid.   
+* Set `contentFolders` to the folders you want to index - notice, on windows backslashes must be double  
+  so `d:\user\videos` must be written `d:\\user\\videos` - if not, the JSON is not invalid.   
 * Set `minVideoLength` - default 3 sec. It will add all videos that are 2 sec or less in duration to the delete-list.    
 
 Now you can re-start the program:   
@@ -26,14 +26,14 @@ Now you can re-start the program:
 
 ### How it works
 1. The program first indexes all video-files in the folders specified in "contentFolders" in settings.json and reads the video metadata (size and duration) and 3 screenshots are made at 25%, 50% and 75%.
-The screenshots are saved in the `_screens`-folder and the metadate is saved in a SQLite DB. This means you can stop the program at any time, it will resume where it left off within a few seconds or minutes, depending on the hardware and the amount of files in the indexed folders.  It will remember each file it indexs on the path so you have to delete the .db file to reset the program to zero. If you do, you must also delete the content of the "_screens" folder, since it will not match the indexes of a new database.
+The screenshots are saved in the `_screens`-folder and the metadate is saved in a SQLite DB. This means you can stop the program at any time, it will resume where it left off within a few seconds or minutes, depending on the hardware and the amount of files in the indexed folders.  It will remember each file it indexes on the path so you have to delete the .db file to reset the program to zero. If you do, you must also delete the content of the "_screens" folder, since it will no longer match the indexes of a new database.
 
-It's recommneded to place the program on an SSD disk since it executes a lot of local read/write operations to update the db and read/write the screenshots. The free space should be aprox. 260 Kb pr video, so if you plan on running the program om a NAS with 43.000 videos, make sure your SSD has more than 10 GB of free space.   
+It's recommneded to place the program on an SSD disk since it executes a lot of local read/write operations to update the db and read/write the screenshots. Free space on the drive must be aprox. 260 Kb pr video, so if you plan on running the program om a NAS with 43.000 videos, make sure your SSD has more than 10 GB of free space.   
 
-2. After the indexing process is over, checksums are calculated, compared and a .bat file and an HTML report is made.  
+2. After the indexing process is over, checksums are calculated, compared and a .bat file and an HTML report is made in the `.\output` folder.  
 
 **Cleaning the database and screenshots**  
-After running the program for a number of days (or months) you may have a lot of references in the database and screenshots in the `_screens` folder that are nolonger present, either because they have been deleted or moved. You can clean up thoes entried by running the application with the `clean` parameter.  
+After running the program for a number of days (or months) you may have a lot of references in the database and screenshots in the `_screens` folder that are nolonger present, either because they have been deleted or moved. You can clean up thoes entried and files by running the application with the `clean` parameter.  
 Like so: `dotnet run -- clean`  
 Both entries in the db and screenshors stored in the file system that don't match with a file currently found in the filessystem will be permanemtly deleted, so make sure you have access to all drive sources when you run the cleanup.  
 
