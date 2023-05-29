@@ -191,6 +191,7 @@ namespace deepduplicates
                 if (retainStructure && settings.retainStructure.Where(p => item.path.ToLower().StartsWith(p.ToLower())).Any())
                 {
                     VideoInfo org = mediaList.Where(x => x.id == item.triggerId).FirstOrDefault();
+                    if (org == null) continue;
                     filetext += "MOVE \"" + batchPath(org.path) + "\" \""+ batchPath(item.path) + "\"" + Environment.NewLine;
                 }
 
@@ -199,7 +200,10 @@ namespace deepduplicates
         }
 
         public void generateEncoding(List<VideoInfo> mediaList)
-        {
+        {   
+            // TODO: Switch to using MediaInfo
+            // dotnet add package MediaInfo.Wrapper.Core 
+
             using (StreamWriter outputFile = new StreamWriter(Path.Combine(this.outputFolder, "encoding-template.bat")))
             {
                 outputFile.WriteLine("REM     This encoding template is a suggestion with highest bitrates at the top");
@@ -214,10 +218,18 @@ namespace deepduplicates
                         && !x.path.ToLower().EndsWith(".wmv")).OrderByDescending(p => p.fileSize / p.duration))
                 {
                     double bitrateKbps = Math.Round(((item.bitrate ?? 1000) / 1000));
-                    string modifiedPath = item.path.Insert(item.path.LastIndexOf("."), "_720p"); ;
+                    string modifiedPath = item.path.Substring(0, item.path.LastIndexOf(".")) + "_720p.mp4"; // output ext is always mp4 
 
                     outputFile.WriteLine($"REM  Total bitrate: {bitrateKbps} kbps");
-                    outputFile.WriteLine($"..\\ffmpeg\\ffmpeg -n -i \"{item.path}\" -c:v libx265 -vtag hvc1 -vf scale=1280:720 -crf 20 -c:a copy \"{modifiedPath}\"");
+                    // -c:v libx265         use h.265 encoding
+                    // -vtag hvc1           set the video container to hvc1
+                    // -vf scale=1280:720   scale video to 720p
+                    // -crf XX              set video conpression (Constant Rate Factor). 0-16=lossless, 20=Very good, 24=Good, 28-51=degraded 
+                    // crf values explained here: https://goughlui.com/2016/08/27/video-compression-testing-x264-vs-x265-crf-in-handbrake-0-10-5/
+                    // This encoding is CPU-only as hardware accelerated encoders do not support CRF
+                    // -preset superfast    Only at the "slow"-preset is there a quality gain over "superfast"
+                    //  preset values are explained here: https://www.youtube.com/watch?v=bzgFL-gNF9g
+                    outputFile.WriteLine($"..\\ffmpeg\\ffmpeg -n -i \"{item.path}\" -c:v libx265 -vtag hvc1 -vf scale=1280:720 -crf 24 -preset superfast  -c:a copy \"{modifiedPath}\"");
                     outputFile.WriteLine();
 
                 }
