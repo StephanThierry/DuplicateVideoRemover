@@ -95,7 +95,7 @@ namespace deepduplicates
             foreach (string contentFolder in instance.settings.contentFolders)
             {
                 Console.WriteLine("Indexing all files in: " + contentFolder + "...");
-                IEnumerable<string> files = instance.GetFiles(contentFolder, new[] { ".avi", ".divx", ".mp4", ".m4v", ".mov", ".wmv", ".mpg", ".mpeg", ".flv", ".mkv" }, instance.settings.excludePaths);
+                    IEnumerable<string> files = instance.GetFiles(contentFolder, new[] { ".avi", ".divx", ".mp4", ".m4v", ".mov", ".wmv", ".mpg", ".mpeg", ".flv", ".mkv" }, instance.settings.excludePaths);
                 if (instance.allFiles == null)
                 {
                     instance.allFiles = files;
@@ -206,6 +206,7 @@ namespace deepduplicates
 
             using (StreamWriter outputFile = new StreamWriter(Path.Combine(this.outputFolder, "encoding-template.bat")))
             {
+                outputFile.WriteLine("chcp 65001"); // Set codepage
                 outputFile.WriteLine("REM     This encoding template is a suggestion with highest bitrates at the top");
                 outputFile.WriteLine("REM     NOTE! Many files will NOT be valid to encode, the bitrate may be due to faulty 'duration'-mesaurements");
                 outputFile.WriteLine("REM     ------------------------------------------------------------------------------------------------------");
