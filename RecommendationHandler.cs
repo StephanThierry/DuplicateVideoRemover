@@ -67,6 +67,8 @@ namespace deepduplicates
                 }
             }
 
+            rgb[] diff = new rgb[3];
+            double[] diffHash = new double[3];
             foreach (int dupeKey in lengthDubes)
             {
                 // p.duration +/- 1 sec tolerance
@@ -91,9 +93,6 @@ namespace deepduplicates
                         {
                             continue;
                         }
-                        rgb[] diff = new rgb[3];
-                        double[] diffHash = new double[3];
-
                         diff[0] = imageChecksumDiff(dupGroup[i].image1Checksum, dupGroup[n].image1Checksum);
                         diff[1] = imageChecksumDiff(dupGroup[i].image2Checksum, dupGroup[n].image2Checksum);
                         diff[2] = imageChecksumDiff(dupGroup[i].image3Checksum, dupGroup[n].image3Checksum);
