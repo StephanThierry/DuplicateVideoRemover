@@ -187,7 +187,7 @@ namespace deepduplicates
             bool retainStructure = (settings.retainStructure.Length > 0);
             foreach (VideoInfo item in mediaList.Where(x => (x.remove ?? false) && !String.IsNullOrEmpty(x.path)).OrderBy(p => p.triggerId))
             {
-                filetext += "DEL \"" + batchPath(item.path) + "\"" + Environment.NewLine;
+                filetext += "DEL \"" + batchPath(item.path) + "\" /f" + Environment.NewLine;
                 if (retainStructure && settings.retainStructure.Where(p => item.path.ToLower().StartsWith(p.ToLower())).Any())
                 {
                     VideoInfo org = mediaList.Where(x => x.id == item.triggerId).FirstOrDefault();
