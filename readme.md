@@ -37,6 +37,11 @@ After running the program for a number of days (or months) you may have a lot of
 Like so: `dotnet run -- clean`  
 Both entries in the db and screenshors stored in the file system that don't match with a file currently found in the filessystem will be permanemtly deleted, so make sure you have access to all drive sources when you run the cleanup.  
 
+**Making a full index report**  
+If you need a complete index of all videos, you can generate a full index report.  
+Like so: `dotnet run -- index`  
+A HTML report `indexReport.html` is made in the `.\output` folder. 
+
 **Dependencies**  
 Xabe.FFmpeg - at the moment running on a custom build located in the `/components`-folder. After pending pull request will switch back to package (master).  
 FFmpeg (Latest version is automatically downloaded on first run)  
