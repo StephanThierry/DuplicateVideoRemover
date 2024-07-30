@@ -198,7 +198,7 @@ namespace deepduplicates
             }
             File.WriteAllText(filepath, filetext);
         }
-
+  
         public void generateEncoding(List<VideoInfo> mediaList)
         {   
             // TODO: Switch to using MediaInfo
@@ -301,6 +301,21 @@ namespace deepduplicates
 
                 outputFile.WriteLine(SpaceNotice(spaceUsedByOriginals, "Space used by originals: "));
                 outputFile.WriteLine(SpaceNotice(spaceSaved, "Space used by dupes: "));
+            }
+        }
+        public void generateIndexReport(List<VideoInfo> mediaList)
+        {
+            using (StreamWriter outputFile = new StreamWriter(Path.Combine(this.outputFolder, "indexReport.html")))
+            {
+                outputFile.WriteLine("<h3>Index report</h3>");
+                foreach (VideoInfo item in mediaList.OrderBy(p => p.path))
+                {
+                        outputFile.WriteLine(item.path + "  (" + item.fileSize + " MB )<br>");
+                        outputFile.WriteLine("<img src='file:///" + screenshotPath(item, 1) + "'>");
+                        outputFile.WriteLine("<img src='file:///" + screenshotPath(item, 2) + "'>");
+                        outputFile.WriteLine("<img src='file:///" + screenshotPath(item, 3) + "'><br>");
+                        outputFile.WriteLine("<hr><br>");
+               }
             }
         }
 

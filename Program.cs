@@ -27,6 +27,11 @@ namespace deepduplicates
                 await ch.runCleanup();
             }
 
+            if (args.Length>0 && args[0].ToLower() == "index") {
+                Console.WriteLine("Indexing enabled - complete index of all files is created!");
+                fileHandler.generateIndexReport(mediaList);
+            } 
+
             RecommendationHandler recommendationHandler = new RecommendationHandler();
             Console.WriteLine("Marking incomplete videos for removal...");
             mediaList = recommendationHandler.removingIncompleteVideos(mediaList); 
