@@ -44,9 +44,20 @@ namespace deepduplicates
                 // Presumably settings.json does not exist - set default values and save
                 Console.WriteLine("Creating 'settings.json' - edit settings and run again.");
                 instance.settings = new Settings();
+                instance.settings.contentFolders = new string[0];
+                instance.settings.retainStructure = new string[0];
+                instance.settings.priorityFolders = new string[0];
+                instance.settings.excludePaths = new string[0];
+                instance.settings.retainIncomingFilenames = new string[0];
                 instance.settings.minVideoLength = 3;
-                instance.settings.contentFolders = new string[] { @"c:\" };
+                instance.settings.contentFolders = new string[] { @"c:\MyVideos_changeThis" };
                 instance.settings.switchPriority = new switchPrioritySet[1];
+                switchPrioritySet spExample = new switchPrioritySet();
+                spExample.down = "x264";
+                spExample.up = "x265";
+                spExample.triggerBelowPctSizeDiff = 15;
+                instance.settings.switchPriority[0] = spExample;
+                
                 instance.settings.logInterval = 100;
                 instance.settings.matchSettings = new matchSettingsSet();
                 instance.settings.matchSettings.colorTolerance = 35;

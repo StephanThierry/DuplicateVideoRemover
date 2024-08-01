@@ -11,3 +11,5 @@ settings.json
 .vs/VSWorkspaceState.json
 .vs/DuplicateVideoRemover/config/applicationhost.config
 .vs/DuplicateVideoRemover/v16/.suo
+
+.fake

@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.002.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "duplicatevideoremover", "duplicatevideoremover.csproj", "{517FCA8E-6511-4496-BB06-7DF098E131B3}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{517FCA8E-6511-4496-BB06-7DF098E131B3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{517FCA8E-6511-4496-BB06-7DF098E131B3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{517FCA8E-6511-4496-BB06-7DF098E131B3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{517FCA8E-6511-4496-BB06-7DF098E131B3}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {2B284FA4-BDEB-4C4B-9E82-5D6E5626100A}
+	EndGlobalSection
+EndGlobal
