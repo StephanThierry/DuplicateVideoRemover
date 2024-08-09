@@ -4,13 +4,13 @@
 1. Video duplicates
 2. Invalid video files 
 3. Videos at or under a specified length (2 sec by default)
-
-Delete commands for all files found are added to a batchfile (delete_all_dupes.bat) in the /output folder
-An HTML report (report.html) of the findings are made and placed in the output folder.  
+4. Generate a HTML report `./output/report.html` of all videofiles that are invalid or duplicates
+5. Generate a .bat file `./output/delete_all_duples.bat` with "DEL" (delete) commands to delete all invalid and duplicate videos 
+4. Is able to generate a complete HTML index `./output/reportIndex.html` of all videofiles with full path and 3 screenshots pr. video.
 
 Review the report before running the batch file to delete, the algorithms are about 99.99% accurate - so 1-2 in each 10000 videos will likely be a false positive.   
 
-All settings are located in: `settings.json`  - run the program once to create this file.  
+All settings are located in: `./settings.json`  - run the program once to create this file.  
 
 ### To run
 Requires .NET Core 3.1 (or higher) https://dotnet.microsoft.com/download - so install that first.  
