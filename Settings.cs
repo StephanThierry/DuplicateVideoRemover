@@ -13,6 +13,11 @@ namespace deepduplicates
         public int minVideoSizeKb { get; set; }
 
         public matchSettingsSet matchSettings { get; set; }
+
+        /// <summary>
+        /// This matchSettingsSet is only used if the files are  in the same folder - this is to take into account differences introduced by recompression
+        /// </summary>
+        public matchSettingsSet matchSettings_sameFolder { get; set; }
     }
 
     public class switchPrioritySet
@@ -42,6 +47,8 @@ namespace deepduplicates
         /// </summary>
         /// <value>Recommended value: 0</value>
         public int faultTolerance { get; set; }
+
+        public bool triggerOnNameMatch { get; set; }
 
     }
 }

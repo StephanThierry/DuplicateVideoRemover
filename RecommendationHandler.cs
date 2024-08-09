@@ -100,15 +100,33 @@ namespace deepduplicates
                         diffHash[1] = CompareImageHash(dupGroup[i].image2hash, dupGroup[n].image2hash);
                         diffHash[2] = CompareImageHash(dupGroup[i].image3hash, dupGroup[n].image3hash);
 
-                        int score = 0;
-                        for(int count=0;count<3;count++){
-                            if (diff[count].r < settings.matchSettings.colorTolerance && 
-                                diff[count].g < settings.matchSettings.colorTolerance && 
-                                diff[count].b < settings.matchSettings.colorTolerance) score ++;
-                            if (diffHash[count] > settings.matchSettings.shapeMatch) score ++;
+                        matchSettingsSet currentMatchset = settings.matchSettings;
+                        System.IO.FileInfo dupGroup_orgPath = new System.IO.FileInfo(dupGroup[i].path);
+                        System.IO.FileInfo dupGroup_diffPath = new System.IO.FileInfo(dupGroup[n].path);
+                        String orgFileName = System.IO.Path.GetFileNameWithoutExtension(dupGroup[i].path);
+                        String diffFileName = System.IO.Path.GetFileNameWithoutExtension(dupGroup[n].path);
+
+                        if (dupGroup_orgPath.Directory.Name == dupGroup_diffPath.Directory.Name){
+                            currentMatchset = settings.matchSettings_sameFolder;
                         }
 
-                        if (score >= 6 - settings.matchSettings.faultTolerance) // 6 = all elements match
+                        int score = 0;
+                        for(int count=0;count<3;count++){
+                            if (diff[count].r < currentMatchset.colorTolerance && 
+                                diff[count].g < currentMatchset.colorTolerance && 
+                                diff[count].b < currentMatchset.colorTolerance) score ++;
+                            if (diffHash[count] > currentMatchset.shapeMatch) score ++;
+                        }
+
+                        if (currentMatchset.triggerOnNameMatch){
+                            if (orgFileName.StartsWith(diffFileName) || orgFileName.StartsWith(diffFileName)){
+                                dupGroup[n].remove = true;
+                                dupGroup[n].reason = $"Name match triggered";
+                                dupGroup[n].triggerId = dupGroup[i].id;
+                            }
+                        }
+
+                        if (score >= 6 - currentMatchset.faultTolerance) // 6 = all elements match
                         {
                             dupGroup[n].remove = true;
                             dupGroup[n].reason = $"Matching length. Screenshots have a color difference of {diff[0].r},{diff[0].g},{diff[0].b} : {diff[1].r},{diff[1].g},{diff[1].b} : {diff[2].r},{diff[2].g},{diff[2].b} -   Diffhash of: " + Math.Round(diffHash[0], 1) + ",  " + Math.Round(diffHash[1], 1) + " and  " + Math.Round(diffHash[2], 1) + ".";
