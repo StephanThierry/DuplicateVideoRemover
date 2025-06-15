@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading.Tasks;
 // Publish single trimmed executable: 	
 // dotnet publish -r win-x64 -c Release /p:PublishSingleFile=true /p:PublishTrimmed=true
@@ -37,7 +38,7 @@ namespace deepduplicates
             mediaList = recommendationHandler.removingIncompleteVideos(mediaList); 
 
             Console.WriteLine("Performing checksum validation...");
-            mediaList = recommendationHandler.checkCheckSumofAllSimilarVideos(mediaList, fileHandler.settings);
+            mediaList = recommendationHandler.checkChecksumOfAllSimilarVideos_Optimized(mediaList, fileHandler.settings);
 
             Console.WriteLine("Generating batch-file...");
             fileHandler.generateBatchFile(mediaList);
@@ -46,7 +47,7 @@ namespace deepduplicates
             fileHandler.generateReport(mediaList);
 
             Console.WriteLine("Generating Encoding batch...");
-            fileHandler.generateEncoding(mediaList);
+            fileHandler.generateEncoding(mediaList, fileHandler.settings.encodeSettings);
 
             Console.WriteLine("Check ./output directory");
             Console.WriteLine("Done!");

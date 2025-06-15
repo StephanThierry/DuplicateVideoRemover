@@ -50,115 +50,155 @@ namespace deepduplicates
             public int count;
         }        
 
-        public List<VideoInfo> checkCheckSumofAllSimilarVideos(List<VideoInfo> mediaList, Settings settings)
-        {
-            List<dubeObject> lengthGroups = mediaList.Where(x => !(x.remove ?? false)).GroupBy(x => x.duration).Where(g => g.Count() >= 1).Select(y => new dubeObject{duration = y.Key, count = y.Count()}).OrderBy(x => x.duration).ToList();
-            List<dubeObject> org_lengthGroups = mediaList.Where(x => !(x.remove ?? false)).GroupBy(x => x.duration).Where(g => g.Count() >1).Select(y => new dubeObject{duration = y.Key, count = y.Count()}).OrderBy(x => x.duration).ToList();
-            List<int?> lengthDubes = new List<int?>();
+public List<VideoInfo> checkChecksumOfAllSimilarVideos_Optimized(List<VideoInfo> mediaList, Settings settings)
+{
+    // 1. PRE-FILTERING & GROUPING:
+    var videosToProcess = mediaList.Where(v => !(v.remove ?? false) && v.duration.HasValue && v.path != null);
+    var videosByDuration = videosToProcess.ToLookup(v => v.duration);
 
-            // Add all lengths to check with a +/- 1 sec tolerance
-            for(int i=0; i<lengthGroups.Count; i++){
-                if (lengthGroups[i].count>1) {
-                    lengthDubes.Add(lengthGroups[i].duration); 
-                } else {
-                    if (lengthGroups[i].count>0 && ( (i>0 && lengthGroups[i-1].duration == lengthGroups[i].duration-1) || (i<lengthGroups.Count-1 && lengthGroups[i+1].duration == lengthGroups[i].duration+1) )){
-                        lengthDubes.Add(lengthGroups[i].duration); 
+    // Get a sorted list of unique durations 
+    var sortedDurations = videosByDuration.Select(g => g.Key.Value).OrderBy(d => d).ToList();
+    
+    // Use a HashSet for priority folder lookups 
+    var priorityFolderSet = new HashSet<string>(settings.priorityFolders);
+
+    for (int i = 0; i < sortedDurations.Count; i++)
+    {
+        int currentDuration = sortedDurations[i];
+        
+        // Get the videos for the current duration and the next duration (+1 sec tolerance)
+        var currentGroup = videosByDuration[currentDuration].ToList();
+        var nextGroup = (i + 1 < sortedDurations.Count && sortedDurations[i+1] == currentDuration + 1)
+            ? videosByDuration[currentDuration + 1].ToList()
+            : new List<VideoInfo>();
+
+        var comparisonGroup = currentGroup.Concat(nextGroup).ToList();
+        if (comparisonGroup.Count < 2) continue; 
+
+        // Sort based on priority rules.
+        comparisonGroup = comparisonGroup
+            .OrderByDescending(p => priorityFolderSet.Any(x => p.path.StartsWith(x)))
+            .ThenBy(p => p.fileSize)
+            .ToList();
+
+        CompareVideosInGroup(comparisonGroup, settings);
+    }
+    
+    // 3. POST-PROCESSING (Switch Priority Logic):
+    // Group removed items by their duplicate master (triggerId)
+    var duplicatesToRecheck = mediaList
+        .Where(v => v.remove == true && v.triggerId != -1)
+        .ToLookup(v => v.triggerId);
+
+    if (duplicatesToRecheck.Count > 0)
+    {
+        // Create a fast way to look up videos by ID
+        var videoDictById = mediaList.ToDictionary(v => v.id, v => v);
+
+        foreach (var switchSet in settings.switchPriority)
+        {
+            foreach (var group in duplicatesToRecheck)
+            {
+                // The video that was originally kept
+                if (!videoDictById.TryGetValue(group.Key, out VideoInfo main)) continue;
+
+                // The videos that were marked as duplicates of 'main'
+                foreach (var item in group) 
+                {
+                    // Check if a switch is warranted based on paths
+                    if (main.path.Contains(switchSet.down) && item.path.Contains(switchSet.up))
+                    {
+                        double fileSizeDiff = Math.Abs((double)(main.fileSize ?? 0) - (double)(item.fileSize ?? 0));
+                        double percentDiff = main.fileSize > 0 ? (fileSizeDiff / (double)main.fileSize) * 100 : 100;
+
+                        if (percentDiff < switchSet.triggerBelowPctSizeDiff)
+                        {
+                            // Perform the switch
+                            main.remove = true;
+                            main.triggerId = item.id;
+                            main.reason = $"SWITCHED: {switchSet.up}/{switchSet.down} | Sizediff: {Math.Round(percentDiff, 1)}% | {item.reason}";
+                            
+                            item.remove = false;
+                            item.reason = ""; // Clear the reason from the newly kept item
+                            item.triggerId = -1;
+                            break; // Switched, move to the next group
+                        }
                     }
                 }
             }
+        }
+    }
 
+    return mediaList;
+}
+
+// Helper method to contain the core comparison logic
+private void CompareVideosInGroup(List<VideoInfo> group, Settings settings)
+{
+    for (int i = 0; i < group.Count - 1; i++)
+    {
+        var video1 = group[i];
+        
+        if (video1.remove == true) continue;
+
+        for (int n = i + 1; n < group.Count; n++)
+        {
+            var video2 = group[n];
+            if (video2.remove == true) continue; // Already marked for removal
+
+            // Skip if checksums/hashes are missing
+            if (video1.image1hash == null || video1.image2hash == null || video1.image3hash == null ||
+                video2.image1hash == null || video2.image2hash == null || video2.image3hash == null)
+            {
+                continue;
+            }
+
+            // Determine which match settings to use
+            var currentMatchset = new System.IO.FileInfo(video1.path).Directory.Name == new System.IO.FileInfo(video2.path).Directory.Name
+                ? settings.matchSettings_sameFolder
+                : settings.matchSettings;
+
+            // Name match check
+            if (currentMatchset.triggerOnNameMatch)
+            {
+                string fileName1 = System.IO.Path.GetFileNameWithoutExtension(video1.path);
+                string fileName2 = System.IO.Path.GetFileNameWithoutExtension(video2.path);
+                if (fileName1.StartsWith(fileName2) || fileName2.StartsWith(fileName1))
+                {
+                    video2.remove = true;
+                    video2.reason = $"Name match triggered with {video1.path}";
+                    video2.triggerId = video1.id;
+                    continue; // Move to the next video
+                }
+            }
+
+            // Checksum and hash comparison
             rgb[] diff = new rgb[3];
             double[] diffHash = new double[3];
-            foreach (int dupeKey in lengthDubes)
+
+            diff[0] = imageChecksumDiff(video1.image1Checksum, video2.image1Checksum);
+            diff[1] = imageChecksumDiff(video1.image2Checksum, video2.image2Checksum);
+            diff[2] = imageChecksumDiff(video1.image3Checksum, video2.image3Checksum);
+            diffHash[0] = CompareImageHash(video1.image1hash, video2.image1hash);
+            diffHash[1] = CompareImageHash(video1.image2hash, video2.image2hash);
+            diffHash[2] = CompareImageHash(video1.image3hash, video2.image3hash);
+
+            int score = 0;
+            for (int k = 0; k < 3; k++)
             {
-                // p.duration +/- 1 sec tolerance
-                List<VideoInfo> dupGroup = mediaList.Where(p => p.path != null && p.path.Length > 1 && 
-                    (p.duration == dupeKey || p.duration-1 == dupeKey || p.duration+1 == dupeKey) && 
-                    !(p.remove ?? false)).OrderByDescending(p => settings.priorityFolders.Any(x => p.path.StartsWith(x))).ThenBy(p => p.fileSize).ToList();
-                int dupeCount = dupGroup.Count();
-                for (int i = 0; i < dupeCount - 1; i++) // from first to secound-last
-                {
-                    for (int n = i + 1; n < dupeCount; n++) // from 2nd to last
-                    {
-                        if (dupGroup[i].image1hash == null ||
-                        dupGroup[i].image2hash == null ||
-                        dupGroup[i].image3hash == null)
-                        {
-                            continue;
-                        }
-
-                        if (dupGroup[n].image1hash == null ||
-                            dupGroup[n].image2hash == null ||
-                             dupGroup[n].image3hash == null)
-                        {
-                            continue;
-                        }
-                        diff[0] = imageChecksumDiff(dupGroup[i].image1Checksum, dupGroup[n].image1Checksum);
-                        diff[1] = imageChecksumDiff(dupGroup[i].image2Checksum, dupGroup[n].image2Checksum);
-                        diff[2] = imageChecksumDiff(dupGroup[i].image3Checksum, dupGroup[n].image3Checksum);
-                        diffHash[0] = CompareImageHash(dupGroup[i].image1hash, dupGroup[n].image1hash);
-                        diffHash[1] = CompareImageHash(dupGroup[i].image2hash, dupGroup[n].image2hash);
-                        diffHash[2] = CompareImageHash(dupGroup[i].image3hash, dupGroup[n].image3hash);
-
-                        matchSettingsSet currentMatchset = settings.matchSettings;
-                        System.IO.FileInfo dupGroup_orgPath = new System.IO.FileInfo(dupGroup[i].path);
-                        System.IO.FileInfo dupGroup_diffPath = new System.IO.FileInfo(dupGroup[n].path);
-                        String orgFileName = System.IO.Path.GetFileNameWithoutExtension(dupGroup[i].path);
-                        String diffFileName = System.IO.Path.GetFileNameWithoutExtension(dupGroup[n].path);
-
-                        if (dupGroup_orgPath.Directory.Name == dupGroup_diffPath.Directory.Name){
-                            currentMatchset = settings.matchSettings_sameFolder;
-                        }
-
-                        int score = 0;
-                        for(int count=0;count<3;count++){
-                            if (diff[count].r < currentMatchset.colorTolerance && 
-                                diff[count].g < currentMatchset.colorTolerance && 
-                                diff[count].b < currentMatchset.colorTolerance) score ++;
-                            if (diffHash[count] > currentMatchset.shapeMatch) score ++;
-                        }
-
-                        if (currentMatchset.triggerOnNameMatch){
-                            if (orgFileName.StartsWith(diffFileName) || orgFileName.StartsWith(diffFileName)){
-                                dupGroup[n].remove = true;
-                                dupGroup[n].reason = $"Name match triggered";
-                                dupGroup[n].triggerId = dupGroup[i].id;
-                            }
-                        }
-
-                        if (score >= 6 - currentMatchset.faultTolerance) // 6 = all elements match
-                        {
-                            dupGroup[n].remove = true;
-                            dupGroup[n].reason = $"Matching length. Screenshots have a color difference of {diff[0].r},{diff[0].g},{diff[0].b} : {diff[1].r},{diff[1].g},{diff[1].b} : {diff[2].r},{diff[2].g},{diff[2].b} -   Diffhash of: " + Math.Round(diffHash[0], 1) + ",  " + Math.Round(diffHash[1], 1) + " and  " + Math.Round(diffHash[2], 1) + ".";
-                            dupGroup[n].triggerId = dupGroup[i].id;
-                        }
-                    }
-
-                }
-
-                if (dupGroup.Any(p => p.remove ?? false))
-                {
-                    foreach (switchPrioritySet switchSet in settings.switchPriority)
-                    {
-                            foreach(VideoInfo item in dupGroup.Where(p=>p.remove ?? false && p.path.IndexOf(switchSet.up)!=-1)){
-                                VideoInfo main = dupGroup.Where(p=>p.id == item.triggerId).First();
-                                double fileSizeDiff = Math.Round((double)(Math.Abs((double)(main.fileSize ?? 0)-(double)(item.fileSize ?? 0)) / (double)(main.fileSize)) * 100);
-                                if (main.path.IndexOf(switchSet.down) != -1 && item.path.IndexOf(switchSet.up)!= -1 && fileSizeDiff < switchSet.triggerBelowPctSizeDiff) {
-                                    main.remove = true;
-                                    main.triggerId = item.id;
-                                    main.reason = "SWITCHED: "+ switchSet.up + "/" + switchSet.down + "  Sizediff: " + fileSizeDiff + " " + item.reason;
-                                    
-                                    item.remove = false;
-                                    break;
-                                }
-                            }
-
-                    }
-                }
+                if (diff[k].r < currentMatchset.colorTolerance && diff[k].g < currentMatchset.colorTolerance && diff[k].b < currentMatchset.colorTolerance) score++;
+                if (diffHash[k] > currentMatchset.shapeMatch) score++;
             }
-            return (mediaList);
-        }
 
+            if (score >= 6 - currentMatchset.faultTolerance)
+            {
+                video2.remove = true;
+                video2.reason = $"Match with {video1.path}. Score: {score}/6. C-Diff: {diff[0]},{diff[1]},{diff[2]}. H-Match: {Math.Round(diffHash[0])}%,{Math.Round(diffHash[1])}%,{Math.Round(diffHash[2])}%";
+                video2.triggerId = video1.id;
+            }
+        }
+    }
+}
         public rgb imageChecksumDiff(rgb[] checksum1, rgb[] checksum2)
         {
             rgb checksumTotal = new rgb();

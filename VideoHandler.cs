@@ -20,7 +20,7 @@ namespace deepduplicates
             this.imageHandler = imageHandler;
         }
 
-        public void ShowTimeStamp(Stopwatch stopWatch, string comment)
+        public static void ShowTimeStamp(Stopwatch stopWatch, string comment)
         {
             TimeSpan ts = stopWatch.Elapsed;
             string elapsedTime = String.Format("{0:00}:{1:00}:{2:00}.{3:00}",

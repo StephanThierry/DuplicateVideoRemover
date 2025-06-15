@@ -105,6 +105,7 @@ namespace deepduplicates
             instance.allFiles = null;
             foreach (string contentFolder in instance.settings.contentFolders)
             {
+                try{
                 Console.WriteLine("Indexing all files in: " + contentFolder + "...");
                     IEnumerable<string> files = instance.GetFiles(contentFolder, new[] { ".avi", ".divx", ".mp4", ".m4v", ".mov", ".wmv", ".mpg", ".mpeg", ".flv", ".mkv" }, instance.settings.excludePaths);
                 if (instance.allFiles == null)
@@ -117,6 +118,9 @@ namespace deepduplicates
                 }
 
                 Console.WriteLine("Found a total of " + instance.allFiles.Count() + " video files.");
+                } catch {
+                    Console.WriteLine("Failed to get " + contentFolder + " - skipping.");
+                }
             }
             instance.allFilesCount = instance.allFiles.Count();
 
@@ -161,7 +165,7 @@ namespace deepduplicates
                 }
                 catch (Exception ex)
                 {
-                    Console.Error.WriteLine(ex);
+                    //Console.Error.WriteLine(ex); -- ignore
                 }
                 string[] files = null;
                 try
@@ -174,7 +178,7 @@ namespace deepduplicates
                 }
                 catch (Exception ex)
                 {
-                    Console.Error.WriteLine(ex);
+                    //Console.Error.WriteLine(ex); - ignore
                 }
                 if (files != null)
                 {
@@ -198,19 +202,19 @@ namespace deepduplicates
             bool retainStructure = (settings.retainStructure.Length > 0);
             foreach (VideoInfo item in mediaList.Where(x => (x.remove ?? false) && !String.IsNullOrEmpty(x.path)).OrderBy(p => p.triggerId))
             {
-                filetext += "DEL \"" + batchPath(item.path) + "\" /f" + Environment.NewLine;
+                filetext += "DEL \"" + item.pathForBatchFile + "\" /f" + Environment.NewLine;
                 if (retainStructure && settings.retainStructure.Where(p => item.path.ToLower().StartsWith(p.ToLower())).Any())
                 {
                     VideoInfo org = mediaList.Where(x => x.id == item.triggerId).FirstOrDefault();
                     if (org == null) continue;
-                    filetext += "MOVE \"" + batchPath(org.path) + "\" \""+ batchPath(item.path) + "\"" + Environment.NewLine;
+                    filetext += "MOVE \"" + org.pathForBatchFile + "\" \""+ item.pathForBatchFile + "\"" + Environment.NewLine;
                 }
 
             }
             File.WriteAllText(filepath, filetext);
         }
   
-        public void generateEncoding(List<VideoInfo> mediaList)
+        public void generateEncoding(List<VideoInfo> mediaList, EncodeSettings encodeSettings)
         {   
             // TODO: Switch to using MediaInfo
             // dotnet add package MediaInfo.Wrapper.Core 
@@ -230,18 +234,19 @@ namespace deepduplicates
                         && !x.path.ToLower().EndsWith(".wmv")).OrderByDescending(p => p.fileSize / p.duration))
                 {
                     double bitrateKbps = Math.Round(((item.bitrate ?? 1000) / 1000));
-                    string modifiedPath = item.path.Substring(0, item.path.LastIndexOf(".")) + "_720p.mp4"; // output ext is always mp4 
+                    string modifiedPath = item.pathForBatchFile.Substring(0, item.pathForBatchFile.LastIndexOf(".")) + "_720p.mp4"; // output ext is always mp4 
 
                     outputFile.WriteLine($"REM  Total bitrate: {bitrateKbps} kbps");
                     // -c:v libx265         use h.265 encoding
                     // -vtag hvc1           set the video container to hvc1
-                    // -vf scale=1280:720   scale video to 720p
+                    // -vf scale=1280:720   scale video to 720p, 
                     // -crf XX              set video conpression (Constant Rate Factor). 0-16=lossless, 20=Very good, 24=Good, 28-51=degraded 
                     // crf values explained here: https://goughlui.com/2016/08/27/video-compression-testing-x264-vs-x265-crf-in-handbrake-0-10-5/
                     // This encoding is CPU-only as hardware accelerated encoders do not support CRF
                     // -preset superfast    Only at the "slow"-preset is there a quality gain over "superfast"
                     //  preset values are explained here: https://www.youtube.com/watch?v=bzgFL-gNF9g
-                    outputFile.WriteLine($"..\\ffmpeg\\ffmpeg -n -i \"{item.path}\" -c:v libx265 -vtag hvc1 -vf scale=1280:720 -crf 24 -preset superfast  -c:a copy \"{modifiedPath}\"");
+                    if (!String.IsNullOrEmpty(encodeSettings.extraFilter) && !encodeSettings.extraFilter.EndsWith(",")) encodeSettings.extraFilter +=",";
+                    outputFile.WriteLine($"..\\ffmpeg\\ffmpeg -n -i \"{item.pathForBatchFile}\" -c:v libx265 -vtag hvc1 -vf {encodeSettings.extraFilter}scale={encodeSettings.scale} -crf {encodeSettings.compressionLevelcrf} -preset {encodeSettings.compressionPreset} -c:a copy \"{modifiedPath}\"");
                     outputFile.WriteLine();
 
                 }

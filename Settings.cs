@@ -11,6 +11,7 @@ namespace deepduplicates
         public int logInterval { get; set; }
         public int minVideoLength { get; set; }
         public int minVideoSizeKb { get; set; }
+        public EncodeSettings encodeSettings { get; set; }
 
         public matchSettingsSet matchSettings { get; set; }
 
@@ -27,6 +28,15 @@ namespace deepduplicates
         public int triggerBelowPctSizeDiff { get; set; }
 
     }
+
+    public class EncodeSettings
+    {
+        public string scale  { get; set; }
+        public string compressionLevelcrf { get; set; }
+        public string compressionPreset { get; set; }
+        public string extraFilter { get; set; }
+    }
+
 
     public class matchSettingsSet
     {
