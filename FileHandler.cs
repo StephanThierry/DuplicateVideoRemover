@@ -163,7 +163,7 @@ namespace deepduplicates
                 {
                     // Ignore this error
                 }
-                catch (Exception ex)
+                catch //(Exception ex)
                 {
                     //Console.Error.WriteLine(ex); -- ignore
                 }
@@ -176,7 +176,7 @@ namespace deepduplicates
                 {
                     // ignore this error
                 }
-                catch (Exception ex)
+                catch //(Exception ex)
                 {
                     //Console.Error.WriteLine(ex); - ignore
                 }
