@@ -1,10 +1,25 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!--
+    The duplicate-finding engine, shared by the three front ends in apps/:
+      apps/Cli      - command line (the original program)
+      apps/Web      - browser interface, also for headless Linux/NAS use
+      apps/Desktop  - Avalonia desktop app for Windows and Linux
+  -->
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <!-- .NET 10 runs on both Windows and Linux (.NET Core 3.1 is end-of-life and won't install on current Linux distros) -->
+    <OutputType>Library</OutputType>
     <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>DuplicateVideoRemover.Core</AssemblyName>
+    <RootNamespace>deepduplicates</RootNamespace>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The front ends live in sub folders with their own projects -->
+    <Compile Remove="apps/**;tests/**" />
+    <None Remove="apps/**;tests/**" />
+    <Content Remove="apps/**;tests/**" />
+    <EmbeddedResource Remove="apps/**;tests/**" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
@@ -19,9 +34,10 @@
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.13" />
 
-    <!-- Image decoding/resizing for screenshot checksums. Replaces System.Drawing.Common, which is Windows-only on .NET 6+ -->
-    <PackageReference Include="SkiaSharp" Version="4.151.2" />
-    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.151.2" />
+    <!-- Image decoding for screenshot checksums (System.Drawing is Windows-only on .NET 6+).
+         3.119.x is the version Avalonia uses, so the desktop app and the engine share one SkiaSharp.
+         The Linux native library is referenced by each app (see apps/*). -->
+    <PackageReference Include="SkiaSharp" Version="3.119.4" />
   </ItemGroup>
 
 </Project>
