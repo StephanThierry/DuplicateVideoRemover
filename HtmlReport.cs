@@ -183,7 +183,10 @@ namespace deepduplicates
 
         private string ScreenshotUrl(VideoInfo item, int index)
         {
-            string relative = Path.GetRelativePath(fileHandler.outputFolder, fileHandler.screenshotPath(item, index));
+            string shot = fileHandler.screenshotPath(item, index);
+            string relative = Path.GetRelativePath(fileHandler.outputFolder, shot);
+            // The database (and its screenshots) can be on another drive: then link the full path
+            if (Path.IsPathRooted(relative)) return new Uri(shot).AbsoluteUri;
             return string.Join("/", relative.Split('\\', '/').Select(Uri.EscapeDataString));
         }
 
