@@ -49,26 +49,52 @@ namespace deepduplicates
                 throw new InvalidDataException($"'{path}' is not valid JSON: {e.Message}");
             }
 
-            mappings = (file?.Mappings ?? new List<PathMapping>())
-                .Where(m => !string.IsNullOrWhiteSpace(m.Windows) && !string.IsNullOrWhiteSpace(m.Linux))
-                .Select(m => new PathMapping { Windows = NormalizeWindowsRoot(m.Windows), Linux = NormalizeLinuxRoot(m.Linux) })
-                // Longest prefix first, so "L:\Video\" wins over "L:\"
-                .OrderByDescending(m => Math.Max(m.Windows.Length, m.Linux.Length))
-                .ToList();
+            mappings = Normalize(file?.Mappings ?? new List<PathMapping>());
 
             foreach (var m in mappings) Console.WriteLine($"Path mapping: {m.Windows}  <->  {m.Linux}");
         }
 
+        /// <summary>Replaces the mappings and saves pathmapping.json (used by the interfaces).</summary>
+        public static void Save(string appFolder, IEnumerable<PathMapping> newMappings)
+        {
+            var clean = newMappings
+                .Where(m => !string.IsNullOrWhiteSpace(m.Windows) && !string.IsNullOrWhiteSpace(m.Linux))
+                .Select(m => new PathMapping { Windows = m.Windows.Trim(), Linux = m.Linux.Trim() })
+                .ToList();
+            var json = JsonSerializer.Serialize(new PathMappingFile { Mappings = clean },
+                new JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+            File.WriteAllText(Path.Combine(appFolder, FileName), json);
+            Load(appFolder);
+        }
+
+        private static List<PathMapping> Normalize(IEnumerable<PathMapping> raw) => raw
+            .Where(m => !string.IsNullOrWhiteSpace(m.Windows) && !string.IsNullOrWhiteSpace(m.Linux))
+            .Select(m => new PathMapping { Windows = NormalizeWindowsRoot(m.Windows), Linux = NormalizeLinuxRoot(m.Linux) })
+            // Longest prefix first, so "L:\Video\" wins over "L:\"
+            .OrderByDescending(m => Math.Max(m.Windows.Length, m.Linux.Length))
+            .ToList();
+
         /// <summary>Converts a path (in either form) to the form used on the current OS.</summary>
         public static string ToLocal(string path) => IsWindows ? ToWindows(path) : ToLinux(path);
+
+        /// <summary>What ToLocal would return with these (unsaved) mappings - for "try a path" in the interfaces.</summary>
+        public static string PreviewLocal(string path, IEnumerable<PathMapping> unsaved)
+        {
+            var list = Normalize(unsaved);
+            return IsWindows ? ToWindows(path, list) : ToLinux(path, list);
+        }
 
         /// <summary>Converts a path to the form stored in the database (Windows form when a mapping matches).</summary>
         public static string ToStorage(string path) => ToWindows(path);
 
-        public static string ToWindows(string path)
+        public static string ToWindows(string path) => ToWindows(path, mappings);
+
+        public static string ToLinux(string path) => ToLinux(path, mappings);
+
+        private static string ToWindows(string path, List<PathMapping> list)
         {
             if (string.IsNullOrEmpty(path)) return path;
-            foreach (var m in mappings)
+            foreach (var m in list)
             {
                 if (StartsWithRoot(path, m.Linux, StringComparison.Ordinal))
                     return m.Windows + path.Substring(TrimmedLength(m.Linux, path)).TrimStart('/').Replace('/', '\\');
@@ -76,10 +102,10 @@ namespace deepduplicates
             return path;
         }
 
-        public static string ToLinux(string path)
+        private static string ToLinux(string path, List<PathMapping> list)
         {
             if (string.IsNullOrEmpty(path)) return path;
-            foreach (var m in mappings)
+            foreach (var m in list)
             {
                 if (StartsWithRoot(path, m.Windows, StringComparison.OrdinalIgnoreCase))
                     return m.Linux + path.Substring(TrimmedLength(m.Windows, path)).TrimStart('\\', '/').Replace('\\', '/');

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
@@ -22,8 +23,32 @@ namespace deepduplicates
     {
         public DbSet<VideoInfo> VideoInfos { get; set; }
 
+        // The database may be in its own folder (see DataLocation). Wait up to 60 s when another
+        // program (a second app or a scan elsewhere) is writing at the same moment.
         protected override void OnConfiguring(DbContextOptionsBuilder options)
-    => options.UseSqlite("Data Source=deepdupes.db");
+    => options.UseSqlite($"Data Source={DataLocation.DatabasePath};Default Timeout=60");
+
+        /// <summary>
+        /// Creates the database if needed and sets the classic journal mode instead of WAL. WAL does not work
+        /// when the database is opened over a network share (a PC using the NAS's database), and the classic
+        /// mode still lets several programs read while one writes. Call once at start-up.
+        /// </summary>
+        public static void Prepare()
+        {
+            using var db = new VideoInfoContext();
+            db.Database.EnsureCreated();
+            try
+            {
+                // Can only change while no other program has the database open; it's stored in the file,
+                // so it only has to succeed once
+                db.Database.SetCommandTimeout(5);
+                db.Database.ExecuteSqlRaw("PRAGMA busy_timeout=5000; PRAGMA journal_mode=DELETE;");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Database journal mode not changed (in use by another program): " + e.Message);
+            }
+        }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -112,6 +137,9 @@ namespace deepduplicates
         public List<bool> image3hash { get; set; }
         [NotMapped]
         public int triggerId { get; set; }
+
+        /// <summary>Copy of the fields (the screenshot hashes are shared, they are never changed).</summary>
+        public VideoInfo ShallowCopy() => (VideoInfo)MemberwiseClone();
 
         public override string ToString()
         {

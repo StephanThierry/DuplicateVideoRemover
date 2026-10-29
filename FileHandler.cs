@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Xabe.FFmpeg.Enums;
 
@@ -31,51 +32,45 @@ namespace deepduplicates
             return (json);
         }
 
-        private static void InitConfig(FileHandler instance)
+        /// <summary>The folder with settings.json, the database, screenshots and output (the current directory).</summary>
+        public static string AppFolder => appFolder;
+
+        public static string SettingsPath => Path.Combine(appFolder, "settings.json");
+
+        /// <summary>
+        /// Loads settings.json, or creates it with default values when it doesn't exist (created = true).
+        /// Paths are converted to the current OS (see PathMapper).
+        /// </summary>
+        public static Settings LoadSettings(out bool created)
         {
-            string settingsPath = Path.Combine(appFolder, "settings.json");
-            string settings_json = "";
-            try
+            created = false;
+            Settings settings;
+            if (!File.Exists(SettingsPath))
             {
-                settings_json = System.IO.File.ReadAllText(settingsPath);
-            }
-            catch
-            {
-                // Presumably settings.json does not exist - set default values and save
                 Console.WriteLine("Creating 'settings.json' - edit settings and run again.");
-                instance.settings = new Settings();
-                instance.settings.contentFolders = new string[0];
-                instance.settings.retainStructure = new string[0];
-                instance.settings.priorityFolders = new string[0];
-                instance.settings.excludePaths = new string[0];
-                instance.settings.retainIncomingFilenames = new string[0];
-                instance.settings.minVideoLength = 3;
-                instance.settings.contentFolders = new string[] { @"c:\MyVideos_changeThis" };
-                instance.settings.switchPriority = new switchPrioritySet[1];
-                switchPrioritySet spExample = new switchPrioritySet();
-                spExample.down = "x264";
-                spExample.up = "x265";
-                spExample.triggerBelowPctSizeDiff = 15;
-                instance.settings.switchPriority[0] = spExample;
-                
-                instance.settings.logInterval = 100;
-                instance.settings.matchSettings = new matchSettingsSet();
-                instance.settings.matchSettings.colorTolerance = 35;
-                instance.settings.matchSettings.shapeMatch = 280;
-                instance.settings.matchSettings.faultTolerance = 0;
-
-                File.WriteAllText(settingsPath, lameJSONBeautifier(JsonSerializer.Serialize(instance.settings)));
-                instance.firstRun = true;
+                settings = Settings.CreateDefault();
+                File.WriteAllText(SettingsPath, lameJSONBeautifier(JsonSerializer.Serialize(settings)));
+                created = true;
             }
-
-            if (instance.settings == null) instance.settings = JsonSerializer.Deserialize<Settings>(settings_json);
+            else
+            {
+                settings = JsonSerializer.Deserialize<Settings>(File.ReadAllText(SettingsPath));
+            }
+            settings.Normalize();
 
             // Paths in settings.json may be written in Windows or Linux form - convert them to the current OS
-            instance.settings.contentFolders = MapPaths(instance.settings.contentFolders);
-            instance.settings.excludePaths = MapPaths(instance.settings.excludePaths);
-            instance.settings.priorityFolders = MapPaths(instance.settings.priorityFolders);
-            instance.settings.retainStructure = MapPaths(instance.settings.retainStructure);
-            instance.settings.retainIncomingFilenames = MapPaths(instance.settings.retainIncomingFilenames);
+            settings.contentFolders = MapPaths(settings.contentFolders);
+            settings.excludePaths = MapPaths(settings.excludePaths);
+            settings.priorityFolders = MapPaths(settings.priorityFolders);
+            settings.retainStructure = MapPaths(settings.retainStructure);
+            settings.retainIncomingFilenames = MapPaths(settings.retainIncomingFilenames);
+            return settings;
+        }
+
+        /// <summary>Saves settings.json (used by the web and desktop interfaces).</summary>
+        public static void SaveSettings(Settings settings)
+        {
+            File.WriteAllText(SettingsPath, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
         }
 
         private static string[] MapPaths(string[] paths)
@@ -88,17 +83,32 @@ namespace deepduplicates
             return (Path.Combine(this.screenshotFolder, item.id + "_" + prefix + FileExtensions.Png));
         }
 
-        private FileHandler()
+        public FileHandler(Settings settings)
         {
-            // Block non-async object creation
+            this.settings = settings;
+            this.screenshotFolder = DataLocation.ScreenshotFolder;
+            Directory.CreateDirectory(this.screenshotFolder);
+            this.outputFolder = Path.Combine(appFolder, "output");
+            Directory.CreateDirectory(this.outputFolder);
+            this.allFiles = new List<string>();
         }
 
+        /// <summary>The original command-line start-up: settings, FFmpeg and the list of video files.</summary>
         public static async Task<FileHandler> CreateInstance()
         {
-            FileHandler instance = new FileHandler();
+            Settings settings = LoadSettings(out bool created);
+            await EnsureFFmpegAsync();
+            FileHandler instance = new FileHandler(settings);
+            instance.firstRun = created;
+            if (created) return (instance);
 
-            InitConfig(instance);
+            instance.FindFiles(null, CancellationToken.None);
+            return (instance);
+        }
 
+        /// <summary>Makes sure ffmpeg/ffprobe are available (system install on Linux, else downloaded).</summary>
+        public static async Task EnsureFFmpegAsync()
+        {
             string ffmpegFolder = Path.Combine(appFolder, "ffmpeg");
             Directory.CreateDirectory(ffmpegFolder);
             Xabe.FFmpeg.FFmpeg.ExecutablesPath = ffmpegFolder;
@@ -115,38 +125,40 @@ namespace deepduplicates
                 MakeExecutable(Path.Combine(ffmpegFolder, "ffprobe"));
                 Console.WriteLine("Done.");
             }
-            if (instance.firstRun) return (instance);
+        }
 
-            instance.screenshotFolder = Path.Combine(appFolder, "_screens");
-            Directory.CreateDirectory(instance.screenshotFolder);
-
-            instance.outputFolder = Path.Combine(appFolder, "output");
-            Directory.CreateDirectory(instance.outputFolder);
-
-            instance.allFiles = null;
-            foreach (string contentFolder in instance.settings.contentFolders)
+        /// <summary>Finds all video files in the content folders. Reports the running count to onCount.</summary>
+        public void FindFiles(Action<int> onCount, CancellationToken ct)
+        {
+            var found = new List<string>();
+            foreach (string contentFolder in settings.contentFolders)
             {
-                try{
-                Console.WriteLine("Indexing all files in: " + contentFolder + "...");
-                    IEnumerable<string> files = instance.GetFiles(contentFolder, new[] { ".avi", ".divx", ".mp4", ".m4v", ".mov", ".wmv", ".mpg", ".mpeg", ".flv", ".mkv" }, instance.settings.excludePaths);
-                if (instance.allFiles == null)
+                try
                 {
-                    instance.allFiles = files;
+                    Console.WriteLine("Indexing all files in: " + contentFolder + "...");
+                    foreach (string file in GetFiles(contentFolder, VideoExtensions, settings.excludePaths))
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        found.Add(file);
+                        if (found.Count % 200 == 0) onCount?.Invoke(found.Count);
+                    }
+                    Console.WriteLine("Found a total of " + found.Count + " video files.");
                 }
-                else
+                catch (OperationCanceledException) { throw; }
+                catch
                 {
-                    instance.allFiles = instance.allFiles.Concat(files);
-                }
-
-                Console.WriteLine("Found a total of " + instance.allFiles.Count() + " video files.");
-                } catch {
                     Console.WriteLine("Failed to get " + contentFolder + " - skipping.");
                 }
             }
-            instance.allFilesCount = instance.allFiles.Count();
-
-            return (instance);
+            onCount?.Invoke(found.Count);
+            this.allFiles = found;
+            this.allFilesCount = found.Count;
         }
+
+        public static readonly string[] VideoExtensions = { ".avi", ".divx", ".mp4", ".m4v", ".mov", ".wmv", ".mpg", ".mpeg", ".flv", ".mkv" };
+
+        /// <summary>Folder that "move to quarantine" puts files in (inside each content folder). Never scanned.</summary>
+        public const string QuarantineFolderName = "_DuplicateVideoRemover_quarantine";
 
         /// <summary>
         /// Linux/macOS: if ffmpeg and ffprobe are installed (e.g. "apt install ffmpeg"), link them into
@@ -220,7 +232,8 @@ namespace deepduplicates
                 {
                     foreach (string subDir in Directory.GetDirectories(path))
                     {
-                        queue.Enqueue(subDir);
+                        // The quarantine folder holds files the user removed - never index them again
+                        if (Path.GetFileName(subDir) != QuarantineFolderName) queue.Enqueue(subDir);
                     }
                 }
                 catch (UnauthorizedAccessException)

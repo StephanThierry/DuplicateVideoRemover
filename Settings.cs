@@ -1,7 +1,42 @@
+using System;
+
 namespace deepduplicates
 {
     public class Settings
     {
+        public static Settings CreateDefault()
+        {
+            var s = new Settings
+            {
+                contentFolders = new[] { OperatingSystem.IsWindows() ? @"c:\MyVideos_changeThis" : "/path/to/videos_changeThis" },
+                excludePaths = new string[0],
+                priorityFolders = new string[0],
+                retainStructure = new string[0],
+                retainIncomingFilenames = new string[0],
+                switchPriority = new[] { new switchPrioritySet { down = "x264", up = "x265", triggerBelowPctSizeDiff = 15 } },
+                logInterval = 100,
+                minVideoLength = 3,
+                matchSettings = matchSettingsSet.Recommended()
+            };
+            return s;
+        }
+
+        /// <summary>Fills in missing values, so code and interfaces never see null lists.</summary>
+        public void Normalize()
+        {
+            contentFolders ??= new string[0];
+            excludePaths ??= new string[0];
+            priorityFolders ??= new string[0];
+            retainStructure ??= new string[0];
+            retainIncomingFilenames ??= new string[0];
+            switchPriority ??= new switchPrioritySet[0];
+            matchSettings ??= matchSettingsSet.Recommended();
+            if (logInterval <= 0) logInterval = 100;
+        }
+
+        public Settings Clone() =>
+            System.Text.Json.JsonSerializer.Deserialize<Settings>(System.Text.Json.JsonSerializer.Serialize(this));
+
         public string[] contentFolders { get; set; }
         public string[] excludePaths { get; set; }
         public string[] priorityFolders { get; set; }
@@ -40,6 +75,11 @@ namespace deepduplicates
 
     public class matchSettingsSet
     {
+        public static matchSettingsSet Recommended() =>
+            new matchSettingsSet { colorTolerance = 35, shapeMatch = 280, faultTolerance = 0, triggerOnNameMatch = false };
+
+        public matchSettingsSet Clone() => (matchSettingsSet)MemberwiseClone();
+
         /// <summary>
         /// Tolerance for color accuracy. Lower value means "more accurate predictions".
         /// </summary>
