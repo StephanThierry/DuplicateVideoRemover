@@ -1,0 +1,104 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DuplicateVideoRemover.Desktop.ViewModels"
+             xmlns:img="using:Avalonia.Media.Imaging"
+             x:Class="DuplicateVideoRemover.Desktop.Views.ScanView"
+             x:DataType="vm:ScanViewModel">
+  <ScrollViewer>
+    <Grid RowDefinitions="Auto,*" Margin="12,16,12,12">
+      <DockPanel Grid.Row="0" Margin="0,0,0,16">
+        <Panel DockPanel.Dock="Right" VerticalAlignment="Bottom">
+          <Button Classes="primary" Content="Start scan" Command="{Binding StartCommand}" IsVisible="{Binding !IsRunning}" FontSize="15" Padding="20,9"/>
+          <Button Content="Stop scan" Command="{Binding StopCommand}" IsVisible="{Binding IsRunning}" IsEnabled="{Binding !Stopping}" FontSize="15" Padding="20,9"/>
+        </Panel>
+        <StackPanel>
+          <TextBlock Classes="h1" Text="Scan"/>
+          <TextBlock Classes="muted" Text="Finds the videos in your folders, reads the new ones and compares them all." Margin="0,4,0,0"/>
+        </StackPanel>
+      </DockPanel>
+
+      <Grid Grid.Row="1" ColumnDefinitions="*,340" ColumnSpacing="20">
+        <Border Classes="panel" VerticalAlignment="Top">
+          <StackPanel Spacing="14">
+            <ItemsControl ItemsSource="{Binding Steps}">
+              <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Rows="1"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:StepItem">
+                  <StackPanel Margin="0,0,8,0">
+                    <Panel Height="4">
+                      <Border Background="{DynamicResource Rule}"/>
+                      <Border Background="{DynamicResource Keep}" IsVisible="{Binding IsDone}"/>
+                      <Border Background="{DynamicResource Accent}" IsVisible="{Binding IsCurrent}"/>
+                    </Panel>
+                    <TextBlock Text="{Binding Label}" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock IsVisible="{Binding IsIdle}" Classes="muted" TextWrapping="Wrap"
+                       Text="No scan running. Videos already in the database are not read again, so later scans are much faster."/>
+
+            <StackPanel Spacing="14" IsVisible="{Binding !IsIdle}">
+              <ProgressBar Value="{Binding Percent}" Maximum="100" Height="14" CornerRadius="7"/>
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Right" Classes="muted" Text="{Binding Remaining}" VerticalAlignment="Bottom"/>
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                  <TextBlock Text="{Binding PercentText}" FontSize="34" FontWeight="SemiBold"/>
+                  <TextBlock Text="{Binding Message}" Classes="muted" VerticalAlignment="Bottom" Margin="0,0,0,7" TextWrapping="Wrap"/>
+                </StackPanel>
+              </DockPanel>
+
+              <UniformGrid Columns="3">
+                <StackPanel Margin="0,0,0,12"><TextBlock Classes="muted small" Text="Videos found"/><TextBlock Text="{Binding Found}" FontSize="17" FontWeight="SemiBold"/></StackPanel>
+                <StackPanel Margin="0,0,0,12"><TextBlock Classes="muted small" Text="Already read before"/><TextBlock Text="{Binding AlreadyRead}" FontSize="17" FontWeight="SemiBold"/></StackPanel>
+                <StackPanel Margin="0,0,0,12"><TextBlock Classes="muted small" Text="New videos read"/><TextBlock Text="{Binding NewRead}" FontSize="17" FontWeight="SemiBold"/></StackPanel>
+                <StackPanel><TextBlock Classes="muted small" Text="Could not read"/><TextBlock Text="{Binding Failed}" FontSize="17" FontWeight="SemiBold"/></StackPanel>
+                <StackPanel><TextBlock Classes="muted small" Text="Time so far"/><TextBlock Text="{Binding Elapsed}" FontSize="17" FontWeight="SemiBold"/></StackPanel>
+                <StackPanel><TextBlock Classes="muted small" Text="Per new video"/><TextBlock Text="{Binding PerVideo}" FontSize="17" FontWeight="SemiBold"/></StackPanel>
+              </UniformGrid>
+
+              <TextBlock Classes="muted small" Text="{Binding CurrentFile}" TextWrapping="Wrap"/>
+
+              <Border Background="{DynamicResource Frame}" CornerRadius="3" Padding="4" ClipToBounds="True" HorizontalAlignment="Left">
+                <ItemsControl ItemsSource="{Binding Recent}">
+                  <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="3"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="img:Bitmap"><Image Source="{Binding}" Width="120" Height="80" Stretch="UniformToFill"/></DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Border>
+
+              <Border IsVisible="{Binding IsDone}" Background="{DynamicResource KeepWash}" CornerRadius="4" Padding="14,12">
+                <StackPanel Spacing="10">
+                  <TextBlock Text="{Binding Message}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                  <Button Classes="primary" Content="Review results" Command="{Binding ReviewCommand}"/>
+                </StackPanel>
+              </Border>
+              <Border IsVisible="{Binding IsProblem}" Background="{DynamicResource GreaseWash}" CornerRadius="4" Padding="14,12">
+                <TextBlock Text="{Binding Message}" TextWrapping="Wrap"/>
+              </Border>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <StackPanel Grid.Column="1" Spacing="16">
+          <Border Classes="panel">
+            <StackPanel Spacing="8">
+              <TextBlock Classes="h2" Text="What is scanned"/>
+              <TextBlock Text="{Binding ScopeText}" TextWrapping="Wrap"/>
+              <Button Classes="link" Content="Change folders and rules" Command="{Binding EditSettingsCommand}"/>
+            </StackPanel>
+          </Border>
+          <Border Classes="panel">
+            <StackPanel Spacing="6">
+              <TextBlock Classes="h2" Text="Last scan"/>
+              <TextBlock Text="{Binding LastRunText}" TextWrapping="Wrap"/>
+              <TextBlock Classes="muted" Text="{Binding LastRunDetail}" TextWrapping="Wrap"/>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </Grid>
+    </Grid>
+  </ScrollViewer>
+</UserControl>

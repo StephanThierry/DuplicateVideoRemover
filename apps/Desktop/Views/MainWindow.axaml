@@ -1,0 +1,32 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DuplicateVideoRemover.Desktop.ViewModels"
+        xmlns:v="using:DuplicateVideoRemover.Desktop.Views"
+        x:Class="DuplicateVideoRemover.Desktop.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Title="Duplicate Video Remover"
+        Width="1280" Height="860" MinWidth="900" MinHeight="600"
+        Background="{DynamicResource Table}">
+  <DockPanel>
+    <Border DockPanel.Dock="Top" Background="{DynamicResource Sheet}" BorderBrush="{DynamicResource Rule}" BorderThickness="0,0,0,1" Padding="20,10">
+      <DockPanel>
+        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+          <Viewbox Width="22" Height="22">
+            <Canvas Width="24" Height="24">
+              <Rectangle Canvas.Left="2" Canvas.Top="4" Width="20" Height="16" RadiusX="2" RadiusY="2" Stroke="{DynamicResource Grease}" StrokeThickness="2"/>
+              <Path Data="M7,9 L17,15 M17,9 L7,15" Stroke="{DynamicResource Grease}" StrokeThickness="2.4" StrokeLineCap="Round"/>
+            </Canvas>
+          </Viewbox>
+          <TextBlock Text="Duplicate Video Remover" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center"/>
+        </StackPanel>
+        <TextBlock Text="{Binding DataFolder}" Classes="muted small" HorizontalAlignment="Right" VerticalAlignment="Center"
+                   TextTrimming="CharacterEllipsis" ToolTip.Tip="Data folder (settings, database, screenshots)"/>
+      </DockPanel>
+    </Border>
+    <TabControl SelectedIndex="{Binding SelectedTab}" Padding="0" Margin="12,4,12,0">
+      <TabItem Header="Review"><v:ReviewView DataContext="{Binding Review}"/></TabItem>
+      <TabItem Header="Scan"><v:ScanView DataContext="{Binding Scan}"/></TabItem>
+      <TabItem Header="Settings"><v:SettingsView DataContext="{Binding Settings}"/></TabItem>
+    </TabControl>
+  </DockPanel>
+</Window>
