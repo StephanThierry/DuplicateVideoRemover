@@ -1,9 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
 // Publish single trimmed executable: 	
-// dotnet publish -r win-x64 -c Release /p:PublishSingleFile=true /p:PublishTrimmed=true
+// dotnet publish -r win-x64 -c Release /p:PublishSingleFile=true   (use -r linux-x64 for Linux)
 
 namespace deepduplicates
 {
@@ -12,6 +12,9 @@ namespace deepduplicates
         // Accuracy tested to 99.99% with default settings - so check the report for false positives. On average there is aprox. 1 i every 10000 files.
         static async Task Main(string[] args)
         {
+            // Load Windows <-> Linux path mappings first, the database uses them when reading/writing paths
+            PathMapper.Load(System.IO.Directory.GetCurrentDirectory());
+
             VideoInfoContext db = new VideoInfoContext();
             db.Database.EnsureCreated(); 
 
@@ -40,13 +43,13 @@ namespace deepduplicates
             Console.WriteLine("Performing checksum validation...");
             mediaList = recommendationHandler.checkChecksumOfAllSimilarVideos_Optimized(mediaList, fileHandler.settings);
 
-            Console.WriteLine("Generating batch-file...");
+            Console.WriteLine("Generating delete script...");
             fileHandler.generateBatchFile(mediaList);
 
             Console.WriteLine("Generating HTML report...");
             fileHandler.generateReport(mediaList);
 
-            Console.WriteLine("Generating Encoding batch...");
+            Console.WriteLine("Generating encoding script...");
             fileHandler.generateEncoding(mediaList, fileHandler.settings.encodeSettings);
 
             Console.WriteLine("Check ./output directory");

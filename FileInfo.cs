@@ -13,6 +13,9 @@ namespace deepduplicates
         public int r { get; set; }
         public int g { get; set; }
         public int b { get; set; }
+
+        // Used in the match reason shown in the report (was printed as "deepduplicates.rgb")
+        public override string ToString() => $"{r}/{g}/{b}";
     }
     
     public class VideoInfoContext : DbContext
@@ -21,6 +24,17 @@ namespace deepduplicates
 
         protected override void OnConfiguring(DbContextOptionsBuilder options)
     => options.UseSqlite("Data Source=deepdupes.db");
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            // Paths are stored in Windows form and converted to the current OS when read
+            // (see PathMapper / pathmapping.json), so one database works on Windows and Linux.
+            modelBuilder.Entity<VideoInfo>()
+                .Property(v => v.path)
+                .HasConversion(
+                    local => PathMapper.ToStorage(local),
+                    stored => PathMapper.ToLocal(stored));
+        }
 
     }
 

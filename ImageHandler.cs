@@ -1,10 +1,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Drawing;
-using System.Drawing.Imaging;
-using System.IO;
 using System.Linq;
+using SkiaSharp;
 using Xabe.FFmpeg;
 using Xabe.FFmpeg.Enums;
 using Xabe.FFmpeg.Streams;
@@ -12,52 +10,68 @@ using Xabe.FFmpeg.Streams;
 namespace deepduplicates
 {
 
+    // Uses SkiaSharp (cross-platform) instead of System.Drawing, which only works on Windows in .NET 6+.
     public class ImageHandler
     {
         public static byte thumbnailDimensions = 32;
+
         public rgb[] imageChecksum(string path)
         {
-            using (FileStream pngStream = new FileStream(path, FileMode.Open, FileAccess.Read))
+            byte[] rgbValues1 = ReadAs24bppBgr(path, out int bytes);
+
+            // Same algorithm as before, on the same bytes (24-bit, B-G-R order, rows padded
+            // to 4 bytes, like System.Drawing's Format24bppRgb), so results match existing DB values.
+            int nbrOfSegments = 4;
+            int segment = 0;
+            rgb[] profile = new rgb[nbrOfSegments];
+            int pixelPointer = 0;
+            while(pixelPointer+2<bytes){
+                if (profile[segment] == null) profile[segment] = new rgb();
+                profile[segment].r += rgbValues1[pixelPointer];
+                profile[segment].b += rgbValues1[pixelPointer+1];
+                profile[segment].g += rgbValues1[pixelPointer+2];
+                segment = pixelPointer / (bytes / nbrOfSegments);
+                pixelPointer +=3;
+            }
+            for(int i=0;i<nbrOfSegments;i++){
+                List<int> values = new List<int>();
+                values.Add(profile[i].r);
+                values.Add(profile[i].g);
+                values.Add(profile[i].b);
+                int smallestRatio = values.Min() / 100;
+                if(smallestRatio == 0) smallestRatio = 1; 
+                profile[i].r = profile[i].r / smallestRatio;
+                profile[i].g = profile[i].g / smallestRatio;
+                profile[i].b = profile[i].b / smallestRatio;
+            }
+            return (profile);
+        }
+
+        /// <summary>Decodes an image into the byte layout System.Drawing used for Format24bppRgb.</summary>
+        private static byte[] ReadAs24bppBgr(string path, out int bytes)
+        {
+            using (var decoded = SKBitmap.Decode(path))
             {
-                using (var image = new Bitmap(pngStream))
+                if (decoded == null) throw new ArgumentException("Can't decode image: " + path);
+                using (var bitmap = decoded.Copy(SKColorType.Rgba8888))
                 {
-                    using (var graphics = Graphics.FromImage(image))
+                    int width = bitmap.Width, height = bitmap.Height;
+                    int stride = ((width * 3) + 3) & ~3;
+                    bytes = stride * height;
+                    byte[] result = new byte[bytes];
+                    ReadOnlySpan<byte> src = bitmap.GetPixelSpan();
+                    int srcStride = bitmap.RowBytes;
+                    for (int y = 0; y < height; y++)
                     {
-                        BitmapData bitmapData = image.LockBits(new Rectangle(0, 0, image.Width, image.Height), ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
-                        IntPtr ptr = bitmapData.Scan0;
-                        int bytes = Math.Abs(bitmapData.Stride) * image.Height;
-                        byte[] rgbValues1 = new byte[bytes];
-                        System.Runtime.InteropServices.Marshal.Copy(ptr, rgbValues1, 0, bytes);
-
-                        //long profile1 = 0;
-                        int nbrOfSegments = 4;
-                        int segment = 0;
-                        rgb[] profile = new rgb[nbrOfSegments];
-                        int pixelPointer = 0;
-                        while(pixelPointer+2<bytes){
-                            if (profile[segment] == null) profile[segment] = new rgb();
-                            profile[segment].r += rgbValues1[pixelPointer];
-                            profile[segment].b += rgbValues1[pixelPointer+1];
-                            profile[segment].g += rgbValues1[pixelPointer+2];
-                            segment = pixelPointer / (bytes / nbrOfSegments);
-                            pixelPointer +=3;
+                        int s = y * srcStride, d = y * stride;
+                        for (int x = 0; x < width; x++, s += 4, d += 3)
+                        {
+                            result[d] = src[s + 2];     // B
+                            result[d + 1] = src[s + 1]; // G
+                            result[d + 2] = src[s];     // R
                         }
-                        for(int i=0;i<nbrOfSegments;i++){
-                            List<int> values = new List<int>();
-                            values.Add(profile[i].r);
-                            values.Add(profile[i].g);
-                            values.Add(profile[i].b);
-                            int smallestRatio = values.Min() / 100;
-                            if(smallestRatio == 0) smallestRatio = 1; 
-                            profile[i].r = profile[i].r / smallestRatio;
-                            profile[i].g = profile[i].g / smallestRatio;
-                            profile[i].b = profile[i].b / smallestRatio;
-                        }
-
-                        // Release the unmanaged memory manually - GC will not do it
-                        image.UnlockBits(bitmapData);
-                        return (profile);
                     }
+                    return result;
                 }
             }
         }
@@ -90,29 +104,27 @@ namespace deepduplicates
 
             try
             {
-                using (FileStream pngStream = new FileStream(path, FileMode.Open, FileAccess.Read))
+                using (var image = SKBitmap.Decode(path))
+                using (var bmpMin = image.Resize(new SKImageInfo(thumbnailDimensions, thumbnailDimensions, SKColorType.Rgba8888, SKAlphaType.Unpremul),
+                                                 new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.None)))
                 {
-                    using (var image = new Bitmap(pngStream))
+                    float totalBrightness = 0;
+                    for (int j = 0; j < bmpMin.Height; j++)
                     {
-                        Bitmap bmpMin = new Bitmap(image, new Size(thumbnailDimensions, thumbnailDimensions));
-                        float totalBrightness = 0;
-                        for (int j = 0; j < bmpMin.Height; j++)
+                        for (int i = 0; i < bmpMin.Width; i++)
                         {
-                            for (int i = 0; i < bmpMin.Width; i++)
-                            {
-                                //reduce colors to true / false                
-                                totalBrightness += bmpMin.GetPixel(i, j).GetBrightness(); 
-                            }
+                            //reduce colors to true / false                
+                            totalBrightness += GetBrightness(bmpMin.GetPixel(i, j)); 
                         }
+                    }
 
-                        float avgBrightness = totalBrightness/(thumbnailDimensions*thumbnailDimensions);
-                        for (int j = 0; j < bmpMin.Height; j++)
+                    float avgBrightness = totalBrightness/(thumbnailDimensions*thumbnailDimensions);
+                    for (int j = 0; j < bmpMin.Height; j++)
+                    {
+                        for (int i = 0; i < bmpMin.Width; i++)
                         {
-                            for (int i = 0; i < bmpMin.Width; i++)
-                            {
-                                //reduce colors to true / false                
-                                lResult.Add(bmpMin.GetPixel(i, j).GetBrightness() < avgBrightness);
-                            }
+                            //reduce colors to true / false                
+                            lResult.Add(GetBrightness(bmpMin.GetPixel(i, j)) < avgBrightness);
                         }
                     }
                 }
@@ -122,6 +134,14 @@ namespace deepduplicates
                 // ignore
             }
             return lResult;
+        }
+
+        // Same formula as System.Drawing.Color.GetBrightness()
+        private static float GetBrightness(SKColor c)
+        {
+            int max = Math.Max(c.Red, Math.Max(c.Green, c.Blue));
+            int min = Math.Min(c.Red, Math.Min(c.Green, c.Blue));
+            return (max + min) / (byte.MaxValue * 2f);
         }
 
         public IConversion takeScreenshot(IMediaInfo info, string outputPath, TimeSpan captureTime, int width, int height)
