@@ -1,0 +1,335 @@
+@page "/"
+@implements IDisposable
+@inject AppController App
+@inject NavigationManager Nav
+
+<PageTitle>Review duplicates</PageTitle>
+
+<div class="page">
+    <div class="page-head">
+        <div>
+            <h1>Review duplicates</h1>
+            <p>
+                @if (Results.Groups.Count + Results.Broken.Count == 0)
+                {
+                    <text>Nothing to review yet.</text>
+                }
+                else
+                {
+                    <text>@Fmt.Plural(Results.DuplicateCount, "duplicate", "duplicates") in @Fmt.Plural(Results.Groups.Count, "group", "groups"), @Fmt.Plural(Results.Broken.Count, "broken or short video", "broken or short videos"). Found @Fmt.Ago(Results.CreatedUtc).</text>
+                }
+            </p>
+        </div>
+        <button @onclick="Reanalyze" disabled="@App.Scanner.IsRunning" title="Uses the saved settings and the videos already read - no files are read">Compare again</button>
+    </div>
+
+    @if (Results.Groups.Count + Results.Broken.Count == 0)
+    {
+        <div class="empty">
+            <h2>No duplicates to review</h2>
+            <p>Scan your folders to find duplicate and broken videos. Finished results show up here.</p>
+            <button class="primary big" @onclick='() => Nav.NavigateTo("scan")'>Go to scan</button>
+        </div>
+    }
+    else
+    {
+        <div class="review">
+            <aside class="folders" aria-label="Folders with duplicates">
+                <h2>Folders</h2>
+                <ul>
+                    @foreach (var f in folders)
+                    {
+                        <li>
+                            <button class="folder-item @(f.Folder == folderFilter ? "active" : "")" title="@f.Folder" @onclick="() => FilterFolder(f.Folder)">
+                                <span class="name">@ShortFolder(f.Folder)</span>
+                                <span class="n num">@f.Count</span>
+                                @if (f.SelectedCount > 0) { <span class="sel num">@f.SelectedCount selected</span> }
+                            </button>
+                        </li>
+                    }
+                </ul>
+            </aside>
+
+            <section>
+                <div class="toolbar">
+                    <button @onclick="Session.SelectAllDuplicates">Select all duplicates</button>
+                    <button @onclick="Session.SelectAllBroken" disabled="@(Results.Broken.Count == 0)">Select broken and short</button>
+                    <button @onclick="Session.SelectNone" disabled="@(Session.SelectedCount == 0)">Select none</button>
+                    <input type="search" placeholder="Filter by file or folder name" @bind="search" @bind:event="oninput" @bind:after="ResetPaging" aria-label="Filter by file or folder name" />
+                </div>
+
+                @if (folderFilter != null)
+                {
+                    var summary = folders.FirstOrDefault(f => f.Folder == folderFilter);
+                    <div class="filterbar">
+                        <span>Showing <span class="path">@folderFilter</span></span>
+                        <button class="danger" @onclick="SelectFolder">Select all duplicates in this folder</button>
+                        @if (summary?.SelectedCount > 0) { <button @onclick="() => Session.UnselectFolder(folderFilter)">Unselect folder</button> }
+                        <button class="link" @onclick="() => FilterFolder(null)">Show all folders</button>
+                    </div>
+                }
+
+                @{
+                    var groups = VisibleGroups().ToList();
+                    var broken = VisibleBroken().ToList();
+                }
+
+                @if (groups.Count > 0)
+                {
+                    <div class="section-title"><h2>Duplicates</h2><span>@Fmt.Plural(groups.Count, "group", "groups")</span></div>
+                    @foreach (var g in groups.Take(shown))
+                    {
+                        int keepId = Session.KeepId(g);
+                        <article class="group" @key="g.Id">
+                            <div class="group-head">@g.Members.Count copies, @Fmt.Duration(g.Members[0].DurationSeconds) long</div>
+                            @foreach (var m in g.Members)
+                            {
+                                bool sel = Session.IsSelected(m.Id);
+                                <div class="row @(sel ? "is-selected" : "") @(m.Id == keepId ? "is-kept" : "")" @key="m.Id">
+                                    <input type="checkbox" checked="@sel" @onchange="() => Toggle(m.Id)" aria-label="Select @m.FileName for removal" />
+                                    <Strip VideoId="m.Id" Title="Click to select or unselect" OnClick="() => Toggle(m.Id)" />
+                                    <div class="info">
+                                        <div class="name">@m.FileName</div>
+                                        <button class="link folderlink" @onclick="() => FilterFolder(m.Folder)" title="Show only this folder">@m.Folder</button>
+                                        <div class="meta"><span>@Fmt.Size(m.SizeBytes)</span><span>@Fmt.Duration(m.DurationSeconds)</span><span>@Fmt.Bitrate(m.Bitrate)</span></div>
+                                        @if (m.Id != keepId && !string.IsNullOrEmpty(m.Reason)) { <div class="reason">@CleanReason(m.Reason)</div> }
+                                    </div>
+                                    <div class="row-actions">
+                                        @if (m.Id != keepId) { <button @onclick="() => Session.KeepInstead(m.Id)">Keep this one</button> }
+                                    </div>
+                                </div>
+                            }
+                        </article>
+                    }
+                    @if (groups.Count > shown)
+                    {
+                        <div class="more"><button @onclick="() => shown += PageSize">Show @Math.Min(PageSize, groups.Count - shown) more groups</button></div>
+                    }
+                }
+
+                @if (broken.Count > 0)
+                {
+                    <div class="section-title"><h2>Broken, incomplete or too short</h2><span>@Fmt.Plural(broken.Count, "video", "videos")</span></div>
+                    <article class="group">
+                        @foreach (var b in broken.Take(shownBroken))
+                        {
+                            bool sel = Session.IsSelected(b.Id);
+                            <div class="row @(sel ? "is-selected" : "")" @key="b.Id">
+                                <input type="checkbox" checked="@sel" @onchange="() => Toggle(b.Id)" aria-label="Select @b.FileName for removal" />
+                                <Strip VideoId="b.Id" Title="Click to select or unselect" OnClick="() => Toggle(b.Id)" />
+                                <div class="info">
+                                    <div class="name">@b.FileName</div>
+                                    <button class="link folderlink" @onclick="() => FilterFolder(b.Folder)" title="Show only this folder">@b.Folder</button>
+                                    <div class="meta"><span>@Fmt.Size(b.SizeBytes)</span><span>@Fmt.Duration(b.DurationSeconds)</span></div>
+                                    <div class="reason">@CleanReason(b.Reason)</div>
+                                </div>
+                                <div></div>
+                            </div>
+                        }
+                    </article>
+                    @if (broken.Count > shownBroken)
+                    {
+                        <div class="more"><button @onclick="() => shownBroken += PageSize * 2">Show more</button></div>
+                    }
+                }
+
+                @if (groups.Count == 0 && broken.Count == 0)
+                {
+                    <div class="empty"><h2>No matches</h2><p>Nothing matches this filter.</p><button @onclick="ClearFilters">Clear the filter</button></div>
+                }
+            </section>
+        </div>
+
+        <div class="actionbar">
+            <div class="inner">
+                <div class="count num">
+                    @Fmt.Plural(Session.SelectedCount, "file", "files") selected
+                    <small>@Fmt.Size(Session.SelectedBytes)</small>
+                </div>
+                <div class="segmented" role="radiogroup" aria-label="How to remove">
+                    <label><input type="radio" name="mode" checked="@(mode == RemoveMode.Quarantine)" @onchange="() => mode = RemoveMode.Quarantine" />Move to quarantine</label>
+                    <label><input type="radio" name="mode" checked="@(mode == RemoveMode.Delete)" @onchange="() => mode = RemoveMode.Delete" />Delete permanently</label>
+                </div>
+                <button class="@(mode == RemoveMode.Delete ? "danger" : "primary") big" disabled="@(Session.SelectedCount == 0 || busy)" @onclick="() => confirming = true">
+                    @(mode == RemoveMode.Delete ? "Delete" : "Move") @Fmt.Plural(Session.SelectedCount, "file", "files")
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@if (confirming)
+{
+    <div class="dialog-backdrop" @onclick="() => confirming = false">
+        <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" @onclick:stopPropagation="true">
+            @if (mode == RemoveMode.Delete)
+            {
+                <h2 id="confirm-title">Delete @Fmt.Plural(Session.SelectedCount, "file", "files") permanently?</h2>
+                <p>@Fmt.Size(Session.SelectedBytes) will be deleted. This can't be undone.</p>
+            }
+            else
+            {
+                <h2 id="confirm-title">Move @Fmt.Plural(Session.SelectedCount, "file", "files") to quarantine?</h2>
+                <p>The files (@Fmt.Size(Session.SelectedBytes)) are moved to a folder named @FileHandler.QuarantineFolderName inside each scanned folder. Delete that folder when you are sure, or move files back from it.</p>
+            }
+            <div class="buttons">
+                <button @onclick="() => confirming = false">Cancel</button>
+                <button class="@(mode == RemoveMode.Delete ? "danger" : "primary")" @onclick="Execute" disabled="@busy">
+                    @(busy ? "Working..." : mode == RemoveMode.Delete ? "Delete permanently" : "Move to quarantine")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (report != null && report.Failed.Count > 0 && showFailures)
+{
+    <div class="dialog-backdrop" @onclick="() => showFailures = false">
+        <div class="dialog wide" role="dialog" aria-modal="true" @onclick:stopPropagation="true">
+            <h2>@Fmt.Plural(report.Failed.Count, "file was", "files were") not removed</h2>
+            <p>They are still selected. Close any program using them, check that you may change the folder, and try again.</p>
+            <ul class="failures">
+                @foreach (var f in report.Failed) { <li><strong>@f.Entry.Path</strong><br />@f.Error</li> }
+            </ul>
+            <div class="buttons"><button class="primary" @onclick="() => showFailures = false">Close</button></div>
+        </div>
+    </div>
+}
+
+@if (toast != null)
+{
+    <div class="toast" role="status">
+        @toast
+        @if (report?.Failed.Count > 0) { <button class="link" @onclick="() => showFailures = true">See what failed</button> }
+    </div>
+}
+
+@code {
+    private const int PageSize = 40;
+    private ResultSession Session => App.Session;
+    private ResultSet Results => App.Session.Results;
+    private ResultSession watched;
+
+    private List<FolderSummary> folders = new();
+    private string folderFilter;
+    private string search = "";
+    private int shown = PageSize, shownBroken = PageSize * 2;
+    private RemoveMode mode = RemoveMode.Quarantine;
+    private bool confirming, busy, showFailures;
+    private ExecuteReport report;
+    private string toast;
+    private CancellationTokenSource toastTimer;
+
+    protected override void OnInitialized()
+    {
+        App.SessionReplaced += OnSessionReplaced;
+        Watch();
+    }
+
+    private void Watch()
+    {
+        if (watched != null) watched.Changed -= OnChanged;
+        watched = App.Session;
+        watched.Changed += OnChanged;
+        folders = watched.Folders();
+    }
+
+    private void OnChanged()
+    {
+        folders = Session.Folders();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnSessionReplaced()
+    {
+        Watch();
+        folderFilter = null;
+        ResetPaging();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private IEnumerable<DuplicateGroup> VisibleGroups() =>
+        Results.Groups.Where(g => g.Members.Any(Matches));
+
+    private IEnumerable<VideoEntry> VisibleBroken() => Results.Broken.Where(Matches);
+
+    private bool Matches(VideoEntry e) =>
+        (folderFilter == null || e.Folder == folderFilter) &&
+        (string.IsNullOrWhiteSpace(search) || e.Path.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    private void FilterFolder(string folder)
+    {
+        folderFilter = folder;
+        ResetPaging();
+    }
+
+    private void ClearFilters() { folderFilter = null; search = ""; ResetPaging(); }
+
+    private void ResetPaging() { shown = PageSize; shownBroken = PageSize * 2; }
+
+    private void Toggle(int id)
+    {
+        var message = Session.Toggle(id);
+        if (message != null) ShowToast(message);
+    }
+
+    private void SelectFolder()
+    {
+        int n = Session.SelectFolder(folderFilter);
+        ShowToast(n == 0 ? "Nothing more to select in this folder." : $"Selected {Fmt.Plural(n, "file", "files")} in this folder.");
+    }
+
+    private async Task Execute()
+    {
+        busy = true;
+        StateHasChanged();
+        var m = mode;
+        report = await Task.Run(() => App.Execute(m));
+        busy = false;
+        confirming = false;
+        folders = Session.Folders();
+        // The folder may be empty now - then show everything again
+        if (folderFilter != null && !folders.Any(f => f.Folder == folderFilter)) FilterFolder(null);
+        var verb = m == RemoveMode.Delete ? "Deleted" : "Moved";
+        var text = $"{verb} {Fmt.Plural(report.Removed.Count, "file", "files")}, {Fmt.Size(report.BytesFreed)}.";
+        if (report.Failed.Count > 0) text += $" {Fmt.Plural(report.Failed.Count, "file", "files")} could not be removed.";
+        ShowToast(text, report.Failed.Count > 0 ? 12000 : 6000);
+    }
+
+    private void Reanalyze()
+    {
+        App.ReanalyzeFromDatabase();
+        ShowToast("Compared again with the saved settings.");
+    }
+
+    private void ShowToast(string text, int ms = 4000)
+    {
+        toast = text;
+        toastTimer?.Cancel();
+        toastTimer = new CancellationTokenSource();
+        var token = toastTimer.Token;
+        _ = Task.Delay(ms, token).ContinueWith(t =>
+        {
+            if (t.IsCanceled) return;
+            toast = null;
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    /// <summary>Last two folder names, enough to tell folders apart in the side list.</summary>
+    private static string ShortFolder(string folder)
+    {
+        var parts = folder.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length <= 2 ? folder : "…" + System.IO.Path.DirectorySeparatorChar + string.Join(System.IO.Path.DirectorySeparatorChar, parts[^2..]);
+    }
+
+    private static string CleanReason(string reason) =>
+        System.Text.RegularExpressions.Regex.Replace(reason ?? "", "<!--.*?-->", "").Trim(' ', '-');
+
+    public void Dispose()
+    {
+        App.SessionReplaced -= OnSessionReplaced;
+        if (watched != null) watched.Changed -= OnChanged;
+        toastTimer?.Cancel();
+    }
+}
