@@ -5,10 +5,10 @@
 2. Invalid video files 
 3. Videos at or under a specified length (2 sec by default)
 4. Generate a HTML report `./output/report.html` of all videofiles that are invalid or duplicates
-5. Generate a script `./output/delete_all_dupes.bat` (Windows) or `./output/delete_all_dupes.sh` (Linux) with delete commands for all invalid and duplicate videos 
+5. Generate a script `./output/delete_all_dupes.ps1` (Windows PowerShell) or `./output/delete_all_dupes.sh` (Linux) with delete commands for all invalid and duplicate videos 
 4. Is able to generate a complete HTML index `./output/reportIndex.html` of all videofiles with full path and 3 screenshots pr. video.
 
-Review the report before running the batch file to delete, the algorithms are about 99.99% accurate - so 1-2 in each 10000 videos will likely be a false positive.   
+Review the report before running the delete script, the algorithms are about 99.99% accurate - so 1-2 in each 10000 videos will likely be a false positive.   
 
 All settings are located in: `./settings.json`  - run the program once to create this file.  
 
@@ -24,6 +24,13 @@ Edit `settings.json`
 
 Now you can re-start the program:   
 `dotnet run` 
+
+### Running the scripts
+On Windows the scripts in `./output` are PowerShell scripts (`.ps1`). Unlike `.bat` files they work with network paths that aren't mapped to a drive letter (`\\nas\video\...`), and with file names containing `%`, `[ ]`, `'` or `æøå`. Windows blocks scripts by default, so run them like this:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\output\delete_all_dupes.ps1
+```
 
 ### Running on Linux and sharing the database with Windows
 The program runs the same way on Linux. The scripts in `./output` are then `.sh` files: run them with `./output/delete_all_dupes.sh`.  
@@ -50,7 +57,7 @@ The screenshots are saved in the `_screens`-folder and the metadate is saved in 
 
 It's recommneded to place the program on an SSD disk since it executes a lot of local read/write operations to update the db and read/write the screenshots. Free space on the drive must be aprox. 260 Kb pr video, so if you plan on running the program om a NAS with 43.000 videos, make sure your SSD has more than 10 GB of free space.   
 
-2. After the indexing process is over, checksums are calculated, compared and a delete script (`.bat` on Windows, `.sh` on Linux) and an HTML report is made in the `./output` folder. The report groups each original with its duplicates, shows broken or short videos separately, and can be filtered by path.  
+2. After the indexing process is over, checksums are calculated, compared and a delete script (`.ps1` on Windows, `.sh` on Linux) and an HTML report is made in the `./output` folder. The report groups each original with its duplicates, shows broken or short videos separately, and can be filtered by path.  
 
 **Cleaning the database and screenshots**  
 After running the program for a number of days (or months) you may have a lot of references in the database and screenshots in the `_screens` folder that are nolonger present, either because they have been deleted or moved. You can clean up thoes entried and files by running the application with the `clean` parameter.  

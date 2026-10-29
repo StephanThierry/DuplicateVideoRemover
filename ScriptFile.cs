@@ -5,59 +5,81 @@ using System.Text;
 namespace deepduplicates
 {
     /// <summary>
-    /// Writes a .bat file on Windows and a .sh file on Linux/macOS.
-    /// Use the helpers to produce commands and quoted paths for the current OS.
+    /// Writes a PowerShell script (.ps1) on Windows and a shell script (.sh) on Linux/macOS.
+    ///
+    /// PowerShell is used instead of .bat because cmd.exe can't use UNC paths (\\server\share\...)
+    /// as the current folder, mangles % in paths and needs code page tricks for special characters.
+    /// PowerShell handles UNC paths natively, and -LiteralPath / single quotes keep [ ] $ % ' literal.
     /// </summary>
     public sealed class ScriptFile : IDisposable
     {
         public static bool IsWindows => OperatingSystem.IsWindows();
-        public static string Extension => IsWindows ? ".bat" : ".sh";
+        public static string Extension => IsWindows ? ".ps1" : ".sh";
 
         public string FilePath { get; }
         private readonly StreamWriter writer;
+        private readonly bool powerShell;
 
         /// <param name="folder">Output folder</param>
         /// <param name="baseName">File name without extension, e.g. "delete_all_dupes"</param>
-        /// <param name="changeToScriptFolder">Start the script by changing to its own folder (for relative paths)</param>
-        public ScriptFile(string folder, string baseName, bool changeToScriptFolder = false)
+        /// <param name="powerShell">Write PowerShell (default on Windows) instead of sh</param>
+        public ScriptFile(string folder, string baseName, bool? powerShell = null)
         {
-            FilePath = Path.Combine(folder, baseName + Extension);
-            // No BOM: cmd.exe would try to run it as part of the first command, and sh needs "#!" first
-            writer = new StreamWriter(FilePath, false, new UTF8Encoding(false));
-            writer.NewLine = IsWindows ? "\r\n" : "\n";
+            this.powerShell = powerShell ?? IsWindows;
+            FilePath = Path.Combine(folder, baseName + (this.powerShell ? ".ps1" : ".sh"));
 
-            if (IsWindows)
+            // Windows PowerShell 5.1 reads a .ps1 without BOM as ANSI, breaking æ/ø/å etc. in paths,
+            // so .ps1 gets a UTF-8 BOM. sh must start with "#!", so no BOM there.
+            writer = new StreamWriter(FilePath, false, new UTF8Encoding(this.powerShell));
+            writer.NewLine = this.powerShell ? "\r\n" : "\n";
+
+            if (this.powerShell)
             {
-                writer.WriteLine("chcp 65001"); // UTF-8 code page, so special characters in paths work
-                if (changeToScriptFolder) writer.WriteLine("cd /d \"%~dp0\"");
+                writer.WriteLine("# Run with:  powershell -ExecutionPolicy Bypass -File \"" + Path.GetFileName(FilePath) + "\"");
+                writer.WriteLine("$ErrorActionPreference = 'Continue'");
+                writer.WriteLine("Set-Location -LiteralPath $PSScriptRoot  # works for UNC paths too");
             }
             else
             {
                 writer.WriteLine("#!/bin/sh");
-                if (changeToScriptFolder) writer.WriteLine("cd \"$(dirname \"$0\")\" || exit 1");
+                writer.WriteLine("cd \"$(dirname \"$0\")\" || exit 1");
             }
+            writer.WriteLine();
         }
 
         public void Line(string text = "") => writer.WriteLine(text);
 
-        public void Comment(string text) => writer.WriteLine((IsWindows ? "REM " : "# ") + text.Replace("\r", " ").Replace("\n", " "));
+        public void Comment(string text) => writer.WriteLine("# " + text.Replace("\r", " ").Replace("\n", " "));
 
-        public void Delete(string path) =>
-            writer.WriteLine(IsWindows ? $"DEL {Quote(path)} /f" : $"rm -f -- {Quote(path)}");
+        public void Delete(string path) => writer.WriteLine(powerShell
+            ? $"Remove-Item -LiteralPath {Quote(path)} -Force"
+            : $"rm -f -- {Quote(path)}");
 
-        public void Move(string from, string to) =>
-            writer.WriteLine(IsWindows ? $"MOVE {Quote(from)} {Quote(to)}" : $"mv -- {Quote(from)} {Quote(to)}");
+        public void Move(string from, string to) => writer.WriteLine(powerShell
+            // .NET method: no wildcard handling of the destination, works with UNC paths
+            ? $"[System.IO.File]::Move({Quote(from)}, {Quote(to)})"
+            : $"mv -- {Quote(from)} {Quote(to)}");
 
-        public void Rename(string from, string to) =>
-            writer.WriteLine(IsWindows ? $"ren {Quote(from)} {Quote(to)}" : $"mv -n -- {Quote(from)} {Quote(to)}");
+        public void Rename(string from, string to) => writer.WriteLine(powerShell
+            ? $"Rename-Item -LiteralPath {Quote(from)} -NewName {Quote(Path.GetFileName(to.Replace('\\', '/')))}"
+            : $"mv -n -- {Quote(from)} {Quote(to)}");
 
-        /// <summary>Quotes a path for the current shell.</summary>
-        public static string Quote(string path)
+        /// <summary>Runs a program with arguments, each argument quoted.</summary>
+        public void Run(string program, params string[] args)
         {
-            // .bat: % must be written as %%.  sh: single quotes keep everything literal; ' becomes '\''
-            return IsWindows
-                ? "\"" + path.Replace("%", "%%") + "\""
-                : "'" + path.Replace("'", "'\\''") + "'";
+            var line = new StringBuilder(powerShell ? "& " + Quote(program) : Quote(program));
+            foreach (string a in args) line.Append(' ').Append(Quote(a ?? ""));
+            writer.WriteLine(line.ToString());
+        }
+
+        /// <summary>Quotes a value as a literal string for this script's shell.</summary>
+        public string Quote(string value)
+        {
+            // Both shells: single quotes are fully literal (no $, %, [ ] or ` expansion).
+            // PowerShell escapes ' as ''.  sh escapes ' as '\''.
+            return powerShell
+                ? "'" + value.Replace("'", "''") + "'"
+                : "'" + value.Replace("'", "'\\''") + "'";
         }
 
         public void Dispose()

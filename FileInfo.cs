@@ -97,12 +97,6 @@ namespace deepduplicates
         [NotMapped]
         public rgb[] image3Checksum { get; set; }
         public string path { get; set; }
-        public string pathForBatchFile { 
-            get {
-                return(this.path.Replace("%", "%%"));
-            }
-        }
-        
         public bool formatNotSupported { get; set; }
         public string reason { get; set; }
         public bool? remove { get; set; }

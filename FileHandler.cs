@@ -256,12 +256,7 @@ namespace deepduplicates
         }
 
 
-        public string batchPath(string path){
-            // % needs to be escaped to %% to work in a .bat file
-            return path.Replace("%", "%%");
-        }
-
-        // Writes delete_all_dupes.bat on Windows, delete_all_dupes.sh on Linux/macOS
+        // Writes delete_all_dupes.ps1 on Windows, delete_all_dupes.sh on Linux/macOS
         public void generateBatchFile(List<VideoInfo> mediaList)
         {
             bool retainStructure = (settings.retainStructure.Length > 0);
@@ -280,17 +275,17 @@ namespace deepduplicates
             }
         }
 
-        // Writes encoding-template.bat on Windows, encoding-template.sh on Linux/macOS
+        // Writes encoding-template.ps1 on Windows, encoding-template.sh on Linux/macOS
         public void generateEncoding(List<VideoInfo> mediaList, EncodeSettings encodeSettings)
         {   
             // TODO: Switch to using MediaInfo
             // dotnet add package MediaInfo.Wrapper.Core 
             if (encodeSettings == null) return;
 
-            string ffmpegCommand = ScriptFile.IsWindows ? "..\\ffmpeg\\ffmpeg" : "../ffmpeg/ffmpeg";
+            // Scripts start by changing to their own folder (the output folder), so ../ffmpeg works from anywhere
+            string ffmpegCommand = ScriptFile.IsWindows ? "..\\ffmpeg\\ffmpeg.exe" : "../ffmpeg/ffmpeg";
 
-            // The Linux script starts by changing to its own folder, so ../ffmpeg works from anywhere
-            using (var script = new ScriptFile(this.outputFolder, "encoding-template", changeToScriptFolder: !ScriptFile.IsWindows))
+            using (var script = new ScriptFile(this.outputFolder, "encoding-template"))
             {
                 script.Comment("    This encoding template is a suggestion with highest bitrates at the top");
                 script.Comment("    NOTE! Many files will NOT be valid to encode, the bitrate may be due to faulty 'duration'-mesaurements");
@@ -317,7 +312,10 @@ namespace deepduplicates
                     // This encoding is CPU-only as hardware accelerated encoders do not support CRF
                     // -preset superfast    Only at the "slow"-preset is there a quality gain over "superfast"
                     //  preset values are explained here: https://www.youtube.com/watch?v=bzgFL-gNF9g
-                    script.Line($"{ffmpegCommand} -n -i {ScriptFile.Quote(item.path)} -c:v libx265 -vtag hvc1 -vf {encodeSettings.extraFilter}scale={encodeSettings.scale} -crf {encodeSettings.compressionLevelcrf} -preset {encodeSettings.compressionPreset} -c:a copy {ScriptFile.Quote(modifiedPath)}");
+                    script.Run(ffmpegCommand, "-n", "-i", item.path, "-c:v", "libx265", "-vtag", "hvc1",
+                        "-vf", $"{encodeSettings.extraFilter}scale={encodeSettings.scale}",
+                        "-crf", encodeSettings.compressionLevelcrf, "-preset", encodeSettings.compressionPreset,
+                        "-c:a", "copy", modifiedPath);
                     script.Line();
                 }
             }
