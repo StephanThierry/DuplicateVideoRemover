@@ -1,0 +1,87 @@
+@* Browses folders on the machine running the program (the browser can't see its disks). *@
+@if (Open)
+{
+    <div class="dialog-backdrop" @onclick="Cancel">
+        <div class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="picker-title" @onclick:stopPropagation="true">
+            <h2 id="picker-title">Choose a folder</h2>
+            <p>Folders on the computer running Duplicate Video Remover. You can also type a path, for example a network path.</p>
+            <div class="picker-path">
+                <input type="text" @bind="current" @bind:event="oninput" aria-label="Folder path" />
+                <button @onclick="Go">Open</button>
+            </div>
+            @if (error != null) { <p class="muted">@error</p> }
+            <div class="picker-list">
+                @if (parent != null) { <button @onclick="() => Navigate(parent)">.. (up one level)</button> }
+                @foreach (var d in folders)
+                {
+                    <button @onclick="() => Navigate(d)">@System.IO.Path.GetFileName(d.TrimEnd('/', '\\')) </button>
+                }
+                @if (folders.Count == 0 && error == null) { <p class="muted" style="padding:10px">No sub folders.</p> }
+            </div>
+            <div class="buttons">
+                <button @onclick="Cancel">Cancel</button>
+                <button class="primary" @onclick="Choose" disabled="@string.IsNullOrWhiteSpace(current)">Use this folder</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+    [Parameter] public EventCallback<string> OnChosen { get; set; }
+    [Parameter] public string Start { get; set; } = "";
+
+    private string current = "";
+    private string? parent;
+    private string? error;
+    private List<string> folders = new();
+    private bool wasOpen;
+
+    protected override void OnParametersSet()
+    {
+        if (Open && !wasOpen) Navigate(string.IsNullOrWhiteSpace(Start) ? "" : Start);
+        wasOpen = Open;
+    }
+
+    private void Go() => Navigate(current);
+
+    private void Navigate(string path)
+    {
+        error = null;
+        folders.Clear();
+        parent = null;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            // Top level: drives on Windows, / on Linux
+            current = "";
+            folders = OperatingSystem.IsWindows()
+                ? DriveInfo.GetDrives().Where(d => d.IsReady).Select(d => d.RootDirectory.FullName).ToList()
+                : new List<string> { "/" };
+            if (!OperatingSystem.IsWindows()) Navigate("/");
+            return;
+        }
+        current = path;
+        try
+        {
+            folders = Directory.GetDirectories(path)
+                .Where(d => !System.IO.Path.GetFileName(d).StartsWith("."))
+                .OrderBy(d => d, StringComparer.OrdinalIgnoreCase).ToList();
+            var trimmed = path.TrimEnd('/', '\\');
+            parent = trimmed.Length == 0 ? null   // the Linux root "/"
+                : Directory.GetParent(trimmed)?.FullName ?? (OperatingSystem.IsWindows() ? "" : null);
+        }
+        catch (Exception e)
+        {
+            error = "Can't open this folder: " + e.Message;
+        }
+    }
+
+    private async Task Choose()
+    {
+        await OnChosen.InvokeAsync(current);
+        await OpenChanged.InvokeAsync(false);
+    }
+
+    private Task Cancel() => OpenChanged.InvokeAsync(false);
+}
