@@ -1,0 +1,23 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DuplicateVideoRemover.Desktop.ViewModels"
+             x:Class="DuplicateVideoRemover.Desktop.Views.PathListEditor"
+             x:DataType="vm:PathList">
+  <StackPanel Spacing="6">
+    <ItemsControl ItemsSource="{Binding Items}">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:PathItem">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" Margin="0,0,0,6">
+            <TextBox Text="{Binding Value}"/>
+            <Button Grid.Column="1" Content="Remove" Command="{Binding RemoveCommand}"/>
+          </Grid>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
+      <TextBox Text="{Binding NewValue}" Watermark="{Binding $parent[UserControl].Tag}"/>
+      <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseCommand}" IsVisible="{Binding CanBrowse}"/>
+      <Button Grid.Column="2" Content="Add" Command="{Binding AddCommand}"/>
+    </Grid>
+  </StackPanel>
+</UserControl>

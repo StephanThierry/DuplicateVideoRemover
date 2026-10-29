@@ -1,0 +1,132 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DuplicateVideoRemover.Desktop.ViewModels"
+             xmlns:v="using:DuplicateVideoRemover.Desktop.Views"
+             x:Class="DuplicateVideoRemover.Desktop.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel"
+             x:Name="Root">
+  <Grid ColumnDefinitions="*,320" ColumnSpacing="20" Margin="12,16,12,12">
+    <ScrollViewer Grid.Column="0">
+      <StackPanel Spacing="16" Margin="0,0,8,0">
+        <StackPanel>
+          <TextBlock Classes="h1" Text="Settings"/>
+          <TextBlock Classes="muted" Text="Which folders to scan and how alike two videos must be to count as duplicates." Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <Border Classes="panel">
+          <StackPanel Spacing="16">
+            <TextBlock Classes="h2" Text="Folders"/>
+            <StackPanel Spacing="4">
+              <TextBlock Text="Folders to scan" FontWeight="SemiBold"/>
+              <TextBlock Classes="muted small" Text="Sub folders are included."/>
+              <v:PathListEditor DataContext="{Binding ContentFolders}" Tag="{Binding #Root.((vm:SettingsViewModel)DataContext).Placeholder}"/>
+            </StackPanel>
+            <StackPanel Spacing="4">
+              <TextBlock Text="Skip paths that contain" FontWeight="SemiBold"/>
+              <TextBlock Classes="muted small" Text="Any part of a path, for example a folder name."/>
+              <v:PathListEditor DataContext="{Binding ExcludePaths}" Tag="e.g. Samples"/>
+            </StackPanel>
+            <StackPanel Spacing="4">
+              <TextBlock Text="Prefer keeping copies in" FontWeight="SemiBold"/>
+              <TextBlock Classes="muted small" Text="When copies are found, the one in these folders is kept."/>
+              <v:PathListEditor DataContext="{Binding PriorityFolders}" Tag="Folder"/>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="panel">
+          <StackPanel Spacing="8">
+            <TextBlock Classes="h2" Text="Windows and Linux paths"/>
+            <TextBlock Classes="muted small" TextWrapping="Wrap"
+                       Text="Lets Windows and Linux share the database. Each row says where the same storage is found on each system. The Linux side must be a mounted folder, like /mnt/videos."/>
+            <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="6">
+              <TextBlock Classes="muted small" Text="On Windows"/>
+              <TextBlock Grid.Column="1" Classes="muted small" Text="On Linux"/>
+            </Grid>
+            <ItemsControl ItemsSource="{Binding Mappings}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:MappingItem">
+                  <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="6" Margin="0,0,0,6">
+                    <TextBox Text="{Binding Windows}" Watermark="L:\"/>
+                    <TextBox Grid.Column="1" Text="{Binding Linux}" Watermark="/mnt/architecture"/>
+                    <Button Grid.Column="2" Content="Remove" Command="{Binding #Root.((vm:SettingsViewModel)DataContext).RemoveMappingCommand}" CommandParameter="{Binding}"/>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Content="Add a path pair" Command="{Binding AddMappingCommand}"/>
+            <TextBlock Text="Try a path" FontWeight="SemiBold" Margin="0,8,0,0"/>
+            <TextBox Text="{Binding TestPath}" Watermark="Paste a Windows or Linux path"/>
+            <TextBlock Text="{Binding TestResult}" TextWrapping="Wrap"/>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="panel">
+          <StackPanel Spacing="14">
+            <TextBlock Classes="h2" Text="When are videos duplicates?"/>
+            <TextBlock Classes="muted" Text="Videos of the same length (within a second) are compared using 3 screenshots each." TextWrapping="Wrap"/>
+            <v:MatchEditor DataContext="{Binding Match}"/>
+            <CheckBox IsChecked="{Binding UseSameFolder}" Content="Use other rules for copies in folders with the same name" Margin="0,10,0,0"/>
+            <TextBlock Classes="muted small" Text="For example looser rules for re-encoded copies that sit next to each other."/>
+            <v:MatchEditor DataContext="{Binding SameFolder}" IsVisible="{Binding #Root.((vm:SettingsViewModel)DataContext).UseSameFolder}"/>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="panel">
+          <StackPanel Spacing="12">
+            <TextBlock Classes="h2" Text="Short, small and preferred versions"/>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="Remove videos this short or shorter" VerticalAlignment="Center" Width="260"/>
+              <NumericUpDown Value="{Binding MinLength}" Minimum="0" Increment="1" FormatString="0" Width="130"/>
+              <TextBlock Text="seconds" VerticalAlignment="Center"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="Remove videos smaller than" VerticalAlignment="Center" Width="260"/>
+              <NumericUpDown Value="{Binding MinSizeKb}" Minimum="0" Increment="100" FormatString="0" Width="130"/>
+              <TextBlock Text="KB (0 = off)" VerticalAlignment="Center"/>
+            </StackPanel>
+            <TextBlock Text="Prefer one version over another" FontWeight="SemiBold" Margin="0,8,0,0"/>
+            <TextBlock Classes="muted small" TextWrapping="Wrap"
+                       Text="If the path of one copy contains the first text and the other copy the second, keep the first when their sizes are close."/>
+            <ItemsControl ItemsSource="{Binding Switches}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:SwitchItem">
+                  <WrapPanel Margin="0,0,0,6">
+                    <TextBlock Text="Keep" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBox Text="{Binding Up}" Width="90"/>
+                    <TextBlock Text="over" VerticalAlignment="Center" Margin="6,0"/>
+                    <TextBox Text="{Binding Down}" Width="90"/>
+                    <TextBlock Text="when sizes differ by less than" VerticalAlignment="Center" Margin="6,0"/>
+                    <NumericUpDown Value="{Binding Percent}" Minimum="0" Maximum="100" FormatString="0" Width="110"/>
+                    <TextBlock Text="%" VerticalAlignment="Center" Margin="6,0"/>
+                    <Button Content="Remove" Command="{Binding #Root.((vm:SettingsViewModel)DataContext).RemoveSwitchCommand}" CommandParameter="{Binding}"/>
+                  </WrapPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Content="Add a rule" Command="{Binding AddSwitchCommand}"/>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+
+    <!-- Live preview -->
+    <Border Grid.Column="1" Classes="panel" VerticalAlignment="Top">
+      <StackPanel Spacing="10">
+        <TextBlock Classes="h2" Text="With these settings"/>
+        <TextBlock Text="{Binding PreviewDuplicates}" FontSize="38" FontWeight="SemiBold"/>
+        <TextBlock Classes="muted" Text="duplicates would be found" Margin="0,-8,0,0"/>
+        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="6">
+          <TextBlock Classes="muted" Text="Groups of copies"/><TextBlock Grid.Column="1" Text="{Binding PreviewGroups}" FontWeight="SemiBold"/>
+          <TextBlock Grid.Row="1" Classes="muted" Text="Broken or short"/><TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding PreviewBroken}" FontWeight="SemiBold"/>
+          <TextBlock Grid.Row="2" Classes="muted" Text="Space in duplicates"/><TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding PreviewSize}" FontWeight="SemiBold"/>
+        </Grid>
+        <TextBlock Classes="muted small" Text="{Binding PreviewNote}" TextWrapping="Wrap"/>
+        <Button Classes="primary" Content="Save settings" Command="{Binding SaveCommand}" IsEnabled="{Binding Dirty}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+        <Button Content="Save and compare again" Command="{Binding SaveAndCompareCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                ToolTip.Tip="Saves, then updates the review with the videos already read"/>
+        <TextBlock Text="{Binding SavedMessage}" Foreground="{DynamicResource Keep}" FontWeight="SemiBold"/>
+      </StackPanel>
+    </Border>
+  </Grid>
+</UserControl>

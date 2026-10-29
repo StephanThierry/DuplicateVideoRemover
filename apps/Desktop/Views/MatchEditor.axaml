@@ -1,0 +1,33 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DuplicateVideoRemover.Desktop.ViewModels"
+             x:Class="DuplicateVideoRemover.Desktop.Views.MatchEditor"
+             x:DataType="vm:MatchViewModel">
+  <StackPanel Spacing="14">
+    <StackPanel>
+      <TextBlock Text="Colour difference allowed" FontWeight="SemiBold"/>
+      <TextBlock Classes="muted small" Text="How different the colours of the screenshots may be. Lower is stricter. Recommended: 35." TextWrapping="Wrap"/>
+      <Grid ColumnDefinitions="*,70">
+        <Slider Minimum="5" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding ColorTolerance}"/>
+        <TextBlock Grid.Column="1" Text="{Binding ColorText}" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+      </Grid>
+    </StackPanel>
+    <StackPanel>
+      <TextBlock Text="Shapes that must match" FontWeight="SemiBold"/>
+      <TextBlock Classes="muted small" Text="How much of the picture's light and dark shapes must be the same. Higher is stricter. Recommended: 70%." TextWrapping="Wrap"/>
+      <Grid ColumnDefinitions="*,70">
+        <Slider Minimum="200" Maximum="396" TickFrequency="4" IsSnapToTickEnabled="True" Value="{Binding ShapeMatch}"/>
+        <TextBlock Grid.Column="1" Text="{Binding ShapeText}" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+      </Grid>
+    </StackPanel>
+    <StackPanel>
+      <TextBlock Text="Checks allowed to disagree" FontWeight="SemiBold"/>
+      <TextBlock Classes="muted small" Text="Each pair of videos gets 6 checks (colour and shape at 3 points). 0 means all must agree. Above 1 gives many wrong matches." TextWrapping="Wrap"/>
+      <Grid ColumnDefinitions="*,70">
+        <Slider Minimum="0" Maximum="3" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding FaultTolerance}"/>
+        <TextBlock Grid.Column="1" Text="{Binding FaultText}" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+      </Grid>
+    </StackPanel>
+    <CheckBox IsChecked="{Binding NameMatch}" Content="Same length and one name starts with the other also counts as a duplicate"/>
+  </StackPanel>
+</UserControl>
