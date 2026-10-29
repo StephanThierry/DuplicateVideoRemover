@@ -1,0 +1,233 @@
+@page "/settings"
+@implements IDisposable
+@inject AppController App
+
+<PageTitle>Settings</PageTitle>
+
+<div class="page">
+    <div class="page-head">
+        <div>
+            <h1>Settings</h1>
+            <p>Which folders to scan and how alike two videos must be to count as duplicates.</p>
+        </div>
+    </div>
+
+    <div class="settings-grid">
+        <div>
+            <section class="panel">
+                <h2>Folders</h2>
+                <div class="field">
+                    <span class="label">Folders to scan</span>
+                    <div class="help">Sub folders are included.</div>
+                    <ListEditor Items="contentFolders" Label="folder to scan" Placeholder="@(OperatingSystem.IsWindows() ? @"D:\Videos or \\nas\videos" : "/mnt/videos")" Browse="true" Changed="Edited" />
+                </div>
+                <div class="field">
+                    <span class="label">Skip paths that contain</span>
+                    <div class="help">Any part of a path, for example a folder name.</div>
+                    <ListEditor Items="excludePaths" Label="path to skip" Placeholder="e.g. Samples" Changed="Edited" />
+                </div>
+                <div class="field">
+                    <span class="label">Prefer keeping copies in</span>
+                    <div class="help">When copies are found, the one in these folders is kept.</div>
+                    <ListEditor Items="priorityFolders" Label="preferred folder" Placeholder="Folder" Browse="true" Changed="Edited" />
+                </div>
+            </section>
+
+            <section class="panel">
+                <h2>Windows and Linux paths</h2>
+                <div class="help muted" style="margin-bottom:12px">
+                    Lets Windows and Linux share the database. Each row says where the same storage is found on each system.
+                    The Linux side must be a mounted folder, like /mnt/videos.
+                </div>
+                <div class="mapping head"><span>On Windows</span><span>On Linux</span><span></span></div>
+                @for (int i = 0; i < mappings.Count; i++)
+                {
+                    int index = i;
+                    <div class="mapping" style="margin-top:6px">
+                        <input type="text" @bind="mappings[index].Windows" @bind:after="Edited" placeholder="L:\" aria-label="Windows path @(index + 1)" />
+                        <input type="text" @bind="mappings[index].Linux" @bind:after="Edited" placeholder="/mnt/architecture" aria-label="Linux path @(index + 1)" />
+                        <button @onclick="() => { mappings.RemoveAt(index); Edited(); }">Remove</button>
+                    </div>
+                }
+                <p style="margin-top:10px"><button @onclick="() => { mappings.Add(new PathMapping()); Edited(); }">Add a path pair</button></p>
+                <div class="testpath">
+                    <label for="testpath" class="label" style="font-weight:600">Try a path</label>
+                    <input id="testpath" type="text" @bind="testPath" @bind:event="oninput" placeholder="Paste a Windows or Linux path" />
+                    @if (!string.IsNullOrWhiteSpace(testPath)) { <div class="result">@TestResult()</div> }
+                </div>
+            </section>
+
+            <section class="panel">
+                <h2>When are videos duplicates?</h2>
+                <p class="muted" style="margin-bottom:16px">Videos of the same length (within a second) are compared using 3 screenshots each.</p>
+                <MatchEditor Value="settings.matchSettings" Id="main" Changed="Edited" />
+
+                <div class="field" style="margin-top:24px">
+                    <label class="inline"><input type="checkbox" checked="@(settings.matchSettings_sameFolder != null)" @onchange="ToggleSameFolder" /> Use other rules for copies in folders with the same name</label>
+                    <div class="help">For example looser rules for re-encoded copies that sit next to each other.</div>
+                </div>
+                @if (settings.matchSettings_sameFolder != null)
+                {
+                    <MatchEditor Value="settings.matchSettings_sameFolder" Id="same" Changed="Edited" />
+                }
+            </section>
+
+            <section class="panel">
+                <h2>Short, small and preferred versions</h2>
+                <div class="field">
+                    <label for="minlen">Remove videos this short or shorter</label>
+                    <div class="inline"><input id="minlen" type="number" min="0" @bind="settings.minVideoLength" @bind:after="Edited" /> seconds</div>
+                </div>
+                <div class="field">
+                    <label for="minsize">Remove videos smaller than</label>
+                    <div class="inline"><input id="minsize" type="number" min="0" @bind="settings.minVideoSizeKb" @bind:after="Edited" /> KB (0 = off)</div>
+                </div>
+                <div class="field">
+                    <span class="label">Prefer one version over another</span>
+                    <div class="help">If the path of one copy contains the first text and the other copy the second, keep the first when their sizes are close.</div>
+                    @for (int i = 0; i < switches.Count; i++)
+                    {
+                        int index = i;
+                        <div class="inline" style="margin-top:6px">
+                            Keep <input type="text" style="width:90px" @bind="switches[index].up" @bind:after="Edited" aria-label="Preferred text" />
+                            over <input type="text" style="width:90px" @bind="switches[index].down" @bind:after="Edited" aria-label="Other text" />
+                            when sizes differ by less than <input type="number" @bind="switches[index].triggerBelowPctSizeDiff" @bind:after="Edited" aria-label="Percent" /> %
+                            <button @onclick="() => { switches.RemoveAt(index); Edited(); }">Remove</button>
+                        </div>
+                    }
+                    <p style="margin-top:8px"><button @onclick="AddSwitch">Add a rule</button></p>
+                </div>
+            </section>
+        </div>
+
+        <aside class="panel preview" aria-live="polite">
+            <h2>With these settings</h2>
+            @if (preview == null)
+            {
+                <p class="muted" style="margin-top:12px">@(previewError ?? "Working out the result...")</p>
+            }
+            else
+            {
+                <div class="big" style="margin-top:12px">@preview.Duplicates.ToString("N0")</div>
+                <div class="muted">duplicates would be found</div>
+                <dl>
+                    <dt>Groups of copies</dt><dd>@preview.Groups.ToString("N0")</dd>
+                    <dt>Broken or short</dt><dd>@preview.Broken.ToString("N0")</dd>
+                    <dt>Space in duplicates</dt><dd>@Fmt.Size(preview.DuplicateBytes)</dd>
+                </dl>
+                <p class="muted" style="font-size:.85rem;margin-bottom:16px">Based on the @preview.VideosInScope.ToString("N0") videos already read in these folders. New videos count after the next scan.</p>
+            }
+            <div class="buttons">
+                <button class="primary" @onclick="Save" disabled="@(!dirty)">Save settings</button>
+                <button @onclick="SaveAndCompare" disabled="@App.Scanner.IsRunning" title="Saves, then updates the review with the videos already read">Save and compare again</button>
+                @if (savedMessage != null) { <span class="saved" role="status">@savedMessage</span> }
+            </div>
+        </aside>
+    </div>
+</div>
+
+@code {
+    private deepduplicates.Settings settings = new();
+    private List<string> contentFolders = new(), excludePaths = new(), priorityFolders = new();
+    private List<PathMapping> mappings = new();
+    private List<switchPrioritySet> switches = new();
+    private PreviewResult preview;
+    private string previewError;
+    private string testPath = "";
+    private bool dirty;
+    private string savedMessage;
+    private CancellationTokenSource debounce;
+
+    protected override void OnInitialized()
+    {
+        settings = App.Settings.Clone();
+        contentFolders = settings.contentFolders.ToList();
+        excludePaths = settings.excludePaths.ToList();
+        priorityFolders = settings.priorityFolders.ToList();
+        switches = settings.switchPriority.ToList();
+        mappings = PathMapper.Mappings.Select(m => new PathMapping { Windows = m.Windows, Linux = m.Linux }).ToList();
+        SchedulePreview(0);
+        App.DataChanged += OnDataChanged;
+    }
+
+    private void OnDataChanged() => SchedulePreview(0);
+
+    private deepduplicates.Settings Current()
+    {
+        settings.contentFolders = contentFolders.Where(s => !string.IsNullOrWhiteSpace(s)).ToArray();
+        settings.excludePaths = excludePaths.Where(s => !string.IsNullOrWhiteSpace(s)).ToArray();
+        settings.priorityFolders = priorityFolders.Where(s => !string.IsNullOrWhiteSpace(s)).ToArray();
+        settings.switchPriority = switches.Where(s => !string.IsNullOrWhiteSpace(s.up) && !string.IsNullOrWhiteSpace(s.down)).ToArray();
+        return settings;
+    }
+
+    private void Edited()
+    {
+        dirty = true;
+        savedMessage = null;
+        SchedulePreview(400);
+    }
+
+    private void AddSwitch()
+    {
+        switches.Add(new switchPrioritySet { up = "x265", down = "x264", triggerBelowPctSizeDiff = 15 });
+        Edited();
+    }
+
+    private void ToggleSameFolder(ChangeEventArgs e)
+    {
+        settings.matchSettings_sameFolder = (bool)e.Value! ? settings.matchSettings.Clone() : null;
+        Edited();
+    }
+
+    // Re-runs the comparison on videos already read, a moment after the last change
+    private void SchedulePreview(int delayMs)
+    {
+        debounce?.Cancel();
+        debounce = new CancellationTokenSource();
+        var token = debounce.Token;
+        var snapshot = Current().Clone();
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(delayMs, token);
+                var result = App.Preview(snapshot);
+                if (token.IsCancellationRequested) return;
+                preview = result;
+                previewError = null;
+            }
+            catch (OperationCanceledException) { return; }
+            catch (Exception ex) { previewError = "Could not work out the result: " + ex.Message; preview = null; }
+            await InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private void Save()
+    {
+        App.SaveSettings(Current().Clone(), mappings);
+        dirty = false;
+        savedMessage = "Saved";
+    }
+
+    private async Task SaveAndCompare()
+    {
+        Save();
+        await Task.Run(App.ReanalyzeFromDatabase);
+        savedMessage = "Saved and compared - see Review";
+    }
+
+    // Shows what a path becomes on this computer with the mappings as currently edited
+    private string TestResult()
+    {
+        var local = PathMapper.PreviewLocal(testPath.Trim(), mappings);
+        bool exists = Directory.Exists(local) || File.Exists(local);
+        return $"On this computer: {local} ({(exists ? "found" : "not found")})";
+    }
+
+    public void Dispose()
+    {
+        debounce?.Cancel();
+        App.DataChanged -= OnDataChanged;
+    }
+}
