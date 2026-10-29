@@ -76,9 +76,10 @@ namespace deepduplicates
         public string Quote(string value)
         {
             // Both shells: single quotes are fully literal (no $, %, [ ] or ` expansion).
-            // PowerShell escapes ' as ''.  sh escapes ' as '\''.
+            // PowerShell escapes ' as '' - and also treats the typographic quotes ‘ ’ ‚ ‛ as single
+            // quotes, so those are doubled too.  sh escapes ' as '\''.
             return powerShell
-                ? "'" + value.Replace("'", "''") + "'"
+                ? "'" + System.Text.RegularExpressions.Regex.Replace(value, "['\u2018\u2019\u201A\u201B]", m => m.Value + m.Value) + "'"
                 : "'" + value.Replace("'", "'\\''") + "'";
         }
 
