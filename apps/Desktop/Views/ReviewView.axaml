@@ -163,12 +163,8 @@
     <!-- Action bar -->
     <Border Grid.Row="2" Background="{DynamicResource Sheet}" BorderBrush="{DynamicResource Rule}" BorderThickness="0,1,0,0" Padding="16,12" IsVisible="{Binding HasResults}">
       <DockPanel>
-        <Button DockPanel.Dock="Right" Classes="primary" Classes.danger="{Binding DeleteMode}" Content="{Binding ExecuteLabel}"
+        <Button DockPanel.Dock="Right" Classes="danger" Content="{Binding ExecuteLabel}"
                 Command="{Binding AskExecuteCommand}" IsEnabled="{Binding HasSelection}" FontSize="15" Padding="18,8"/>
-        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="12" Margin="0,0,20,0" VerticalAlignment="Center">
-          <RadioButton GroupName="mode" Content="Move to quarantine" IsChecked="{Binding !DeleteMode}"/>
-          <RadioButton GroupName="mode" Content="Delete permanently" IsChecked="{Binding DeleteMode}"/>
-        </StackPanel>
         <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
           <TextBlock Text="{Binding SelectionCount}" FontSize="16" FontWeight="SemiBold"/>
           <TextBlock Text="{Binding SelectionSize}" Classes="muted" VerticalAlignment="Bottom"/>
@@ -194,7 +190,7 @@
           <TextBlock Classes="muted" Text="{Binding ConfirmText}" TextWrapping="Wrap"/>
           <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0">
             <Button Content="Cancel" Command="{Binding CancelExecuteCommand}"/>
-            <Button Classes="primary" Classes.danger="{Binding DeleteMode}" Content="{Binding ConfirmButton}" Command="{Binding ExecuteCommand}" IsEnabled="{Binding !Busy}"/>
+            <Button Classes="danger" Content="Delete permanently" Command="{Binding ExecuteCommand}" IsEnabled="{Binding !Busy}"/>
           </StackPanel>
         </StackPanel>
       </Border>
