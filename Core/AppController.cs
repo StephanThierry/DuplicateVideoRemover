@@ -96,9 +96,10 @@ namespace deepduplicates
             ReplaceSession(results);
         }
 
-        public ExecuteReport Execute(RemoveMode mode)
+        /// <summary>Deletes the selected files.</summary>
+        public ExecuteReport Execute()
         {
-            var report = Session.Execute(mode, Settings, CreateFileHandler());
+            var report = Session.Execute(CreateFileHandler());
             InvalidateCache();
             DataChanged?.Invoke();
             return report;

@@ -157,9 +157,6 @@ namespace deepduplicates
 
         public static readonly string[] VideoExtensions = { ".avi", ".divx", ".mp4", ".m4v", ".mov", ".wmv", ".mpg", ".mpeg", ".flv", ".mkv" };
 
-        /// <summary>Folder that "move to quarantine" puts files in (inside each content folder). Never scanned.</summary>
-        public const string QuarantineFolderName = "_DuplicateVideoRemover_quarantine";
-
         /// <summary>
         /// Linux/macOS: if ffmpeg and ffprobe are installed (e.g. "apt install ffmpeg"), link them into
         /// the ffmpeg folder instead of downloading. Returns false if they are not found.
@@ -232,8 +229,7 @@ namespace deepduplicates
                 {
                     foreach (string subDir in Directory.GetDirectories(path))
                     {
-                        // The quarantine folder holds files the user removed - never index them again
-                        if (Path.GetFileName(subDir) != QuarantineFolderName) queue.Enqueue(subDir);
+                        queue.Enqueue(subDir);
                     }
                 }
                 catch (UnauthorizedAccessException)

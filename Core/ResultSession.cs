@@ -5,14 +5,6 @@ using System.Linq;
 
 namespace deepduplicates
 {
-    public enum RemoveMode
-    {
-        /// <summary>Move to a quarantine folder inside the content folder (can be undone by moving back).</summary>
-        Quarantine,
-        /// <summary>Delete permanently.</summary>
-        Delete
-    }
-
     public sealed record ExecuteFailure(VideoEntry Entry, string Error);
 
     public sealed class ExecuteReport
@@ -24,7 +16,7 @@ namespace deepduplicates
 
     /// <summary>
     /// The review-and-delete state behind both interfaces: which copy each group keeps, which files are
-    /// selected, and removing them.
+    /// selected, and deleting them.
     ///
     /// Safety rule: every duplicate group always keeps at least one file that is not selected.
     /// </summary>
@@ -163,10 +155,10 @@ namespace deepduplicates
         // --- Removing ---
 
         /// <summary>
-        /// Removes the selected files (quarantine or delete), takes them out of the database and the results,
+        /// Deletes the selected files, takes them out of the database and the results,
         /// and saves the results. Files that fail stay selected and are reported.
         /// </summary>
-        public ExecuteReport Execute(RemoveMode mode, Settings settings, FileHandler fileHandler)
+        public ExecuteReport Execute(FileHandler fileHandler)
         {
             var report = new ExecuteReport();
             List<VideoEntry> targets;
@@ -176,11 +168,7 @@ namespace deepduplicates
             {
                 try
                 {
-                    if (File.Exists(entry.Path))
-                    {
-                        if (mode == RemoveMode.Delete) File.Delete(entry.Path);
-                        else MoveToQuarantine(entry.Path, settings);
-                    }
+                    if (File.Exists(entry.Path)) File.Delete(entry.Path);
                     // A file that is already gone counts as removed, so it disappears from the list
                     report.Removed.Add(entry);
                 }
@@ -210,25 +198,6 @@ namespace deepduplicates
             });
             try { Results.Save(); } catch (Exception e) { Console.WriteLine("Could not save results: " + e.Message); }
             return report;
-        }
-
-        /// <summary>Moves a file to [content folder]/_DuplicateVideoRemover_quarantine/[same relative path].</summary>
-        public static string MoveToQuarantine(string path, Settings settings)
-        {
-            string root = settings.contentFolders
-                .Where(c => path.StartsWith(c.TrimEnd('/', '\\') + Path.DirectorySeparatorChar, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
-                .OrderByDescending(c => c.Length)
-                .FirstOrDefault() ?? Path.GetDirectoryName(path);
-
-            string relative = Path.GetRelativePath(root, path);
-            string target = Path.Combine(root, FileHandler.QuarantineFolderName, relative);
-            Directory.CreateDirectory(Path.GetDirectoryName(target));
-            // Never overwrite something already in quarantine
-            string candidate = target;
-            for (int i = 2; File.Exists(candidate); i++)
-                candidate = Path.Combine(Path.GetDirectoryName(target), Path.GetFileNameWithoutExtension(target) + $" ({i})" + Path.GetExtension(target));
-            File.Move(path, candidate);
-            return candidate;
         }
 
         private static void RemoveFromDatabase(List<VideoEntry> removed, FileHandler fileHandler)
