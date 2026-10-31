@@ -13,6 +13,7 @@
     <nav class="tabs">
         <NavLink href="" Match="NavLinkMatch.All">Review <span class="count num">@App.Session.Results.DuplicateCount.ToString("N0")</span></NavLink>
         <NavLink href="scan">Scan @if (App.Scanner.IsRunning) { <span class="live" title="Scanning"></span> }</NavLink>
+        <NavLink href="encode">Re-encode</NavLink>
         <NavLink href="settings">Settings</NavLink>
     </nav>
     <div class="datafolder" title="Data folder: @App.DataFolder&#10;Database: @App.DatabaseFolder">@App.DataFolder</div>

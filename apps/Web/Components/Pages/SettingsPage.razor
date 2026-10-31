@@ -72,6 +72,12 @@
                 }
             </section>
 
+            <section class="panel" id="encoding">
+                <h2>Re-encoding</h2>
+                <p class="muted" style="margin-bottom:16px">How the Re-encode screen makes smaller copies of large videos. The defaults are the recommended settings.</p>
+                <EncodeEditor Value="settings.encodeSettings" Changed="Edited" />
+            </section>
+
             <section class="panel">
                 <h2>Short, small and preferred versions</h2>
                 <div class="field">
@@ -141,6 +147,7 @@
     protected override void OnInitialized()
     {
         settings = App.Settings.Clone();
+        settings.encodeSettings ??= EncodeSettings.CreateDefault();
         contentFolders = settings.contentFolders.ToList();
         excludePaths = settings.excludePaths.ToList();
         priorityFolders = settings.priorityFolders.ToList();

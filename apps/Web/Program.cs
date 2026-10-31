@@ -93,6 +93,14 @@ app.MapGet("/shots/{name}", (string name) =>
     return File.Exists(path) ? Results.File(path, "image/png", enableRangeProcessing: false) : Results.NotFound();
 });
 
+// The encoding script made on the Re-encode page: /output/encode_selected.sh or .ps1
+app.MapGet("/output/{name}", (string name) =>
+{
+    if (name != AppController.EncodeScriptName + ScriptFile.Extension) return Results.NotFound();
+    var path = Path.Combine(controller.DataFolder, "output", name);
+    return File.Exists(path) ? Results.File(path, "text/plain; charset=utf-8", name) : Results.NotFound();
+});
+
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 
 string address = urls.Split(';')[0].Replace("0.0.0.0", Dns.GetHostName()).Replace("[::]", Dns.GetHostName());
