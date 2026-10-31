@@ -27,6 +27,7 @@ public partial class SettingsViewModel : ObservableObject
     public ObservableCollection<SwitchItem> Switches { get; } = new();
     public MatchViewModel Match { get; }
     public MatchViewModel SameFolder { get; }
+    public EncodeSettingsViewModel Encoding { get; }
 
     [ObservableProperty] private bool useSameFolder;
     [ObservableProperty] private decimal minLength;
@@ -57,6 +58,7 @@ public partial class SettingsViewModel : ObservableObject
         Match = new MatchViewModel(s.matchSettings, Edited);
         UseSameFolder = s.matchSettings_sameFolder != null;
         SameFolder = new MatchViewModel(s.matchSettings_sameFolder ?? s.matchSettings.Clone(), Edited);
+        Encoding = new EncodeSettingsViewModel(s.EncodeOrDefault(), Edited);
         MinLength = s.minVideoLength;
         MinSizeKb = s.minVideoSizeKb;
         loading = false;
@@ -90,6 +92,7 @@ public partial class SettingsViewModel : ObservableObject
         s.matchSettings_sameFolder = UseSameFolder ? SameFolder.ToSettings() : null;
         s.minVideoLength = (int)MinLength;
         s.minVideoSizeKb = (int)MinSizeKb;
+        s.encodeSettings = Encoding.ToSettings();
         return s;
     }
 
