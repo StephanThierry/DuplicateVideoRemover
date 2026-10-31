@@ -46,8 +46,11 @@
   <Grid RowDefinitions="Auto,*,Auto">
     <!-- Heading -->
     <DockPanel Grid.Row="0" Margin="12,16,12,12">
-      <Button DockPanel.Dock="Right" Content="Compare again" Command="{Binding ReanalyzeCommand}"
-              ToolTip.Tip="Uses the saved settings and the videos already read - no files are read" VerticalAlignment="Bottom"/>
+      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+        <Button Content="Compare again" Command="{Binding ReanalyzeCommand}"
+                ToolTip.Tip="Uses the saved settings and the videos already read - no files are read"/>
+        <Button Classes="primary" Content="Next: re-encode" Command="{Binding GoToEncodeCommand}" ToolTip.Tip="When you are done deleting duplicates"/>
+      </StackPanel>
       <StackPanel>
         <TextBlock Classes="h1" Text="Review duplicates"/>
         <TextBlock Classes="muted" Text="{Binding Summary}" Margin="0,4,0,0"/>
