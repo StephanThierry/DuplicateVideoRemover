@@ -31,6 +31,12 @@ public partial class EncodeViewModel : ObservableObject
     [ObservableProperty] private bool hasVideos;
     [ObservableProperty] private string pickedText = "";
     [ObservableProperty] private string pickedSize = "";
+    [ObservableProperty] private bool confirmVisible;
+    [ObservableProperty] private string confirmTitle = "";
+    [ObservableProperty] private string confirmText = "";
+    private EncodeSettings settings = EncodeSettings.CreateDefault();
+    private EncodeRow? anchor;          // last clicked row, for Shift-click ranges
+    private bool anchorState = true;
     [ObservableProperty] private bool hasPicked;
     [ObservableProperty] private string? scriptPath;
     [ObservableProperty] private string resultText = "";
@@ -52,13 +58,15 @@ public partial class EncodeViewModel : ObservableObject
     /// <summary>Loads the list again (when the screen is opened, after a scan or new settings).</summary>
     public async Task Reload()
     {
-        var e = app.Settings.EncodeOrDefault();
+        var e = settings = app.Settings.EncodeOrDefault();
+        double target = EncodeEstimator.TargetKbps(e);
         SettingsSummary = $"{EncodeOptions.Codec(e.codec).Label}, {e.resolution}p, quality {e.crf}";
         QualitySummary = $"{EncodeOptions.QualityLabel(e.codec, e.crf ?? 0)}. Speed: {e.preset}, {(e.audio == "copy" ? "original sound" : "AAC sound")}, {e.container.ToUpperInvariant()}";
         Loading = true;
         var picked = all.Where(r => r.IsPicked).Select(r => r.Candidate.Id).ToHashSet();
         var candidates = await Task.Run(app.EncodeCandidates);
-        all = candidates.Select(c => new EncodeRow(c, picked.Contains(c.Id), UpdatePicked)).ToList();
+        all = candidates.Select(c => new EncodeRow(c, picked.Contains(c.Id), EncodeEstimator.EstimatedBytes(c, e, target), UpdatePicked)).ToList();
+        anchor = null;
         HasVideos = all.Count > 0;
         Loading = false;
         Filter();
@@ -80,9 +88,31 @@ public partial class EncodeViewModel : ObservableObject
         var picked = all.Where(r => r.IsPicked).ToList();
         HasPicked = picked.Count > 0;
         PickedText = Fmt.Plural(picked.Count, "video", "videos") + " picked";
-        PickedSize = Fmt.Size(picked.Sum(r => r.Candidate.SizeBytes)) + " now";
+        long now = picked.Sum(r => r.Candidate.SizeBytes), after = picked.Sum(r => r.EstimatedBytes);
+        PickedSize = $"{Fmt.Size(now)} now, about {Fmt.Size(after)} after. Saves about {Fmt.Size(now - after)}{EncodeRow.Percent(now, after)}";
     }
 
+    /// <summary>
+    /// Click: pick or unpick one video. Shift-click: give every video between the last click and this one the
+    /// same state as that last click.
+    /// </summary>
+    public void RowClicked(EncodeRow row, bool shift)
+    {
+        if (shift && anchor != null)
+        {
+            int a = Rows.IndexOf(anchor), b = Rows.IndexOf(row);
+            if (a >= 0 && b >= 0)
+            {
+                for (int i = Math.Min(a, b); i <= Math.Max(a, b); i++) Rows[i].IsPicked = anchorState;
+                return;
+            }
+        }
+        row.IsPicked = !row.IsPicked;
+        anchorState = row.IsPicked;
+        anchor = row;
+    }
+
+    [RelayCommand] private void SelectAll() { foreach (var r in Visible()) r.IsPicked = true; }
     [RelayCommand] private void SelectTop() { foreach (var r in Visible().Take(20)) r.IsPicked = true; }
     [RelayCommand] private void SelectAllShown() { foreach (var r in Visible()) r.IsPicked = true; }
     [RelayCommand] private void SelectNone() { foreach (var r in all) r.IsPicked = false; }
@@ -90,8 +120,23 @@ public partial class EncodeViewModel : ObservableObject
     [RelayCommand] private void GoToScan() => main.ShowScan();
 
     [RelayCommand]
+    private void AskCreate()
+    {
+        var picked = all.Where(r => r.IsPicked).ToList();
+        if (picked.Count == 0) return;
+        long now = picked.Sum(r => r.Candidate.SizeBytes), after = picked.Sum(r => r.EstimatedBytes);
+        ConfirmTitle = $"Create an encoding script for {Fmt.Plural(picked.Count, "video", "videos")}?";
+        ConfirmText = $"{EncodeOptions.Codec(settings.codec).Label}, {settings.resolution}p, quality {settings.crf}. Now {Fmt.Size(now)}, about {Fmt.Size(after)} after, saving about {Fmt.Size(now - after)}. "
+                    + "The script makes new files next to the originals; nothing changes until you run it.";
+        ConfirmVisible = true;
+    }
+
+    [RelayCommand] private void CancelCreate() => ConfirmVisible = false;
+
+    [RelayCommand]
     private void Create()
     {
+        ConfirmVisible = false;
         // In list order: highest bitrate first
         var videos = all.Where(r => r.IsPicked).Select(r => r.Candidate).ToList();
         if (videos.Count == 0) return;
@@ -111,7 +156,6 @@ public partial class EncodeViewModel : ObservableObject
 public partial class EncodeRow : ObservableObject
 {
     private readonly Action changed;
-    private Bitmap? shot;
     private bool shotLoaded;
 
     public EncodeCandidate Candidate { get; }
@@ -120,14 +164,34 @@ public partial class EncodeRow : ObservableObject
     public string Bitrate => $"{Candidate.AverageKbps:N0} kbit/s";
     public string Size => Fmt.Size(Candidate.SizeBytes);
     public string Length => Fmt.Duration(Candidate.DurationSeconds);
-    public Bitmap? Shot { get { if (!shotLoaded) { shotLoaded = true; shot = Shots.Get(Candidate.Id, 2); } return shot; } }
+    public long EstimatedBytes { get; }
+    public string Estimate => Fmt.Size(EstimatedBytes);
+    public string Saving => Candidate.SizeBytes - EstimatedBytes < Candidate.SizeBytes / 20
+        ? "little or no saving"
+        : $"saves {Fmt.Size(Candidate.SizeBytes - EstimatedBytes)}{Percent(Candidate.SizeBytes, EstimatedBytes)}";
+    public bool GoodSaving => Candidate.SizeBytes - EstimatedBytes > Candidate.SizeBytes / 10;
+
+    // Screenshots load when the row is first shown (the list is virtualized)
+    public Bitmap? Shot1 { get { LoadShots(); return shots[0]; } }
+    public Bitmap? Shot2 { get { LoadShots(); return shots[1]; } }
+    public Bitmap? Shot3 { get { LoadShots(); return shots[2]; } }
+    private readonly Bitmap?[] shots = new Bitmap?[3];
+    private void LoadShots()
+    {
+        if (shotLoaded) return;
+        shotLoaded = true;
+        for (int i = 0; i < 3; i++) shots[i] = Shots.Get(Candidate.Id, i + 1);
+    }
+
+    public static string Percent(long now, long after) => now > 0 ? $" ({(now - after) * 100 / now}%)" : "";
 
     [ObservableProperty] private bool isPicked;
 
-    public EncodeRow(EncodeCandidate candidate, bool picked, Action changed)
+    public EncodeRow(EncodeCandidate candidate, bool picked, long estimatedBytes, Action changed)
     {
         Candidate = candidate;
         isPicked = picked;
+        EstimatedBytes = estimatedBytes;
         this.changed = changed;
     }
 

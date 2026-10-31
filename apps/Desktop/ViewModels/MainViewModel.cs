@@ -37,5 +37,6 @@ public partial class MainViewModel : ObservableObject
 
     public void ShowReview() => SelectedTab = 0;
     public void ShowScan() => SelectedTab = 1;
+    public void ShowEncode() => SelectedTab = 2;
     public void ShowSettings() => SelectedTab = 3;
 }

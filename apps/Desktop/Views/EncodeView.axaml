@@ -9,14 +9,16 @@
     <Style Selector="ListBox.rows ListBoxItem:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="Transparent"/></Style>
     <Style Selector="Border.encrow"><Setter Property="Background" Value="{DynamicResource Sheet}"/><Setter Property="Padding" Value="12,6"/>
       <Setter Property="BorderBrush" Value="{DynamicResource Rule}"/><Setter Property="BorderThickness" Value="0,0,0,1"/></Style>
+    <Style Selector="Border.encrow:pointerover"><Setter Property="Background" Value="{DynamicResource Table}"/></Style>
     <Style Selector="Border.encrow.picked"><Setter Property="Background" Value="{DynamicResource KeepWash}"/></Style>
+    <Style Selector="TextBlock.saving"><Setter Property="Foreground" Value="{DynamicResource Keep}"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
   </UserControl.Styles>
 
   <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto" Margin="12,16,12,0">
     <StackPanel Grid.Row="0" Margin="0,0,0,12">
       <TextBlock Classes="h1" Text="Re-encode"/>
       <TextBlock Classes="muted" TextWrapping="Wrap" Margin="0,4,0,0"
-                 Text="Videos with the highest bitrate first - they usually shrink the most. Pick videos and create a script that makes smaller copies."/>
+                 Text="Videos with the highest bitrate first - they usually shrink the most. Click a video to pick it, Shift-click to pick everything in between, then create the encoding script."/>
     </StackPanel>
 
     <Border Grid.Row="1" Classes="panel" Padding="16,12" Margin="0,0,0,12">
@@ -36,8 +38,8 @@
     </Border>
 
     <WrapPanel Grid.Row="3" Margin="0,0,0,10" IsVisible="{Binding HasVideos}">
+      <Button Content="Select all" Command="{Binding SelectAllCommand}" Margin="0,0,8,6"/>
       <Button Content="Select top 20" Command="{Binding SelectTopCommand}" Margin="0,0,8,6"/>
-      <Button Content="Select all shown" Command="{Binding SelectAllShownCommand}" Margin="0,0,8,6"/>
       <Button Content="Select none" Command="{Binding SelectNoneCommand}" IsEnabled="{Binding HasPicked}" Margin="0,0,16,6"/>
       <TextBlock Text="Only above" VerticalAlignment="Center" Margin="0,0,6,6"/>
       <NumericUpDown Value="{Binding MinKbps}" Minimum="0" Increment="500" FormatString="0" Width="140" Margin="0,0,6,6"/>
@@ -56,29 +58,38 @@
     <Border Grid.Row="4" BorderBrush="{DynamicResource Rule}" BorderThickness="1" CornerRadius="6" ClipToBounds="True" IsVisible="{Binding HasVideos}">
       <DockPanel>
         <Border DockPanel.Dock="Top" Background="{DynamicResource Table}" Padding="12,6">
-          <Grid ColumnDefinitions="36,132,*,130,90,70">
+          <Grid ColumnDefinitions="32,316,*,120,90,160">
             <TextBlock Grid.Column="2" Text="Video" Classes="muted small" FontWeight="SemiBold"/>
             <TextBlock Grid.Column="3" Text="Bitrate" Classes="muted small" FontWeight="SemiBold" HorizontalAlignment="Right"/>
-            <TextBlock Grid.Column="4" Text="Size" Classes="muted small" FontWeight="SemiBold" HorizontalAlignment="Right"/>
-            <TextBlock Grid.Column="5" Text="Length" Classes="muted small" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+            <TextBlock Grid.Column="4" Text="Size now" Classes="muted small" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+            <TextBlock Grid.Column="5" Text="Estimated after" Classes="muted small" FontWeight="SemiBold" HorizontalAlignment="Right"/>
           </Grid>
         </Border>
         <ListBox Classes="rows" ItemsSource="{Binding Rows}" Background="Transparent">
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="vm:EncodeRow">
-              <Border Classes="encrow" Classes.picked="{Binding IsPicked}">
-                <Grid ColumnDefinitions="36,132,*,130,90,70">
-                  <CheckBox IsChecked="{Binding IsPicked}" VerticalAlignment="Center"/>
-                  <Border Grid.Column="1" Background="{DynamicResource Frame}" CornerRadius="3" Width="120" Height="68" HorizontalAlignment="Left" ClipToBounds="True">
-                    <Image Source="{Binding Shot}" Stretch="UniformToFill"/>
+              <!-- The whole row is clickable; Shift-click picks a range (see EncodeView.axaml.cs) -->
+              <Border Classes="encrow" Classes.picked="{Binding IsPicked}" PointerPressed="Row_PointerPressed" Cursor="Hand">
+                <Grid ColumnDefinitions="32,316,*,120,90,160">
+                  <CheckBox IsChecked="{Binding IsPicked}" IsHitTestVisible="False" VerticalAlignment="Center"/>
+                  <Border Grid.Column="1" Background="{DynamicResource Frame}" CornerRadius="3" Padding="4" HorizontalAlignment="Left">
+                    <StackPanel Orientation="Horizontal" Spacing="3">
+                      <Image Source="{Binding Shot1}" Width="96" Height="64" Stretch="UniformToFill"/>
+                      <Image Source="{Binding Shot2}" Width="96" Height="64" Stretch="UniformToFill"/>
+                      <Image Source="{Binding Shot3}" Width="96" Height="64" Stretch="UniformToFill"/>
+                    </StackPanel>
                   </Border>
-                  <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="2">
+                  <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="2" Margin="8,0,0,0">
                     <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                     <TextBlock Text="{Binding Folder}" Classes="muted small" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Text="{Binding Length}" Classes="muted small"/>
                   </StackPanel>
                   <TextBlock Grid.Column="3" Text="{Binding Bitrate}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                   <TextBlock Grid.Column="4" Text="{Binding Size}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
-                  <TextBlock Grid.Column="5" Text="{Binding Length}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                  <StackPanel Grid.Column="5" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Estimate}" HorizontalAlignment="Right"/>
+                    <TextBlock Text="{Binding Saving}" FontSize="12" HorizontalAlignment="Right" Classes="muted" Classes.saving="{Binding GoodSaving}"/>
+                  </StackPanel>
                 </Grid>
               </Border>
             </DataTemplate>
@@ -89,12 +100,26 @@
 
     <Border Grid.Row="5" Background="{DynamicResource Sheet}" BorderBrush="{DynamicResource Rule}" BorderThickness="0,1,0,0" Padding="16,12" Margin="-12,12,-12,0" IsVisible="{Binding HasVideos}">
       <DockPanel>
-        <Button DockPanel.Dock="Right" Classes="primary" Content="Create encoding script" Command="{Binding CreateCommand}" IsEnabled="{Binding HasPicked}" FontSize="15" Padding="18,8"/>
+        <Button DockPanel.Dock="Right" Classes="primary" Content="Create encoding script" Command="{Binding AskCreateCommand}" IsEnabled="{Binding HasPicked}" FontSize="15" Padding="18,8"/>
         <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
           <TextBlock Text="{Binding PickedText}" FontSize="16" FontWeight="SemiBold"/>
           <TextBlock Text="{Binding PickedSize}" Classes="muted" VerticalAlignment="Bottom"/>
         </StackPanel>
       </DockPanel>
     </Border>
+
+    <!-- Confirmation before the script is written -->
+    <Grid Grid.RowSpan="6" Margin="-12,-16,-12,0" Background="#80000000" IsVisible="{Binding ConfirmVisible}">
+      <Border Classes="panel" Width="560" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
+        <StackPanel Spacing="12">
+          <TextBlock Classes="h2" Text="{Binding ConfirmTitle}" TextWrapping="Wrap"/>
+          <TextBlock Classes="muted" Text="{Binding ConfirmText}" TextWrapping="Wrap"/>
+          <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="Cancel" Command="{Binding CancelCreateCommand}"/>
+            <Button Classes="primary" Content="Create script" Command="{Binding CreateCommand}"/>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Grid>
   </Grid>
 </UserControl>
