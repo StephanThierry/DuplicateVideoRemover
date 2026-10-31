@@ -152,7 +152,7 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     [RelayCommand] private void AddMapping() { Mappings.Add(new MappingItem("", "", Edited)); }
-    [RelayCommand] private void RemoveMapping(MappingItem item) { Mappings.Remove(item); Edited(); }
+    [RelayCommand] private void RemoveMapping(MappingItem item) { item.Cancel(); Mappings.Remove(item); Edited(); }
     [RelayCommand] private void AddSwitch() { Switches.Add(new SwitchItem("x265", "x264", 15, Edited)); Edited(); }
     [RelayCommand] private void RemoveSwitch(SwitchItem item) { Switches.Remove(item); Edited(); }
 }
@@ -213,11 +213,64 @@ public partial class PathItem : ObservableObject
 public partial class MappingItem : ObservableObject
 {
     private readonly Action changed;
+    private CancellationTokenSource? checkRun;
     [ObservableProperty] private string windows;
     [ObservableProperty] private string linux;
-    public MappingItem(string windows, string linux, Action changed) { this.windows = windows; this.linux = linux; this.changed = changed; }
-    partial void OnWindowsChanged(string value) => changed();
-    partial void OnLinuxChanged(string value) => changed();
+
+    // Result of the background check against the database, shown under the row
+    [ObservableProperty] private string checkText = "";
+    [ObservableProperty] private string checkLevel = "";
+    public bool HasCheck => CheckText.Length > 0;
+    public bool IsOk => CheckLevel == "ok";
+    public bool IsWarning => CheckLevel == "warning";
+    public bool IsError => CheckLevel == "error";
+
+    public MappingItem(string windows, string linux, Action changed)
+    {
+        this.windows = windows;
+        this.linux = linux;
+        this.changed = changed;
+        StartCheck(0);
+    }
+
+    partial void OnWindowsChanged(string value) { changed(); StartCheck(500); }
+    partial void OnLinuxChanged(string value) { changed(); StartCheck(500); }
+    partial void OnCheckTextChanged(string value) => OnPropertyChanged(nameof(HasCheck));
+    partial void OnCheckLevelChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsOk));
+        OnPropertyChanged(nameof(IsWarning));
+        OnPropertyChanged(nameof(IsError));
+    }
+
+    public void Cancel() => checkRun?.Cancel();
+
+    // Checks a sample of the videos in the database against the pair, a moment after the last change
+    private void StartCheck(int delayMs)
+    {
+        checkRun?.Cancel();
+        if (string.IsNullOrWhiteSpace(Windows) || string.IsNullOrWhiteSpace(Linux)) { CheckText = ""; CheckLevel = ""; return; }
+        var cts = checkRun = new CancellationTokenSource();
+        var token = cts.Token;
+        var pair = new PathMapping { Windows = Windows, Linux = Linux };
+        void Show(MappingCheck c) => Dispatcher.UIThread.Post(() =>
+        {
+            if (token.IsCancellationRequested) return;
+            CheckText = c.Message;
+            CheckLevel = c.Level.ToString().ToLowerInvariant();
+        });
+        Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(delayMs, token);
+                var result = await MappingChecker.CheckAsync(pair, new SyncProgress<MappingCheck>(Show), token);
+                Show(result);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception e) { Show(new MappingCheck(MappingCheckLevel.Warning, "Could not check this path: " + e.Message)); }
+        });
+    }
 }
 
 public partial class SwitchItem : ObservableObject
