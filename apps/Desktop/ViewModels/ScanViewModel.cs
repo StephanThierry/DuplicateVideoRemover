@@ -144,6 +144,7 @@ public partial class ScanViewModel : ObservableObject
     }
 
     [RelayCommand] private void Review() => main.ShowReview();
+    [RelayCommand] private void Encode() => main.ShowEncode();
     [RelayCommand] private void EditSettings() => main.ShowSettings();
 }
 
