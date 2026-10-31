@@ -5,11 +5,16 @@ select { cursor: pointer; }
 
 /* ---------- Re-encode ---------- */
 .enc-list { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius-sheet); overflow: hidden; }
-.enc-row { display: grid; grid-template-columns: 28px 120px 1fr 110px 90px 70px; gap: 14px; align-items: center; padding: 8px 14px; }
+.enc-row { display: grid; grid-template-columns: 22px auto 1fr 110px 90px 150px; gap: 14px; align-items: center; padding: 8px 14px; cursor: pointer; user-select: none; }
+.enc-row:not(.head):hover { background: var(--table); }
+.enc-row:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
+.enc-row input[type=checkbox] { pointer-events: none; }
+.enc-strip { display: flex; gap: 3px; padding: 4px; background: var(--frame); border-radius: 3px; }
+.enc-strip img { width: 96px; height: 64px; object-fit: cover; display: block; background: #3a424a; }
+.enc-row .saving { color: var(--keep); font-weight: 600; }
 .enc-row + .enc-row { border-top: 1px solid var(--rule); }
 .enc-row.head { font-size: .8rem; color: var(--muted); font-weight: 600; background: var(--table); }
-.enc-row.is-picked { background: var(--keep-wash); }
-.enc-row img { width: 120px; height: 68px; object-fit: cover; border-radius: 3px; background: var(--frame); display: block; }
+.enc-row.is-picked, .enc-row.is-picked:hover { background: var(--keep-wash); }
 .enc-row .num { text-align: right; }
 .enc-summary { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; }
 .result { background: var(--keep-wash); border-radius: var(--radius-sheet); padding: 16px 18px; margin-bottom: 16px; }

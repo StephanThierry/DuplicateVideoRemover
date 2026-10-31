@@ -76,7 +76,11 @@
                 {
                     <div class="notice">
                         <p><strong>@p.Message.</strong></p>
-                        <p style="margin-top:10px"><button class="primary" @onclick='() => Nav.NavigateTo("")'>Review results</button></p>
+                        <p style="margin-top:10px">
+                            <button class="primary" @onclick='() => Nav.NavigateTo("")'>Review results</button>
+                            <button @onclick='() => Nav.NavigateTo("encode")'>Re-encode large videos</button>
+                        </p>
+                        <p class="muted" style="margin-top:8px">Delete duplicates first, then re-encode: deleted videos are left out of the re-encode list.</p>
                     </div>
                 }
                 else if (p.Phase == ScanPhase.Cancelled)
