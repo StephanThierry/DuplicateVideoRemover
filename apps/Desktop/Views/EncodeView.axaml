@@ -1,0 +1,100 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DuplicateVideoRemover.Desktop.ViewModels"
+             x:Class="DuplicateVideoRemover.Desktop.Views.EncodeView"
+             x:DataType="vm:EncodeViewModel">
+  <UserControl.Styles>
+    <Style Selector="ListBox.rows ListBoxItem"><Setter Property="Padding" Value="0"/></Style>
+    <Style Selector="ListBox.rows ListBoxItem:selected /template/ ContentPresenter"><Setter Property="Background" Value="Transparent"/></Style>
+    <Style Selector="ListBox.rows ListBoxItem:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="Transparent"/></Style>
+    <Style Selector="Border.encrow"><Setter Property="Background" Value="{DynamicResource Sheet}"/><Setter Property="Padding" Value="12,6"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Rule}"/><Setter Property="BorderThickness" Value="0,0,0,1"/></Style>
+    <Style Selector="Border.encrow.picked"><Setter Property="Background" Value="{DynamicResource KeepWash}"/></Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto" Margin="12,16,12,0">
+    <StackPanel Grid.Row="0" Margin="0,0,0,12">
+      <TextBlock Classes="h1" Text="Re-encode"/>
+      <TextBlock Classes="muted" TextWrapping="Wrap" Margin="0,4,0,0"
+                 Text="Videos with the highest bitrate first - they usually shrink the most. Pick videos and create a script that makes smaller copies."/>
+    </StackPanel>
+
+    <Border Grid.Row="1" Classes="panel" Padding="16,12" Margin="0,0,0,12">
+      <WrapPanel>
+        <TextBlock Text="{Binding SettingsSummary}" FontWeight="SemiBold" Margin="0,0,14,0" VerticalAlignment="Center"/>
+        <TextBlock Text="{Binding QualitySummary}" Classes="muted" Margin="0,0,14,0" VerticalAlignment="Center"/>
+        <Button Classes="link" Content="Change in Settings" Command="{Binding EditSettingsCommand}"/>
+      </WrapPanel>
+    </Border>
+
+    <Border Grid.Row="2" IsVisible="{Binding HasResult}" Background="{DynamicResource KeepWash}" CornerRadius="6" Padding="16,12" Margin="0,0,0,12">
+      <StackPanel Spacing="6">
+        <SelectableTextBlock Text="{Binding ResultText}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+        <SelectableTextBlock Text="{Binding RunText}" Classes="muted" TextWrapping="Wrap"/>
+        <Button Content="Open the folder" Command="{Binding ShowScriptFolderCommand}" HorizontalAlignment="Left"/>
+      </StackPanel>
+    </Border>
+
+    <WrapPanel Grid.Row="3" Margin="0,0,0,10" IsVisible="{Binding HasVideos}">
+      <Button Content="Select top 20" Command="{Binding SelectTopCommand}" Margin="0,0,8,6"/>
+      <Button Content="Select all shown" Command="{Binding SelectAllShownCommand}" Margin="0,0,8,6"/>
+      <Button Content="Select none" Command="{Binding SelectNoneCommand}" IsEnabled="{Binding HasPicked}" Margin="0,0,16,6"/>
+      <TextBlock Text="Only above" VerticalAlignment="Center" Margin="0,0,6,6"/>
+      <NumericUpDown Value="{Binding MinKbps}" Minimum="0" Increment="500" FormatString="0" Width="140" Margin="0,0,6,6"/>
+      <TextBlock Text="kbit/s" VerticalAlignment="Center" Margin="0,0,16,6"/>
+      <TextBox Text="{Binding Search}" Watermark="Filter by file or folder name" Width="280" Margin="0,0,0,6"/>
+    </WrapPanel>
+
+    <Border Grid.Row="4" Classes="panel" Padding="40" VerticalAlignment="Top" IsVisible="{Binding !HasVideos}">
+      <StackPanel HorizontalAlignment="Center" Spacing="10">
+        <TextBlock Classes="h2" Text="No videos to re-encode" HorizontalAlignment="Center"/>
+        <TextBlock Classes="muted" Text="Scan your folders first. Duplicates, broken videos and left-out file types are not listed." HorizontalAlignment="Center"/>
+        <Button Classes="primary" Content="Go to scan" Command="{Binding GoToScanCommand}" HorizontalAlignment="Center"/>
+      </StackPanel>
+    </Border>
+
+    <Border Grid.Row="4" BorderBrush="{DynamicResource Rule}" BorderThickness="1" CornerRadius="6" ClipToBounds="True" IsVisible="{Binding HasVideos}">
+      <DockPanel>
+        <Border DockPanel.Dock="Top" Background="{DynamicResource Table}" Padding="12,6">
+          <Grid ColumnDefinitions="36,132,*,130,90,70">
+            <TextBlock Grid.Column="2" Text="Video" Classes="muted small" FontWeight="SemiBold"/>
+            <TextBlock Grid.Column="3" Text="Bitrate" Classes="muted small" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+            <TextBlock Grid.Column="4" Text="Size" Classes="muted small" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+            <TextBlock Grid.Column="5" Text="Length" Classes="muted small" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+          </Grid>
+        </Border>
+        <ListBox Classes="rows" ItemsSource="{Binding Rows}" Background="Transparent">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:EncodeRow">
+              <Border Classes="encrow" Classes.picked="{Binding IsPicked}">
+                <Grid ColumnDefinitions="36,132,*,130,90,70">
+                  <CheckBox IsChecked="{Binding IsPicked}" VerticalAlignment="Center"/>
+                  <Border Grid.Column="1" Background="{DynamicResource Frame}" CornerRadius="3" Width="120" Height="68" HorizontalAlignment="Left" ClipToBounds="True">
+                    <Image Source="{Binding Shot}" Stretch="UniformToFill"/>
+                  </Border>
+                  <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="2">
+                    <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Text="{Binding Folder}" Classes="muted small" TextTrimming="CharacterEllipsis"/>
+                  </StackPanel>
+                  <TextBlock Grid.Column="3" Text="{Binding Bitrate}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="4" Text="{Binding Size}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="5" Text="{Binding Length}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </DockPanel>
+    </Border>
+
+    <Border Grid.Row="5" Background="{DynamicResource Sheet}" BorderBrush="{DynamicResource Rule}" BorderThickness="0,1,0,0" Padding="16,12" Margin="-12,12,-12,0" IsVisible="{Binding HasVideos}">
+      <DockPanel>
+        <Button DockPanel.Dock="Right" Classes="primary" Content="Create encoding script" Command="{Binding CreateCommand}" IsEnabled="{Binding HasPicked}" FontSize="15" Padding="18,8"/>
+        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+          <TextBlock Text="{Binding PickedText}" FontSize="16" FontWeight="SemiBold"/>
+          <TextBlock Text="{Binding PickedSize}" Classes="muted" VerticalAlignment="Bottom"/>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+  </Grid>
+</UserControl>

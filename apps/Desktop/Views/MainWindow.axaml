@@ -26,6 +26,7 @@
     <TabControl SelectedIndex="{Binding SelectedTab}" Padding="0" Margin="12,4,12,0">
       <TabItem Header="Review"><v:ReviewView DataContext="{Binding Review}"/></TabItem>
       <TabItem Header="Scan"><v:ScanView DataContext="{Binding Scan}"/></TabItem>
+      <TabItem Header="Re-encode"><v:EncodeView DataContext="{Binding Encode}"/></TabItem>
       <TabItem Header="Settings"><v:SettingsView DataContext="{Binding Settings}"/></TabItem>
     </TabControl>
   </DockPanel>
