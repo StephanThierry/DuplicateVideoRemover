@@ -28,7 +28,8 @@ namespace deepduplicates
             if (string.IsNullOrWhiteSpace(mapping?.Windows) || string.IsNullOrWhiteSpace(mapping?.Linux))
                 return new MappingCheck(MappingCheckLevel.Info, "");
 
-            string win = mapping.Windows.Trim().Replace('/', '\\').TrimEnd('\\') + "\\";
+            // A pair written with a synonym's alias (e.g. "L:\") works on the synonym's main name
+            string win = PathMapper.NormalizeRoot(PathMapper.ToMainName(mapping.Windows.Trim().Replace('/', '\\').TrimEnd('\\') + "\\"));
             string lin = mapping.Linux.Trim().TrimEnd('/') + "/";
             bool onWindows = OperatingSystem.IsWindows();
             string localRoot = onWindows ? win : lin;   // where the pair should lead on this computer
@@ -41,7 +42,8 @@ namespace deepduplicates
             List<string> stored = await Task.Run(() =>
             {
                 using var db = new VideoInfoContext();
-                return db.Database.SqlQueryRaw<string>("SELECT path AS Value FROM VideoInfos WHERE path IS NOT NULL").ToList();
+                return db.Database.SqlQueryRaw<string>("SELECT path AS Value FROM VideoInfos WHERE path IS NOT NULL").ToList()
+                    .Select(PathMapper.ToMainName).ToList();   // paths still stored under an alias count as the main name
             }, ct);
 
             // The source is the other computer's side of the pair, as stored in the database. Paths already

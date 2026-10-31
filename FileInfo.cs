@@ -85,7 +85,7 @@ namespace deepduplicates
 
             set
             {
-                image1Checksum = JsonConvert.DeserializeObject<rgb[]>(value);
+                image1Checksum = value == null ? null : JsonConvert.DeserializeObject<rgb[]>(value);
             }
         }
         
@@ -98,7 +98,7 @@ namespace deepduplicates
 
             set
             {
-                image2Checksum = JsonConvert.DeserializeObject<rgb[]>(value);
+                image2Checksum = value == null ? null : JsonConvert.DeserializeObject<rgb[]>(value);
             }
         }
 
@@ -111,7 +111,7 @@ namespace deepduplicates
 
             set
             {
-                image3Checksum = JsonConvert.DeserializeObject<rgb[]>(value);
+                image3Checksum = value == null ? null : JsonConvert.DeserializeObject<rgb[]>(value);
             }
         }
 

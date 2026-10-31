@@ -68,10 +68,13 @@ namespace deepduplicates
         public string ScreenshotPath(int videoId, int index) =>
             Path.Combine(DataLocation.ScreenshotFolder, videoId + "_" + index + ".png");
 
-        public void SaveSettings(Settings settings, IEnumerable<PathMapping> mappings)
+        public void SaveSettings(Settings settings, IEnumerable<PathMapping> mappings) =>
+            SaveSettings(settings, mappings, PathMapper.Synonyms);
+
+        public void SaveSettings(Settings settings, IEnumerable<PathMapping> mappings, IEnumerable<PathSynonym> synonyms)
         {
             settings.Normalize();
-            PathMapper.Save(DataFolder, mappings);
+            PathMapper.Save(DataFolder, mappings, synonyms);
             FileHandler.SaveSettings(settings);
             Settings = settings.Clone();
         }
@@ -121,6 +124,25 @@ namespace deepduplicates
             EncodePlanner.WriteScript(CreateFileHandler().outputFolder, EncodeScriptName, videos, Settings.EncodeOrDefault());
 
         public const string EncodeScriptName = "encode_selected";
+
+        /// <summary>
+        /// Rewrites the stored paths under the synonym's alias to its main name (see SynonymTools.Update).
+        /// Not while a scan is running. Compares again afterwards, so the review uses the new paths.
+        /// </summary>
+        public SynonymUpdateReport UpdateSynonymPaths(PathSynonym synonym)
+        {
+            ScanLock scanLock;
+            try { scanLock = ScanLock.Acquire("updating paths"); }
+            catch (ScanAlreadyRunningException e) { return new SynonymUpdateReport(0, 0, e.Message); }
+            using (scanLock)
+            {
+                var report = SynonymTools.Update(synonym);
+                InvalidateCache();
+                ReanalyzeFromDatabase();
+                DataChanged?.Invoke();
+                return report;
+            }
+        }
 
         /// <summary>When the last scan of this scope ran, if any.</summary>
         public RunRecord LastRun() => RunHistory.LastRun(Settings);
