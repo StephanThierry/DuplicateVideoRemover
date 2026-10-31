@@ -29,6 +29,26 @@ On Linux, also install FFmpeg (`sudo apt install ffmpeg`). If it is installed, i
 * **Scan** - progress through the steps, videos found, already read and new, and the time left. The estimate comes from earlier scans until the current one has read a few videos. A scan can be stopped; what was read is kept.
 * **Review** - each group of copies with 3 screenshots per video. Select all duplicates, select none, select one by one, "Keep this one", or pick a folder and "Select all duplicates in this folder". Files picked for removal are crossed out. Delete them with one button (after a confirmation); deleted files disappear and you can carry on. A group always keeps at least one copy.
 
+**Re-encoding:** the **Re-encode** screen lists the videos that aren't duplicates or broken, highest average bitrate first (those shrink the most). Pick videos (or "Select top 20") and press "Create encoding script" to get `output/encode_selected.ps1` (Windows) or `.sh` (Linux) with one FFmpeg command per video. The new files are saved next to the originals with a name ending like `_1080p_x265`; the originals are not changed. Nothing is encoded until you run the script.
+
+How it encodes is set under **Settings > Re-encoding**, each with a recommended default:
+
+| Setting | Choices | Default |
+|---|---|---|
+| Video format | H.265 (x265), H.264 (x264) | H.265 |
+| Resolution | 720p, 1080p, 1440p (never enlarged, aspect ratio kept) | 1080p |
+| Quality (CRF slider, right = better) | x265 16-34, x264 14-32 | x265: 22, x264: 20 (looks like the original) |
+| Speed | very fast ... slower | medium |
+| Sound | keep original, AAC 160 kbps | keep original |
+| File type | MP4, MKV | MP4 |
+| Apple devices (H.265 in MP4) | on/off | on |
+| Name ending | any text | automatic, e.g. `_1080p_x265` |
+| Never overwrite existing files | on/off | on |
+| Leave out | file types, videos of N seconds or shorter | .mpg .mpeg .wmv, 2 s |
+| Extra video filter (advanced) | FFmpeg filter, e.g. `yadif` | none |
+
+These are stored as `encodeSettings` in `settings.json` (older files with `scale`, `compressionLevelcrf` and `compressionPreset` are converted). When that section exists, the command-line version also writes `output/encoding-template.ps1`/`.sh` with every video, highest bitrate first.
+
 **Web app options**
 * `--data <folder>` - the data folder (default: the current folder)
 * `--urls http://0.0.0.0:5077` - listen on the network (default: this computer only, http://127.0.0.1:5077)
