@@ -62,6 +62,38 @@
                 </div>
             </section>
 
+            <section class="panel" id="synonyms">
+                <h2>Other names for the same place</h2>
+                <div class="help muted" style="margin-bottom:12px">
+                    For example a mapped drive letter and the network path it points to (L:\ and \\nas\video\).
+                    The main name is what the database uses - the network path is best, because it works on every computer.
+                    Each computer uses whichever of the names it can reach.
+                </div>
+                <div class="mapping head"><span>Main name (network path)</span><span>Also known as</span><span></span></div>
+                @for (int i = 0; i < synonyms.Count; i++)
+                {
+                    int index = i;
+                    var syn = synonyms[index];
+                    var sc = synChecks.TryGetValue(syn, out var c2) ? c2 : null;
+                    <div class="mapping" style="margin-top:6px">
+                        <input type="text" @bind="syn.Main" @bind:after="() => SynonymEdited(syn)" placeholder="\\nas\video\" aria-label="Main name @(index + 1)" />
+                        <input type="text" @bind="syn.Alias" @bind:after="() => SynonymEdited(syn)" placeholder="L:\" aria-label="Also known as @(index + 1)" />
+                        <button @onclick="() => RemoveSynonym(index)">Remove</button>
+                    </div>
+                    @if (!string.IsNullOrEmpty(sc?.Message))
+                    {
+                        <div class="mapcheck @sc.Level.ToString().ToLowerInvariant()" role="status">
+                            @sc.Message
+                            @if (sc.InDatabase > 0 && sc.Level is MappingCheckLevel.Ok or MappingCheckLevel.Warning)
+                            {
+                                <div style="margin-top:8px"><button class="primary" @onclick="() => confirmSynonym = syn">Update paths</button></div>
+                            }
+                        </div>
+                    }
+                }
+                <p style="margin-top:10px"><button @onclick="AddSynonym">Add a synonym</button></p>
+            </section>
+
             <section class="panel">
                 <h2>When are videos duplicates?</h2>
                 <p class="muted" style="margin-bottom:16px">Videos of the same length (within a second) are compared using 3 screenshots each.</p>
@@ -137,6 +169,21 @@
     </div>
 </div>
 
+@if (confirmSynonym != null)
+{
+    var pending = synChecks.TryGetValue(confirmSynonym, out var pc) ? pc : null;
+    <div class="dialog-backdrop" @onclick="() => confirmSynonym = null">
+        <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="syn-confirm" @onclick:stopPropagation="true">
+            <h2 id="syn-confirm">Update @Fmt.Plural(pending?.InDatabase ?? 0, "path", "paths") in the database?</h2>
+            <p>Paths starting with @PathMapper.NormalizeRoot(confirmSynonym.Alias) are changed to start with @PathMapper.NormalizeRoot(confirmSynonym.Main). Videos stored under both names become one. Your settings are saved too, so new scans use the main name. This can't be undone.</p>
+            <div class="buttons">
+                <button @onclick="() => confirmSynonym = null">Cancel</button>
+                <button class="primary" @onclick="UpdateSynonymPaths" disabled="@updating">@(updating ? "Updating..." : "Update paths")</button>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private deepduplicates.Settings settings = new();
     private List<string> contentFolders = new(), excludePaths = new(), priorityFolders = new();
@@ -148,6 +195,12 @@
     private bool dirty;
     private string savedMessage;
     private CancellationTokenSource debounce;
+    // Synonyms (other names for the same place) and their checks
+    private List<PathSynonym> synonyms = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<PathSynonym, MappingCheck> synChecks = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<PathSynonym, CancellationTokenSource> synRuns = new();
+    private PathSynonym confirmSynonym;
+    private bool updating;
     // Background checks of the path pairs against the database, one per row
     private readonly System.Collections.Concurrent.ConcurrentDictionary<PathMapping, MappingCheck> checks = new();
     private readonly System.Collections.Concurrent.ConcurrentDictionary<PathMapping, CancellationTokenSource> checkRuns = new();
@@ -163,6 +216,60 @@
         mappings = PathMapper.Mappings.Select(m => new PathMapping { Windows = m.Windows, Linux = m.Linux }).ToList();
         SchedulePreview(0);
         App.DataChanged += OnDataChanged;
+        foreach (var m in mappings) StartCheck(m, 0);
+        synonyms = PathMapper.Synonyms.Select(s => new PathSynonym { Main = s.Main, Alias = s.Alias }).ToList();
+        foreach (var s in synonyms) StartSynonymCheck(s, 0);
+    }
+
+    private void AddSynonym() { synonyms.Add(new PathSynonym()); Edited(); }
+
+    private void SynonymEdited(PathSynonym s) { Edited(); StartSynonymCheck(s, 500); }
+
+    private void RemoveSynonym(int index)
+    {
+        var s = synonyms[index];
+        if (synRuns.TryRemove(s, out var run)) run.Cancel();
+        synChecks.TryRemove(s, out _);
+        synonyms.RemoveAt(index);
+        Edited();
+    }
+
+    // Counts the videos stored under the alias and checks a sample of them under the main name
+    private void StartSynonymCheck(PathSynonym s, int delayMs)
+    {
+        if (synRuns.TryRemove(s, out var old)) old.Cancel();
+        if (string.IsNullOrWhiteSpace(s.Main) || string.IsNullOrWhiteSpace(s.Alias)) { synChecks.TryRemove(s, out _); return; }
+        var cts = new CancellationTokenSource();
+        synRuns[s] = cts;
+        var token = cts.Token;
+        var snapshot = new PathSynonym { Main = s.Main, Alias = s.Alias };
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(delayMs, token);
+                var progress = new SyncProgress<MappingCheck>(p => { if (!token.IsCancellationRequested) { synChecks[s] = p; InvokeAsync(StateHasChanged); } });
+                var result = await SynonymTools.CheckAsync(snapshot, progress, token);
+                if (token.IsCancellationRequested) return;
+                synChecks[s] = result;
+            }
+            catch (OperationCanceledException) { return; }
+            catch (Exception ex) { synChecks[s] = new MappingCheck(MappingCheckLevel.Warning, "Could not check this synonym: " + ex.Message); }
+            await InvokeAsync(StateHasChanged);
+        });
+    }
+
+    // Saves the settings (so new scans use the main name) and rewrites the stored paths once
+    private async Task UpdateSynonymPaths()
+    {
+        var s = confirmSynonym;
+        if (s == null) return;
+        updating = true;
+        Save();
+        var report = await Task.Run(() => App.UpdateSynonymPaths(s));
+        updating = false;
+        confirmSynonym = null;
+        synChecks[s] = new MappingCheck(report.Updated + report.Merged > 0 ? MappingCheckLevel.Ok : MappingCheckLevel.Warning, report.Message);
         foreach (var m in mappings) StartCheck(m, 0);
     }
 
@@ -261,7 +368,7 @@
 
     private void Save()
     {
-        App.SaveSettings(Current().Clone(), mappings);
+        App.SaveSettings(Current().Clone(), mappings, synonyms);
         dirty = false;
         savedMessage = "Saved";
     }
@@ -285,6 +392,7 @@
     {
         debounce?.Cancel();
         foreach (var run in checkRuns.Values) run.Cancel();
+        foreach (var run in synRuns.Values) run.Cancel();
         App.DataChanged -= OnDataChanged;
     }
 }
