@@ -19,3 +19,11 @@ select { cursor: pointer; }
 .enc-summary { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; }
 .result { background: var(--keep-wash); border-radius: var(--radius-sheet); padding: 16px 18px; margin-bottom: 16px; }
 .result code { word-break: break-all; }
+
+/* ---------- Path pair check (Settings) ---------- */
+.mapcheck { font-size: .85rem; margin: 4px 0 8px; padding: 6px 10px; border-radius: var(--radius-control); word-break: break-word; }
+.mapcheck.checking, .mapcheck.info { color: var(--muted); background: var(--table); }
+.mapcheck.ok { color: var(--keep); background: var(--keep-wash); font-weight: 600; }
+.mapcheck.warning { color: #8a4b00; background: #fff3d6; font-weight: 600; }
+.mapcheck.error { color: var(--grease); background: var(--grease-wash); font-weight: 600; }
+@media (prefers-color-scheme: dark) { .mapcheck.warning { color: #ffc46b; background: #33270f; } }
