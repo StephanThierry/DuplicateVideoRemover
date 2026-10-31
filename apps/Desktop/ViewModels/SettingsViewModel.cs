@@ -24,6 +24,14 @@ public partial class SettingsViewModel : ObservableObject
     public PathList ExcludePaths { get; }
     public PathList PriorityFolders { get; }
     public ObservableCollection<MappingItem> Mappings { get; } = new();
+    public ObservableCollection<SynonymItem> Synonyms { get; } = new();
+
+    // "Update paths" confirmation for a synonym
+    [ObservableProperty] private SynonymItem? confirmSynonym;
+    [ObservableProperty] private string confirmTitle = "";
+    [ObservableProperty] private string confirmText = "";
+    [ObservableProperty] private bool updating;
+    public bool ConfirmVisible => ConfirmSynonym != null;
     public ObservableCollection<SwitchItem> Switches { get; } = new();
     public MatchViewModel Match { get; }
     public MatchViewModel SameFolder { get; }
@@ -54,6 +62,7 @@ public partial class SettingsViewModel : ObservableObject
         ExcludePaths = new PathList(s.excludePaths, Edited, null);
         PriorityFolders = new PathList(s.priorityFolders, Edited, () => PickFolder);
         foreach (var m in PathMapper.Mappings) Mappings.Add(new MappingItem(m.Windows, m.Linux, Edited));
+        foreach (var syn in PathMapper.Synonyms) Synonyms.Add(new SynonymItem(syn.Main, syn.Alias, Edited, AskUpdate));
         foreach (var w in s.switchPriority) Switches.Add(new SwitchItem(w.up, w.down, w.triggerBelowPctSizeDiff, Edited));
         Match = new MatchViewModel(s.matchSettings, Edited);
         UseSameFolder = s.matchSettings_sameFolder != null;
@@ -99,6 +108,38 @@ public partial class SettingsViewModel : ObservableObject
     private PathMapping[] CurrentMappings() =>
         Mappings.Select(m => new PathMapping { Windows = m.Windows, Linux = m.Linux }).ToArray();
 
+    private PathSynonym[] CurrentSynonyms() =>
+        Synonyms.Select(s => new PathSynonym { Main = s.Main, Alias = s.Alias }).ToArray();
+
+    partial void OnConfirmSynonymChanged(SynonymItem? value) => OnPropertyChanged(nameof(ConfirmVisible));
+
+    private void AskUpdate(SynonymItem item)
+    {
+        ConfirmSynonym = item;
+        ConfirmTitle = $"Update {Fmt.Plural(item.Count, "path", "paths")} in the database?";
+        ConfirmText = $"Paths starting with {PathMapper.NormalizeRoot(item.Alias)} are changed to start with {PathMapper.NormalizeRoot(item.Main)}. "
+                    + "Videos stored under both names become one. Your settings are saved too, so new scans use the main name. This can't be undone.";
+    }
+
+    [RelayCommand] private void CancelUpdate() => ConfirmSynonym = null;
+
+    // Saves the settings (so new scans use the main name) and rewrites the stored paths once
+    [RelayCommand]
+    private async Task ConfirmUpdate()
+    {
+        var item = ConfirmSynonym;
+        if (item == null) return;
+        Updating = true;
+        Save();
+        var report = await Task.Run(() => app.UpdateSynonymPaths(new PathSynonym { Main = item.Main, Alias = item.Alias }));
+        Updating = false;
+        ConfirmSynonym = null;
+        item.ShowResult(report);
+    }
+
+    [RelayCommand] private void AddSynonym() { Synonyms.Add(new SynonymItem("", "", Edited, AskUpdate)); }
+    [RelayCommand] private void RemoveSynonym(SynonymItem item) { item.Cancel(); Synonyms.Remove(item); Edited(); }
+
     private void UpdateTest()
     {
         if (string.IsNullOrWhiteSpace(TestPath)) { TestResult = ""; return; }
@@ -138,7 +179,7 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private void Save()
     {
-        app.SaveSettings(Current(), CurrentMappings());
+        app.SaveSettings(Current(), CurrentMappings(), CurrentSynonyms());
         Dirty = false;
         SavedMessage = "Saved";
     }
@@ -269,6 +310,86 @@ public partial class MappingItem : ObservableObject
             }
             catch (OperationCanceledException) { }
             catch (Exception e) { Show(new MappingCheck(MappingCheckLevel.Warning, "Could not check this path: " + e.Message)); }
+        });
+    }
+}
+
+/// <summary>Another name for the same place (e.g. "L:\\" for "\\\\nas\\video\\"), with its check against the database.</summary>
+public partial class SynonymItem : ObservableObject
+{
+    private readonly Action changed;
+    private readonly Action<SynonymItem> askUpdate;
+    private CancellationTokenSource? checkRun;
+    [ObservableProperty] private string main;
+    [ObservableProperty] private string alias;
+    [ObservableProperty] private string checkText = "";
+    [ObservableProperty] private string checkLevel = "";
+    [ObservableProperty] private int count;
+    public bool HasCheck => CheckText.Length > 0;
+    public bool IsOk => CheckLevel == "ok";
+    public bool IsWarning => CheckLevel == "warning";
+    public bool IsError => CheckLevel == "error";
+    /// <summary>Videos are stored under the alias and the check found them under the main name.</summary>
+    public bool CanUpdate => Count > 0 && (IsOk || IsWarning);
+
+    public SynonymItem(string main, string alias, Action changed, Action<SynonymItem> askUpdate)
+    {
+        this.main = main;
+        this.alias = alias;
+        this.changed = changed;
+        this.askUpdate = askUpdate;
+        StartCheck(0);
+    }
+
+    partial void OnMainChanged(string value) { changed(); StartCheck(500); }
+    partial void OnAliasChanged(string value) { changed(); StartCheck(500); }
+    partial void OnCheckTextChanged(string value) => OnPropertyChanged(nameof(HasCheck));
+    partial void OnCountChanged(int value) => OnPropertyChanged(nameof(CanUpdate));
+    partial void OnCheckLevelChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsOk));
+        OnPropertyChanged(nameof(IsWarning));
+        OnPropertyChanged(nameof(IsError));
+        OnPropertyChanged(nameof(CanUpdate));
+    }
+
+    public void Cancel() => checkRun?.Cancel();
+
+    [RelayCommand] private void Update() => askUpdate(this);
+
+    public void ShowResult(SynonymUpdateReport report)
+    {
+        checkRun?.Cancel();
+        Count = 0;
+        CheckText = report.Message;
+        CheckLevel = report.Updated + report.Merged > 0 ? "ok" : "warning";
+    }
+
+    // Counts the videos stored under the alias and checks a sample of them under the main name
+    private void StartCheck(int delayMs)
+    {
+        checkRun?.Cancel();
+        if (string.IsNullOrWhiteSpace(Main) || string.IsNullOrWhiteSpace(Alias)) { CheckText = ""; CheckLevel = ""; Count = 0; return; }
+        var cts = checkRun = new CancellationTokenSource();
+        var token = cts.Token;
+        var synonym = new PathSynonym { Main = Main, Alias = Alias };
+        void Show(MappingCheck c) => Dispatcher.UIThread.Post(() =>
+        {
+            if (token.IsCancellationRequested) return;
+            CheckText = c.Message;
+            CheckLevel = c.Level.ToString().ToLowerInvariant();
+            Count = c.Level == MappingCheckLevel.Checking ? 0 : c.InDatabase;
+        });
+        Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(delayMs, token);
+                var result = await SynonymTools.CheckAsync(synonym, new SyncProgress<MappingCheck>(Show), token);
+                Show(result);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception e) { Show(new MappingCheck(MappingCheckLevel.Warning, "Could not check this synonym: " + e.Message)); }
         });
     }
 }
