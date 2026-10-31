@@ -1,0 +1,16 @@
+/* Re-encode page and encoding settings */
+pre.command { font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; background: var(--table); border-radius: var(--radius-control); padding: 10px 12px; white-space: pre-wrap; word-break: break-all; margin: 4px 0 0; }
+select { cursor: pointer; }
+.panel input[type=checkbox], .enc-list input[type=checkbox] { accent-color: var(--accent); }
+
+/* ---------- Re-encode ---------- */
+.enc-list { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius-sheet); overflow: hidden; }
+.enc-row { display: grid; grid-template-columns: 28px 120px 1fr 110px 90px 70px; gap: 14px; align-items: center; padding: 8px 14px; }
+.enc-row + .enc-row { border-top: 1px solid var(--rule); }
+.enc-row.head { font-size: .8rem; color: var(--muted); font-weight: 600; background: var(--table); }
+.enc-row.is-picked { background: var(--keep-wash); }
+.enc-row img { width: 120px; height: 68px; object-fit: cover; border-radius: 3px; background: var(--frame); display: block; }
+.enc-row .num { text-align: right; }
+.enc-summary { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; }
+.result { background: var(--keep-wash); border-radius: var(--radius-sheet); padding: 16px 18px; margin-bottom: 16px; }
+.result code { word-break: break-all; }

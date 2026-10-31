@@ -1,0 +1,136 @@
+@* The re-encoding settings: only common, well-supported choices, each with a sensible default. *@
+@{ var codec = EncodeOptions.Codec(Value.codec); int crf = Value.crf ?? codec.RecommendedCrf; }
+<div class="field">
+    <label for="enc-codec">Video format</label>
+    <select id="enc-codec" value="@Value.codec" @onchange="ChangeCodec">
+        @foreach (var c in EncodeOptions.Codecs) { <option value="@c.Id">@c.Label</option> }
+    </select>
+    <div class="help" style="margin-top:4px">@codec.Help</div>
+</div>
+<div class="field">
+    <label for="enc-res">Resolution</label>
+    <select id="enc-res" value="@Value.resolution" @onchange="e => Set(() => Value.resolution = int.Parse(e.Value!.ToString()!))">
+        @foreach (var r in EncodeOptions.Resolutions) { <option value="@r.Height">@r.Label</option> }
+    </select>
+    <div class="help" style="margin-top:4px">The width follows the video's own shape. Videos that are already smaller keep their size.</div>
+</div>
+<div class="field">
+    <label for="enc-crf">Quality</label>
+    <div class="help">Further right gives better quality and bigger files. The mark is the recommended setting for @codec.Label.</div>
+    @* The slider runs from small files (left) to best quality (right); CRF itself goes the other way *@
+    <div class="slider">
+        <input id="enc-crf" type="range" list="enc-crf-marks" min="@codec.MinCrf" max="@codec.MaxCrf" step="1"
+               value="@(codec.MinCrf + codec.MaxCrf - crf)" @oninput="e => Set(() => Value.crf = codec.MinCrf + codec.MaxCrf - int.Parse(e.Value!.ToString()!))"
+               aria-valuetext="@EncodeOptions.QualityLabel(Value.codec, crf)" />
+        <output title="CRF value: lower means better quality">CRF @crf</output>
+    </div>
+    <datalist id="enc-crf-marks"><option value="@(codec.MinCrf + codec.MaxCrf - codec.RecommendedCrf)"></option></datalist>
+    <div class="inline" style="justify-content:space-between;margin-top:2px">
+        <span class="muted" style="font-size:.85rem">Smaller files</span>
+        <strong class="@(crf == codec.RecommendedCrf ? "saved" : "")">@EncodeOptions.QualityLabel(Value.codec, crf)</strong>
+        <span class="muted" style="font-size:.85rem">Better quality</span>
+    </div>
+    @if (crf != codec.RecommendedCrf)
+    {
+        <p style="margin-top:6px"><button class="link" @onclick="() => Set(() => Value.crf = codec.RecommendedCrf)">Use the recommended setting (@codec.RecommendedCrf)</button></p>
+    }
+</div>
+<div class="field">
+    <label for="enc-preset">Speed</label>
+    <select id="enc-preset" value="@Value.preset" @onchange="e => Set(() => Value.preset = e.Value!.ToString())">
+        @foreach (var p in EncodeOptions.Presets) { <option value="@p.Id">@p.Label</option> }
+    </select>
+    <div class="help" style="margin-top:4px">Slower encoding makes smaller files at the same quality.</div>
+</div>
+<div class="field">
+    <label for="enc-audio">Sound</label>
+    <select id="enc-audio" value="@Value.audio" @onchange="e => Set(() => Value.audio = e.Value!.ToString())">
+        @foreach (var a in EncodeOptions.AudioChoices) { <option value="@a.Id">@a.Label</option> }
+    </select>
+</div>
+<div class="field">
+    <label for="enc-container">File type</label>
+    <select id="enc-container" value="@Value.container" @onchange="e => Set(() => Value.container = e.Value!.ToString())">
+        @foreach (var c in EncodeOptions.Containers) { <option value="@c.Id">@c.Label</option> }
+    </select>
+</div>
+@if (Value.codec == "x265" && Value.container == "mp4")
+{
+    <div class="field">
+        <label class="inline"><input type="checkbox" checked="@Value.appleCompatible" @onchange="e => Set(() => Value.appleCompatible = (bool)e.Value!)" /> Make the files play on Apple devices (iPhone, Mac, Apple TV)</label>
+    </div>
+}
+<div class="field">
+    <label for="enc-suffix">Name of the new files</label>
+    <div class="help">The new file is saved next to the original, with this added to the name. The original is not changed.</div>
+    <div class="inline">
+        <input id="enc-suffix" type="text" style="width:220px" placeholder="@($"_{Value.resolution}p_{Value.codec}")" value="@Value.fileSuffix" @onchange="e => Set(() => Value.fileSuffix = Str(e))" />
+        <span class="muted">e.g. Holiday@(Value.EffectiveSuffix).@Value.container</span>
+    </div>
+</div>
+<div class="field">
+    <label class="inline"><input type="checkbox" checked="@Value.neverOverwrite" @onchange="e => Set(() => Value.neverOverwrite = (bool)e.Value!)" /> Never overwrite a file that already exists</label>
+</div>
+<div class="field">
+    <span class="label">Leave out</span>
+    <div class="help">Videos of these types (their length is often read wrong), and very short videos.</div>
+    <div class="inline">
+        @foreach (var ext in FileHandler.VideoExtensions)
+        {
+            <label class="inline" style="margin-right:10px"><input type="checkbox" checked="@Skips(ext)" @onchange="e => ToggleSkip(ext, (bool)e.Value!)" /> @ext</label>
+        }
+    </div>
+    <div class="inline" style="margin-top:8px">
+        Videos of <input type="number" min="1" value="@Value.minDurationSeconds" @onchange="e => Set(() => Value.minDurationSeconds = Math.Max(1, int.TryParse(e.Value?.ToString(), out var n) ? n : 2))" aria-label="Minimum length in seconds" /> seconds or shorter
+    </div>
+</div>
+<details class="field">
+    <summary style="cursor:pointer;font-weight:600">Advanced</summary>
+    <label for="enc-filter" style="margin-top:10px">Extra video filter</label>
+    <div class="help">An FFmpeg filter applied before scaling, for example <code>yadif</code> to remove interlacing lines. Leave empty if unsure.</div>
+    <input id="enc-filter" type="text" style="width:100%" value="@Value.extraFilter" @onchange="e => Set(() => Value.extraFilter = Str(e))" />
+</details>
+<div class="field">
+    <span class="label">Example</span>
+    <pre class="command">@EncodePlanner.ExampleCommand(Normalized(), OperatingSystem.IsWindows() ? @"D:\Videos\Holiday.mp4" : "/videos/Holiday.mp4")</pre>
+</div>
+
+@code {
+    [Parameter] public EncodeSettings Value { get; set; } = EncodeSettings.CreateDefault();
+    [Parameter] public EventCallback Changed { get; set; }
+
+    private Task Set(Action change)
+    {
+        change();
+        return Changed.InvokeAsync();
+    }
+
+    // Switching format: stay on the recommended quality if it was used, else keep the value within range
+    private Task ChangeCodec(ChangeEventArgs e) => Set(() =>
+    {
+        var old = EncodeOptions.Codec(Value.codec);
+        var next = EncodeOptions.Codec(e.Value?.ToString());
+        Value.codec = next.Id;
+        Value.crf = (Value.crf ?? old.RecommendedCrf) == old.RecommendedCrf
+            ? next.RecommendedCrf
+            : Math.Clamp(Value.crf ?? next.RecommendedCrf, next.MinCrf, next.MaxCrf);
+    });
+
+    private static string Str(ChangeEventArgs e) => e.Value?.ToString() ?? "";
+
+    private bool Skips(string ext) => (Value.skipExtensions ?? Array.Empty<string>()).Contains(ext, StringComparer.OrdinalIgnoreCase);
+
+    private Task ToggleSkip(string ext, bool skip) => Set(() =>
+    {
+        var list = (Value.skipExtensions ?? Array.Empty<string>()).Where(x => !x.Equals(ext, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (skip) list.Add(ext);
+        Value.skipExtensions = list.ToArray();
+    });
+
+    private EncodeSettings Normalized()
+    {
+        var c = Value.Clone();
+        c.Normalize();
+        return c;
+    }
+}
