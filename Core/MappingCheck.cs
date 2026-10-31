@@ -14,8 +14,10 @@ namespace deepduplicates
     public sealed record MappingCheck(MappingCheckLevel Level, string Message, int Checked = 0, int Found = 0, int Sample = 0, int InDatabase = 0);
 
     /// <summary>
-    /// Checks a path pair before it is saved: takes a sample of the videos in the database that sit under
-    /// either side of the pair, translates each to this computer's side, and checks that the file is there.
+    /// Checks a path pair before it is saved. The database is the source of truth: its paths were read when
+    /// the videos were scanned. The check takes a sample of the stored paths that start with the other
+    /// computer's side of the pair, translates them with this pair only, and checks that the files exist here.
+    /// So it tests the pair itself, not the paths in the database.
     /// </summary>
     public static class MappingChecker
     {
@@ -28,7 +30,8 @@ namespace deepduplicates
 
             string win = mapping.Windows.Trim().Replace('/', '\\').TrimEnd('\\') + "\\";
             string lin = mapping.Linux.Trim().TrimEnd('/') + "/";
-            string localRoot = OperatingSystem.IsWindows() ? win : lin;
+            bool onWindows = OperatingSystem.IsWindows();
+            string localRoot = onWindows ? win : lin;   // where the pair should lead on this computer
             var pair = new[] { new PathMapping { Windows = win, Linux = lin } };
 
             progress?.Report(new MappingCheck(MappingCheckLevel.Checking, "Checking the database..."));
@@ -41,29 +44,30 @@ namespace deepduplicates
                 return db.Database.SqlQueryRaw<string>("SELECT path AS Value FROM VideoInfos WHERE path IS NOT NULL").ToList();
             }, ct);
 
-            // A video belongs to this pair when its stored path starts with either side, or when the saved
-            // path pairs already turn it into a path under this computer's side (e.g. a pair for a sub folder)
-            var cmp = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-            var under = new List<string>();
-            foreach (var p in stored)
-            {
-                if (p.StartsWith(win, StringComparison.OrdinalIgnoreCase) || p.StartsWith(lin, StringComparison.Ordinal))
-                    under.Add(PathMapper.PreviewLocal(p, pair));
-                else
-                {
-                    string local = PathMapper.ToLocal(p);
-                    if (local.StartsWith(localRoot, cmp)) under.Add(local);
-                }
-            }
+            // The source is the other computer's side of the pair, as stored in the database. Paths already
+            // stored with this computer's side don't need the pair, so they say nothing about it.
+            bool FromOtherSide(string p) => onWindows
+                ? p.StartsWith(lin, StringComparison.Ordinal)
+                : p.StartsWith(win, StringComparison.OrdinalIgnoreCase);
+            bool AlreadyLocal(string p) => onWindows
+                ? p.StartsWith(win, StringComparison.OrdinalIgnoreCase)
+                : p.StartsWith(lin, StringComparison.Ordinal);
+
+            var under = stored.Where(FromOtherSide).Select(p => PathMapper.PreviewLocal(p, pair)).ToList();
             under.Sort(StringComparer.OrdinalIgnoreCase);
+            int alreadyLocal = stored.Count(AlreadyLocal);
+            string otherRoot = onWindows ? lin : win;
 
             bool rootExists = await Task.Run(() => Directory.Exists(localRoot), ct);
 
             if (under.Count == 0)
             {
+                if (alreadyLocal > 0)
+                    return new MappingCheck(MappingCheckLevel.Info,
+                        $"The {alreadyLocal:N0} videos under this path are stored with this computer's path ({localRoot}), so this pair isn't needed to find them here. It can't be checked until videos are scanned from {otherRoot}.");
                 return rootExists
-                    ? new MappingCheck(MappingCheckLevel.Info, $"No videos in the database use this path yet, so it can't be checked. The folder {localRoot} exists on this computer.")
-                    : new MappingCheck(MappingCheckLevel.Error, $"The folder {localRoot} was not found on this computer, and no videos in the database use this path.");
+                    ? new MappingCheck(MappingCheckLevel.Info, $"No videos in the database start with {otherRoot} yet, so this pair can't be checked. The folder {localRoot} exists on this computer.")
+                    : new MappingCheck(MappingCheckLevel.Error, $"The folder {localRoot} was not found on this computer, and no videos in the database start with {otherRoot}.");
             }
 
             // Spread the sample over the whole list, so it covers different folders
@@ -79,7 +83,7 @@ namespace deepduplicates
                 progress?.Report(new MappingCheck(MappingCheckLevel.Checking, $"Checking files... {found} of {checkedCount} found", checkedCount, found, sampleSize, under.Count));
             }
 
-            string counts = $"{found} of {sampleSize} files found during the check ({under.Count:N0} videos in the database use this path).";
+            string counts = $"{found} of {sampleSize} files found during the check ({under.Count:N0} videos in the database start with {otherRoot}).";
             if (found == sampleSize) return new MappingCheck(MappingCheckLevel.Ok, "This path looks valid: " + counts, checkedCount, found, sampleSize, under.Count);
             if (found * 10 >= sampleSize * 8)
                 return new MappingCheck(MappingCheckLevel.Ok, "This path looks valid: " + counts + " The missing ones may have been deleted or moved.", checkedCount, found, sampleSize, under.Count);
