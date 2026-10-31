@@ -5,6 +5,16 @@
              x:Class="DuplicateVideoRemover.Desktop.Views.SettingsView"
              x:DataType="vm:SettingsViewModel"
              x:Name="Root">
+  <UserControl.Styles>
+    <Style Selector="Border.mapcheck"><Setter Property="Background" Value="{DynamicResource Table}"/></Style>
+    <Style Selector="Border.mapcheck TextBlock"><Setter Property="Foreground" Value="{DynamicResource Muted}"/></Style>
+    <Style Selector="Border.mapcheck.ok"><Setter Property="Background" Value="{DynamicResource KeepWash}"/></Style>
+    <Style Selector="Border.mapcheck.ok TextBlock"><Setter Property="Foreground" Value="{DynamicResource Keep}"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+    <Style Selector="Border.mapcheck.warning"><Setter Property="Background" Value="#FFF3D6"/></Style>
+    <Style Selector="Border.mapcheck.warning TextBlock"><Setter Property="Foreground" Value="#8A4B00"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+    <Style Selector="Border.mapcheck.error"><Setter Property="Background" Value="{DynamicResource GreaseWash}"/></Style>
+    <Style Selector="Border.mapcheck.error TextBlock"><Setter Property="Foreground" Value="{DynamicResource Grease}"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+  </UserControl.Styles>
   <Grid ColumnDefinitions="*,320" ColumnSpacing="20" Margin="12,16,12,12">
     <ScrollViewer Grid.Column="0">
       <StackPanel Spacing="16" Margin="0,0,8,0">
@@ -46,11 +56,18 @@
             <ItemsControl ItemsSource="{Binding Mappings}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:MappingItem">
-                  <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="6" Margin="0,0,0,6">
-                    <TextBox Text="{Binding Windows}" Watermark="L:\"/>
-                    <TextBox Grid.Column="1" Text="{Binding Linux}" Watermark="/mnt/architecture"/>
-                    <Button Grid.Column="2" Content="Remove" Command="{Binding #Root.((vm:SettingsViewModel)DataContext).RemoveMappingCommand}" CommandParameter="{Binding}"/>
-                  </Grid>
+                  <StackPanel Margin="0,0,0,6" Spacing="4">
+                    <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="6">
+                      <TextBox Text="{Binding Windows}" Watermark="L:\"/>
+                      <TextBox Grid.Column="1" Text="{Binding Linux}" Watermark="/mnt/architecture"/>
+                      <Button Grid.Column="2" Content="Remove" Command="{Binding #Root.((vm:SettingsViewModel)DataContext).RemoveMappingCommand}" CommandParameter="{Binding}"/>
+                    </Grid>
+                    <!-- Background check of the pair against the database -->
+                    <Border IsVisible="{Binding HasCheck}" CornerRadius="4" Padding="10,6" Classes="mapcheck"
+                            Classes.ok="{Binding IsOk}" Classes.warning="{Binding IsWarning}" Classes.error="{Binding IsError}">
+                      <TextBlock Text="{Binding CheckText}" TextWrapping="Wrap" FontSize="12"/>
+                    </Border>
+                  </StackPanel>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
