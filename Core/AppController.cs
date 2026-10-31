@@ -105,6 +105,23 @@ namespace deepduplicates
             return report;
         }
 
+        /// <summary>
+        /// Videos in the scope that could be re-encoded (not duplicates or broken), highest average bitrate first.
+        /// Uses the videos already read - no files are read.
+        /// </summary>
+        public List<EncodeCandidate> EncodeCandidates()
+        {
+            var media = ScanEngine.InScope(CachedMedia(), Settings);
+            var (_, analyzed) = Analyzer.Analyze(media, Settings);
+            return EncodePlanner.Candidates(analyzed, Settings.EncodeOrDefault());
+        }
+
+        /// <summary>Writes output/encode_selected.ps1 (Windows) or .sh (Linux) for these videos. Returns its path.</summary>
+        public string WriteEncodeScript(IEnumerable<EncodeCandidate> videos) =>
+            EncodePlanner.WriteScript(CreateFileHandler().outputFolder, EncodeScriptName, videos, Settings.EncodeOrDefault());
+
+        public const string EncodeScriptName = "encode_selected";
+
         /// <summary>When the last scan of this scope ran, if any.</summary>
         public RunRecord LastRun() => RunHistory.LastRun(Settings);
 

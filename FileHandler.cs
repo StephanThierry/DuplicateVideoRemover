@@ -284,50 +284,14 @@ namespace deepduplicates
             }
         }
 
-        // Writes encoding-template.ps1 on Windows, encoding-template.sh on Linux/macOS
+        // Writes encoding-template.ps1 on Windows, encoding-template.sh on Linux/macOS:
+        // every video that is not a duplicate or broken, highest average bitrate first (see EncodePlanner)
         public void generateEncoding(List<VideoInfo> mediaList, EncodeSettings encodeSettings)
-        {   
-            // TODO: Switch to using MediaInfo
-            // dotnet add package MediaInfo.Wrapper.Core 
-            if (encodeSettings == null) return;
-
-            // Scripts start by changing to their own folder (the output folder), so ../ffmpeg works from anywhere
-            string ffmpegCommand = ScriptFile.IsWindows ? "..\\ffmpeg\\ffmpeg.exe" : "../ffmpeg/ffmpeg";
-
-            using (var script = new ScriptFile(this.outputFolder, "encoding-template"))
-            {
-                script.Comment("    This encoding template is a suggestion with highest bitrates at the top");
-                script.Comment("    NOTE! Many files will NOT be valid to encode, the bitrate may be due to faulty 'duration'-mesaurements");
-                script.Comment("    ------------------------------------------------------------------------------------------------------");
-                script.Line();
-
-                if (!String.IsNullOrEmpty(encodeSettings.extraFilter) && !encodeSettings.extraFilter.EndsWith(",")) encodeSettings.extraFilter +=",";
-
-                // mpg/wmv have unreliable duration and are usually low bitrate
-                foreach (VideoInfo item in mediaList.Where(x => x.duration != null && x.duration > 1
-                        && !x.path.ToLower().EndsWith(".mpg")
-                        && !x.path.ToLower().EndsWith(".mpeg")
-                        && !x.path.ToLower().EndsWith(".wmv")).OrderByDescending(p => p.fileSize / p.duration))
-                {
-                    double bitrateKbps = Math.Round(((item.bitrate ?? 1000) / 1000));
-                    string modifiedPath = item.path.Substring(0, item.path.LastIndexOf(".")) + "_720p.mp4"; // output ext is always mp4 
-
-                    script.Comment($" Total bitrate: {bitrateKbps} kbps");
-                    // -c:v libx265         use h.265 encoding
-                    // -vtag hvc1           set the video container to hvc1
-                    // -vf scale=1280:720   scale video to 720p, 
-                    // -crf XX              set video conpression (Constant Rate Factor). 0-16=lossless, 20=Very good, 24=Good, 28-51=degraded 
-                    // crf values explained here: https://goughlui.com/2016/08/27/video-compression-testing-x264-vs-x265-crf-in-handbrake-0-10-5/
-                    // This encoding is CPU-only as hardware accelerated encoders do not support CRF
-                    // -preset superfast    Only at the "slow"-preset is there a quality gain over "superfast"
-                    //  preset values are explained here: https://www.youtube.com/watch?v=bzgFL-gNF9g
-                    script.Run(ffmpegCommand, "-n", "-i", item.path, "-c:v", "libx265", "-vtag", "hvc1",
-                        "-vf", $"{encodeSettings.extraFilter}scale={encodeSettings.scale}",
-                        "-crf", encodeSettings.compressionLevelcrf, "-preset", encodeSettings.compressionPreset,
-                        "-c:a", "copy", modifiedPath);
-                    script.Line();
-                }
-            }
+        {
+            if (encodeSettings == null) return; // only when settings.json has an encodeSettings section
+            var e = encodeSettings.Clone();
+            e.Normalize();
+            EncodePlanner.WriteScript(this.outputFolder, "encoding-template", EncodePlanner.Candidates(mediaList, e), e);
         }
 
         public void deleteScreenshots(VideoInfo vi){
