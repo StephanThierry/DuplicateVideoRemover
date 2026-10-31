@@ -134,6 +134,7 @@ public partial class ReviewViewModel : ObservableObject
     [RelayCommand] private void ShowFolder(string folder) => FolderFilter = folder;
     [RelayCommand] private void UnselectFolder() { if (FolderFilter != null) session.UnselectFolder(FolderFilter); }
     [RelayCommand] private void GoToScan() => main.ShowScan();
+    [RelayCommand] private void GoToEncode() => main.ShowEncode();
 
     [RelayCommand]
     private void SelectFolder()
