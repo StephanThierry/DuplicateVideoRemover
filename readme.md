@@ -138,6 +138,18 @@ To use the same database (`deepdupes.db` and the `_screens` folder) from both Wi
 * Paths in `settings.json` can be written in either form, so one `settings.json` works on both systems.  
 * The Linux side must be a mounted folder (e.g. a CIFS mount in `/etc/fstab`). Network locations like `smb://nas/share` from a file manager can't be used directly; use the mount point instead (with GNOME/GVFS that's under `/run/user/<uid>/gvfs/`).  
 * An existing Windows database works on Linux as-is once the mappings are in place.  
+* Under each pair, Settings checks the pair against the database: it takes up to 10 stored paths from the other system's side, translates them with the pair and checks that the files are there (e.g. "10 of 10 files found").  
+
+**Other names for the same place (synonyms)**  
+A drive letter and the network path it points to are two names for the same folder, e.g. `L:\` and `\\nas\video\`. Add them under "Other names for the same place" in Settings, or in `pathmapping.json`:
+
+```json
+"synonyms": [ { "main": "\\\\nas\\video\\", "alias": "L:\\" } ]
+```
+
+* The main name (best: the network path, it works on every computer) is what the database uses. Paths under the alias are read and stored as the main name, so a workstation using `L:` and one using `\\nas\video` share the same database entries.
+* On a computer that can't reach the main name but can reach the alias, the alias is used there.
+* Settings shows how many videos in the database still use the alias and checks a sample of them under the main name. "Update paths" then rewrites them to the main name once; videos stored under both names become one entry.
 
 ### How it works
 1. The program first indexes all video-files in the folders specified in "contentFolders" in settings.json and reads the video metadata (size and duration) and 3 screenshots are made at 25%, 50% and 75%.
