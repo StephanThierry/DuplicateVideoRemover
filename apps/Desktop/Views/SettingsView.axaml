@@ -79,6 +79,39 @@
         </Border>
 
         <Border Classes="panel">
+          <StackPanel Spacing="8">
+            <TextBlock Classes="h2" Text="Other names for the same place"/>
+            <TextBlock Classes="muted small" TextWrapping="Wrap"
+                       Text="For example a mapped drive letter and the network path it points to (L:\ and \\nas\video\). The main name is what the database uses - the network path is best, because it works on every computer. Each computer uses whichever of the names it can reach."/>
+            <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="6">
+              <TextBlock Classes="muted small" Text="Main name (network path)"/>
+              <TextBlock Grid.Column="1" Classes="muted small" Text="Also known as"/>
+            </Grid>
+            <ItemsControl ItemsSource="{Binding Synonyms}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:SynonymItem">
+                  <StackPanel Margin="0,0,0,6" Spacing="4">
+                    <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="6">
+                      <TextBox Text="{Binding Main}" Watermark="\\nas\video\"/>
+                      <TextBox Grid.Column="1" Text="{Binding Alias}" Watermark="L:\"/>
+                      <Button Grid.Column="2" Content="Remove" Command="{Binding #Root.((vm:SettingsViewModel)DataContext).RemoveSynonymCommand}" CommandParameter="{Binding}"/>
+                    </Grid>
+                    <Border IsVisible="{Binding HasCheck}" CornerRadius="4" Padding="10,6" Classes="mapcheck"
+                            Classes.ok="{Binding IsOk}" Classes.warning="{Binding IsWarning}" Classes.error="{Binding IsError}">
+                      <StackPanel Spacing="8">
+                        <TextBlock Text="{Binding CheckText}" TextWrapping="Wrap" FontSize="12"/>
+                        <Button Classes="primary" Content="Update paths" Command="{Binding UpdateCommand}" IsVisible="{Binding CanUpdate}" HorizontalAlignment="Left"/>
+                      </StackPanel>
+                    </Border>
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Content="Add a synonym" Command="{Binding AddSynonymCommand}"/>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="panel">
           <StackPanel Spacing="14">
             <TextBlock Classes="h2" Text="When are videos duplicates?"/>
             <TextBlock Classes="muted" Text="Videos of the same length (within a second) are compared using 3 screenshots each." TextWrapping="Wrap"/>
@@ -153,5 +186,19 @@
         <TextBlock Text="{Binding SavedMessage}" Foreground="{DynamicResource Keep}" FontWeight="SemiBold"/>
       </StackPanel>
     </Border>
+
+    <!-- "Update paths" confirmation -->
+    <Grid Grid.ColumnSpan="2" Margin="-12,-16,-12,-12" Background="#80000000" IsVisible="{Binding ConfirmVisible}">
+      <Border Classes="panel" Width="560" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
+        <StackPanel Spacing="12">
+          <TextBlock Classes="h2" Text="{Binding ConfirmTitle}" TextWrapping="Wrap"/>
+          <TextBlock Classes="muted" Text="{Binding ConfirmText}" TextWrapping="Wrap"/>
+          <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="Cancel" Command="{Binding CancelUpdateCommand}"/>
+            <Button Classes="primary" Content="Update paths" Command="{Binding ConfirmUpdateCommand}" IsEnabled="{Binding !Updating}"/>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Grid>
   </Grid>
 </UserControl>
