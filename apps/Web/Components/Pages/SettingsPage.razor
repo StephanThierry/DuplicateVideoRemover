@@ -43,11 +43,16 @@
                 @for (int i = 0; i < mappings.Count; i++)
                 {
                     int index = i;
+                    var check = checks.TryGetValue(mappings[index], out var c) ? c : null;
                     <div class="mapping" style="margin-top:6px">
-                        <input type="text" @bind="mappings[index].Windows" @bind:after="Edited" placeholder="L:\" aria-label="Windows path @(index + 1)" />
-                        <input type="text" @bind="mappings[index].Linux" @bind:after="Edited" placeholder="/mnt/architecture" aria-label="Linux path @(index + 1)" />
-                        <button @onclick="() => { mappings.RemoveAt(index); Edited(); }">Remove</button>
+                        <input type="text" @bind="mappings[index].Windows" @bind:after="() => MappingEdited(index)" placeholder="L:\" aria-label="Windows path @(index + 1)" />
+                        <input type="text" @bind="mappings[index].Linux" @bind:after="() => MappingEdited(index)" placeholder="/mnt/architecture" aria-label="Linux path @(index + 1)" />
+                        <button @onclick="() => RemoveMapping(index)">Remove</button>
                     </div>
+                    @if (!string.IsNullOrEmpty(check?.Message))
+                    {
+                        <div class="mapcheck @check.Level.ToString().ToLowerInvariant()" role="status">@check.Message</div>
+                    }
                 }
                 <p style="margin-top:10px"><button @onclick="() => { mappings.Add(new PathMapping()); Edited(); }">Add a path pair</button></p>
                 <div class="testpath">
@@ -143,6 +148,9 @@
     private bool dirty;
     private string savedMessage;
     private CancellationTokenSource debounce;
+    // Background checks of the path pairs against the database, one per row
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<PathMapping, MappingCheck> checks = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<PathMapping, CancellationTokenSource> checkRuns = new();
 
     protected override void OnInitialized()
     {
@@ -155,6 +163,47 @@
         mappings = PathMapper.Mappings.Select(m => new PathMapping { Windows = m.Windows, Linux = m.Linux }).ToList();
         SchedulePreview(0);
         App.DataChanged += OnDataChanged;
+        foreach (var m in mappings) StartCheck(m, 0);
+    }
+
+    private void MappingEdited(int index)
+    {
+        Edited();
+        StartCheck(mappings[index], 500);
+    }
+
+    private void RemoveMapping(int index)
+    {
+        var m = mappings[index];
+        if (checkRuns.TryRemove(m, out var run)) run.Cancel();
+        checks.TryRemove(m, out _);
+        mappings.RemoveAt(index);
+        Edited();
+    }
+
+    // Checks a sample of the videos in the database against the pair, a moment after the last change
+    private void StartCheck(PathMapping m, int delayMs)
+    {
+        if (checkRuns.TryRemove(m, out var old)) old.Cancel();
+        if (string.IsNullOrWhiteSpace(m.Windows) || string.IsNullOrWhiteSpace(m.Linux)) { checks.TryRemove(m, out _); return; }
+        var cts = new CancellationTokenSource();
+        checkRuns[m] = cts;
+        var token = cts.Token;
+        var snapshot = new PathMapping { Windows = m.Windows, Linux = m.Linux };
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(delayMs, token);
+                var progress = new SyncProgress<MappingCheck>(p => { if (!token.IsCancellationRequested) { checks[m] = p; InvokeAsync(StateHasChanged); } });
+                var result = await MappingChecker.CheckAsync(snapshot, progress, token);
+                if (token.IsCancellationRequested) return;
+                checks[m] = result;
+            }
+            catch (OperationCanceledException) { return; }
+            catch (Exception ex) { checks[m] = new MappingCheck(MappingCheckLevel.Warning, "Could not check this path: " + ex.Message); }
+            await InvokeAsync(StateHasChanged);
+        });
     }
 
     private void OnDataChanged() => SchedulePreview(0);
@@ -235,6 +284,7 @@
     public void Dispose()
     {
         debounce?.Cancel();
+        foreach (var run in checkRuns.Values) run.Cancel();
         App.DataChanged -= OnDataChanged;
     }
 }
