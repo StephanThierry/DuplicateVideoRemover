@@ -146,12 +146,8 @@
                     @Fmt.Plural(Session.SelectedCount, "file", "files") selected
                     <small>@Fmt.Size(Session.SelectedBytes)</small>
                 </div>
-                <div class="segmented" role="radiogroup" aria-label="How to remove">
-                    <label><input type="radio" name="mode" checked="@(mode == RemoveMode.Quarantine)" @onchange="() => mode = RemoveMode.Quarantine" />Move to quarantine</label>
-                    <label><input type="radio" name="mode" checked="@(mode == RemoveMode.Delete)" @onchange="() => mode = RemoveMode.Delete" />Delete permanently</label>
-                </div>
-                <button class="@(mode == RemoveMode.Delete ? "danger" : "primary") big" disabled="@(Session.SelectedCount == 0 || busy)" @onclick="() => confirming = true">
-                    @(mode == RemoveMode.Delete ? "Delete" : "Move") @Fmt.Plural(Session.SelectedCount, "file", "files")
+                <button class="danger big" style="margin-left:auto" disabled="@(Session.SelectedCount == 0 || busy)" @onclick="() => confirming = true">
+                    Delete @Fmt.Plural(Session.SelectedCount, "file", "files")
                 </button>
             </div>
         </div>
@@ -162,20 +158,12 @@
 {
     <div class="dialog-backdrop" @onclick="() => confirming = false">
         <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" @onclick:stopPropagation="true">
-            @if (mode == RemoveMode.Delete)
-            {
-                <h2 id="confirm-title">Delete @Fmt.Plural(Session.SelectedCount, "file", "files") permanently?</h2>
-                <p>@Fmt.Size(Session.SelectedBytes) will be deleted. This can't be undone.</p>
-            }
-            else
-            {
-                <h2 id="confirm-title">Move @Fmt.Plural(Session.SelectedCount, "file", "files") to quarantine?</h2>
-                <p>The files (@Fmt.Size(Session.SelectedBytes)) are moved to a folder named @FileHandler.QuarantineFolderName inside each scanned folder. Delete that folder when you are sure, or move files back from it.</p>
-            }
+            <h2 id="confirm-title">Delete @Fmt.Plural(Session.SelectedCount, "file", "files") permanently?</h2>
+            <p>@Fmt.Size(Session.SelectedBytes) will be deleted. This can't be undone.</p>
             <div class="buttons">
                 <button @onclick="() => confirming = false">Cancel</button>
-                <button class="@(mode == RemoveMode.Delete ? "danger" : "primary")" @onclick="Execute" disabled="@busy">
-                    @(busy ? "Working..." : mode == RemoveMode.Delete ? "Delete permanently" : "Move to quarantine")
+                <button class="danger" @onclick="Execute" disabled="@busy">
+                    @(busy ? "Deleting..." : "Delete permanently")
                 </button>
             </div>
         </div>
@@ -214,7 +202,6 @@
     private string folderFilter;
     private string search = "";
     private int shown = PageSize, shownBroken = PageSize * 2;
-    private RemoveMode mode = RemoveMode.Quarantine;
     private bool confirming, busy, showFailures;
     private ExecuteReport report;
     private string toast;
@@ -283,15 +270,13 @@
     {
         busy = true;
         StateHasChanged();
-        var m = mode;
-        report = await Task.Run(() => App.Execute(m));
+        report = await Task.Run(App.Execute);
         busy = false;
         confirming = false;
         folders = Session.Folders();
         // The folder may be empty now - then show everything again
         if (folderFilter != null && !folders.Any(f => f.Folder == folderFilter)) FilterFolder(null);
-        var verb = m == RemoveMode.Delete ? "Deleted" : "Moved";
-        var text = $"{verb} {Fmt.Plural(report.Removed.Count, "file", "files")}, {Fmt.Size(report.BytesFreed)}.";
+        var text = $"Deleted {Fmt.Plural(report.Removed.Count, "file", "files")}, {Fmt.Size(report.BytesFreed)}.";
         if (report.Failed.Count > 0) text += $" {Fmt.Plural(report.Failed.Count, "file", "files")} could not be removed.";
         ShowToast(text, report.Failed.Count > 0 ? 12000 : 6000);
     }

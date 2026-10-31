@@ -33,7 +33,6 @@ public partial class ReviewViewModel : ObservableObject
     [ObservableProperty] private string selectionCount = "";
     [ObservableProperty] private string selectionSize = "";
     [ObservableProperty] private bool hasSelection;
-    [ObservableProperty] private bool deleteMode;
     [ObservableProperty] private bool confirmVisible;
     [ObservableProperty] private string confirmTitle = "";
     [ObservableProperty] private string confirmText = "";
@@ -42,8 +41,7 @@ public partial class ReviewViewModel : ObservableObject
     [ObservableProperty] private bool failuresVisible;
     [ObservableProperty] private bool hasFailures;
 
-    public string ExecuteLabel => (DeleteMode ? "Delete " : "Move ") + Fmt.Plural(session.SelectedCount, "file", "files");
-    public string ConfirmButton => DeleteMode ? "Delete permanently" : "Move to quarantine";
+    public string ExecuteLabel => "Delete " + Fmt.Plural(session.SelectedCount, "file", "files");
     public bool FolderFilterActive => FolderFilter != null;
 
     public ReviewViewModel(AppController app, MainViewModel main)
@@ -64,7 +62,6 @@ public partial class ReviewViewModel : ObservableObject
         Rebuild();
     }
 
-    partial void OnDeleteModeChanged(bool value) { OnPropertyChanged(nameof(ExecuteLabel)); OnPropertyChanged(nameof(ConfirmButton)); }
     partial void OnFolderFilterChanged(string? value) { OnPropertyChanged(nameof(FolderFilterActive)); shownGroups = PageSize; Rebuild(); }
     partial void OnSearchChanged(string value) { shownGroups = PageSize; Rebuild(); }
 
@@ -159,16 +156,8 @@ public partial class ReviewViewModel : ObservableObject
         int n = session.SelectedCount;
         if (n == 0) return;
         string size = Fmt.Size(session.SelectedBytes);
-        if (DeleteMode)
-        {
-            ConfirmTitle = $"Delete {Fmt.Plural(n, "file", "files")} permanently?";
-            ConfirmText = $"{size} will be deleted. This can't be undone.";
-        }
-        else
-        {
-            ConfirmTitle = $"Move {Fmt.Plural(n, "file", "files")} to quarantine?";
-            ConfirmText = $"The files ({size}) are moved to a folder named {FileHandler.QuarantineFolderName} inside each scanned folder. Delete that folder when you are sure, or move files back from it.";
-        }
+        ConfirmTitle = $"Delete {Fmt.Plural(n, "file", "files")} permanently?";
+        ConfirmText = $"{size} will be deleted. This can't be undone.";
         ConfirmVisible = true;
     }
 
@@ -178,8 +167,7 @@ public partial class ReviewViewModel : ObservableObject
     private async Task Execute()
     {
         Busy = true;
-        var mode = DeleteMode ? RemoveMode.Delete : RemoveMode.Quarantine;
-        var report = await Task.Run(() => app.Execute(mode));
+        var report = await Task.Run(app.Execute);
         Busy = false;
         ConfirmVisible = false;
 
@@ -187,7 +175,7 @@ public partial class ReviewViewModel : ObservableObject
         foreach (var f in report.Failed) Failures.Add(f);
         HasFailures = report.Failed.Count > 0;
 
-        var text = $"{(mode == RemoveMode.Delete ? "Deleted" : "Moved")} {Fmt.Plural(report.Removed.Count, "file", "files")}, {Fmt.Size(report.BytesFreed)}.";
+        var text = $"Deleted {Fmt.Plural(report.Removed.Count, "file", "files")}, {Fmt.Size(report.BytesFreed)}.";
         if (HasFailures) text += $" {Fmt.Plural(report.Failed.Count, "file", "files")} could not be removed.";
         // The folder may be empty now - then show everything again
         if (FolderFilter != null && !session.Folders().Any(f => f.Folder == FolderFilter)) FolderFilter = null;
