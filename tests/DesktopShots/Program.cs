@@ -1,6 +1,8 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading;
+using Avalonia.VisualTree;
 using Avalonia;
 using Avalonia.Headless;
 using Avalonia.Threading;
@@ -23,7 +25,7 @@ AppBuilder.Configure<App>()
     .SetupWithoutStarting();
 
 var vm = new MainViewModel(controller);
-var window = new MainWindow { DataContext = vm, Width = 1280, Height = 860 };
+var window = new MainWindow { DataContext = vm, Width = 1440, Height = 900 };
 window.Show();
 
 void Pump(int ms = 300)
@@ -49,7 +51,7 @@ if (scan)
 }
 vm.SelectedTab = 0; Shot("d_review");
 vm.Review.SelectAllDuplicatesCommand.Execute(null); Shot("d_review_selected");
-vm.Review.ShowFolderCommand.Execute("/tmp/lib/Downloads"); Shot("d_review_folder");
+vm.Review.ShowFolderCommand.Execute(Environment.GetEnvironmentVariable("SHOT_FOLDER") ?? "/tmp/lib/Downloads"); Shot("d_review_folder");
 vm.Review.SelectNoneCommand.Execute(null);
 vm.Review.SelectFolderCommand.Execute(null); Shot("d_review_folder_selected");
 vm.Review.AskExecuteCommand.Execute(null); Shot("d_confirm");
@@ -61,6 +63,23 @@ if (args.Length > 2 && args[^1] == "execute")
     Console.WriteLine("after: " + vm.Review.Summary + " | toast: " + vm.Review.Toast);
 }
 else vm.Review.CancelExecuteCommand.Execute(null);
-vm.SelectedTab = 2; Pump(1500); Shot("d_settings");
+if (Environment.GetEnvironmentVariable("SHOT_ENCODE") == "1")
+{
+    vm.SelectedTab = 2; Pump(2500);
+    vm.Encode.SelectTopCommand.Execute(null); Pump(300);
+    vm.Encode.CreateCommand.Execute(null); Shot("d_encode");
+    Console.WriteLine("encode: " + vm.Encode.ResultText);
+    vm.SelectedTab = 3; Pump(1200);
+    var editor = window.GetVisualDescendants().OfType<EncodeSettingsEditor>().First();
+    var scroller = editor.GetVisualAncestors().OfType<Avalonia.Controls.ScrollViewer>().First();
+    var pos = editor.TranslatePoint(new Avalonia.Point(0, 0), scroller.Content as Avalonia.Visual ?? scroller) ?? new Avalonia.Point(0, 0);
+    scroller.Offset = new Avalonia.Vector(0, pos.Y - 60); Pump(600);
+    vm.Settings.Encoding.Codec = EncodeOptions.Codecs[1]; Pump(300);
+    Console.WriteLine($"x264 crf: {vm.Settings.Encoding.CrfValue} {vm.Settings.Encoding.QualityLabel}");
+    vm.Settings.Encoding.Codec = EncodeOptions.Codecs[0]; Pump(300);
+    Shot("d_enc_settings");
+    Console.WriteLine($"x265 crf: {vm.Settings.Encoding.CrfValue} {vm.Settings.Encoding.QualityLabel}");
+}
+vm.SelectedTab = 3; Pump(1500); Shot("d_settings");
 vm.Settings.Match.ShapeMatch = 396; Pump(1500); Shot("d_settings_strict");
 Console.WriteLine("preview strict: " + vm.Settings.PreviewDuplicates);

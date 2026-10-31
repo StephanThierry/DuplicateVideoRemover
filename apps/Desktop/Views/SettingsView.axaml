@@ -74,6 +74,14 @@
 
         <Border Classes="panel">
           <StackPanel Spacing="12">
+            <TextBlock Classes="h2" Text="Re-encoding"/>
+            <TextBlock Classes="muted" TextWrapping="Wrap" Text="How the Re-encode screen makes smaller copies of large videos. The defaults are the recommended settings."/>
+            <v:EncodeSettingsEditor DataContext="{Binding Encoding}"/>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="panel">
+          <StackPanel Spacing="12">
             <TextBlock Classes="h2" Text="Short, small and preferred versions"/>
             <StackPanel Orientation="Horizontal" Spacing="8">
               <TextBlock Text="Remove videos this short or shorter" VerticalAlignment="Center" Width="260"/>
