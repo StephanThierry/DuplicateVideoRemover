@@ -85,6 +85,47 @@ namespace deepduplicates
         public string FileName => System.IO.Path.GetFileName(Path);
     }
 
+    /// <summary>
+    /// A rough estimate of the re-encoded size. The database knows each video's size and length but not its
+    /// resolution or content, so this uses typical bitrates for the chosen format, resolution, quality and speed,
+    /// and never estimates more than the original. Real results vary with the content (often +/- 50%).
+    /// </summary>
+    public static class EncodeEstimator
+    {
+        // Typical video bitrate (kbit/s) at the recommended quality and "medium" speed
+        private static readonly Dictionary<(string codec, int height), double> TypicalKbps = new()
+        {
+            [("x264", 720)] = 3500, [("x264", 1080)] = 6000, [("x264", 1440)] = 10000,
+            [("x265", 720)] = 1800, [("x265", 1080)] = 3200, [("x265", 1440)] = 5500,
+        };
+
+        private static readonly Dictionary<string, double> PresetFactor = new()
+        {
+            ["veryfast"] = 1.15, ["faster"] = 1.10, ["fast"] = 1.05, ["medium"] = 1.0, ["slow"] = 0.95, ["slower"] = 0.92,
+        };
+
+        private const double AudioKbps = 160;
+
+        /// <summary>Estimated video + sound bitrate of the new file, before capping at the original.</summary>
+        public static double TargetKbps(EncodeSettings e)
+        {
+            var codec = EncodeOptions.Codec(e.codec);
+            double kbps = TypicalKbps.TryGetValue((codec.Id, e.resolution), out var k) ? k : 3200;
+            // Every 6 CRF steps roughly halves (or doubles) the bitrate
+            kbps *= Math.Pow(2, -((e.crf ?? codec.RecommendedCrf) - codec.RecommendedCrf) / 6.0);
+            kbps *= PresetFactor.TryGetValue(e.preset ?? "medium", out var f) ? f : 1.0;
+            return kbps + AudioKbps;
+        }
+
+        /// <summary>Estimated size of the re-encoded file in bytes (at most the original size).</summary>
+        public static long EstimatedBytes(EncodeCandidate c, EncodeSettings e, double? targetKbps = null)
+        {
+            double kbps = targetKbps ?? TargetKbps(e);
+            long estimate = (long)(kbps * 1000 / 8 * c.DurationSeconds);
+            return Math.Min(estimate, c.SizeBytes);
+        }
+    }
+
     /// <summary>Finds videos worth re-encoding and writes the encoding script.</summary>
     public static class EncodePlanner
     {
