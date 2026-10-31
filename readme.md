@@ -27,7 +27,7 @@ On Linux, also install FFmpeg (`sudo apt install ffmpeg`). If it is installed, i
 **The desktop and web apps** have three screens:
 * **Settings** - folders to scan, folders to skip, folders whose copies are preferred, the Windows and Linux path pairs (with a "try a path" box), and the match rules as sliders. A live preview shows how many duplicates the settings would find, using the videos already read.
 * **Scan** - progress through the steps, videos found, already read and new, and the time left. The estimate comes from earlier scans until the current one has read a few videos. A scan can be stopped; what was read is kept.
-* **Review** - each group of copies with 3 screenshots per video. Select all duplicates, select none, select one by one, "Keep this one", or pick a folder and "Select all duplicates in this folder". Files picked for removal are crossed out. Remove them by moving them to a quarantine folder (`_DuplicateVideoRemover_quarantine` inside the scanned folder) or by deleting them; removed files disappear and you can carry on. A group always keeps at least one copy.
+* **Review** - each group of copies with 3 screenshots per video. Select all duplicates, select none, select one by one, "Keep this one", or pick a folder and "Select all duplicates in this folder". Files picked for removal are crossed out. Delete them with one button (after a confirmation); deleted files disappear and you can carry on. A group always keeps at least one copy.
 
 **Web app options**
 * `--data <folder>` - the data folder (default: the current folder)
@@ -53,7 +53,7 @@ The web app comes as a Docker image, with FFmpeg and the command-line version in
 | Container path | What |
 |---|---|
 | `/data` | settings, database, screenshots, results. Map it to a folder on the NAS (or a named volume). |
-| `/videos` | your video folders, mounted below it. Must be writable to move or delete duplicates. |
+| `/videos` | your video folders, mounted below it. Must be writable to delete duplicates. |
 
 * Port: the web app listens on 8080 in the container; map it to any free port on the NAS (`8095:8080`).
 * Command line inside the container: `docker exec duplicate-video-remover dvr-cli` (also `dvr-cli clean`, `dvr-cli index`).
@@ -79,7 +79,7 @@ same video has the same path in the database.
 
 Only one scan runs per database at a time: a scan leaves a `scan.lock` file next to the database, and other
 programs wait with their scan until it is gone (a lock left by a crash expires after 2 minutes). Reviewing and
-removing files works while a scan runs elsewhere. The database uses SQLite's classic journal mode, which
+deleting files works while a scan runs elsewhere. The database uses SQLite's classic journal mode, which
 works over a network share; keep it on the NAS's own disk and let the PC reach it through the share.
 
 ### Command line
