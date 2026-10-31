@@ -20,7 +20,10 @@
                 }
             </p>
         </div>
-        <button @onclick="Reanalyze" disabled="@App.Scanner.IsRunning" title="Uses the saved settings and the videos already read - no files are read">Compare again</button>
+        <div class="inline">
+            <button @onclick="Reanalyze" disabled="@App.Scanner.IsRunning" title="Uses the saved settings and the videos already read - no files are read">Compare again</button>
+            <button class="primary" @onclick='() => Nav.NavigateTo("encode")' title="When you are done deleting duplicates">Next: re-encode</button>
+        </div>
     </div>
 
     @if (Results.Groups.Count + Results.Broken.Count == 0)

@@ -66,8 +66,14 @@ else vm.Review.CancelExecuteCommand.Execute(null);
 if (Environment.GetEnvironmentVariable("SHOT_ENCODE") == "1")
 {
     vm.SelectedTab = 2; Pump(2500);
-    vm.Encode.SelectTopCommand.Execute(null); Pump(300);
-    vm.Encode.CreateCommand.Execute(null); Shot("d_encode");
+    vm.Encode.RowClicked(vm.Encode.Rows[0], false);
+    vm.Encode.RowClicked(vm.Encode.Rows[4], true); Pump(300);
+    Console.WriteLine("shift range picked: " + vm.Encode.Rows.Count(r => r.IsPicked));
+    vm.Encode.RowClicked(vm.Encode.Rows[2], false); Pump(200);
+    Console.WriteLine("after one click: " + vm.Encode.Rows.Count(r => r.IsPicked) + " | " + vm.Encode.PickedSize);
+    vm.Encode.RowClicked(vm.Encode.Rows[2], false); Shot("d_encode");
+    vm.Encode.AskCreateCommand.Execute(null); Shot("d_encode_confirm");
+    vm.Encode.CreateCommand.Execute(null); Pump(300);
     Console.WriteLine("encode: " + vm.Encode.ResultText);
     vm.SelectedTab = 3; Pump(1200);
     var editor = window.GetVisualDescendants().OfType<EncodeSettingsEditor>().First();
