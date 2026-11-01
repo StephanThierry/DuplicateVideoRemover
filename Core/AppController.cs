@@ -5,9 +5,6 @@ using System.Linq;
 
 namespace deepduplicates
 {
-    /// <summary>What the current match settings would find in videos that are already read.</summary>
-    public sealed record PreviewResult(int VideosInScope, int Duplicates, int Groups, int Broken, long DuplicateBytes);
-
     /// <summary>
     /// Everything the web and desktop interfaces share: the data folder, settings and path mappings,
     /// scanning, the live preview and the review session.
@@ -82,14 +79,6 @@ namespace deepduplicates
         /// <summary>Starts a scan with the saved settings.</summary>
         public bool StartScan() => Scanner.Start(Settings);
 
-        /// <summary>Runs the match rules on videos already in the database - no files are read.</summary>
-        public PreviewResult Preview(Settings settings)
-        {
-            var media = ScanEngine.InScope(CachedMedia(), settings);
-            var (results, _) = Analyzer.Analyze(media, settings);
-            return new PreviewResult(media.Count, results.DuplicateCount, results.Groups.Count, results.Broken.Count, results.DuplicateBytes);
-        }
-
         /// <summary>Compares again with the saved settings, using what is in the database (no rescan).</summary>
         public void ReanalyzeFromDatabase()
         {
@@ -99,14 +88,38 @@ namespace deepduplicates
             ReplaceSession(results);
         }
 
-        /// <summary>Deletes the selected files.</summary>
-        public ExecuteReport Execute()
+        /// <summary>Deletes the selected files, reporting each one as it goes.</summary>
+        public ExecuteReport Execute(IProgress<DeleteProgress> progress = null)
         {
-            var report = Session.Execute(CreateFileHandler());
+            var report = Session.Execute(CreateFileHandler(), progress);
             InvalidateCache();
             DataChanged?.Invoke();
             return report;
         }
+
+        /// <summary>A video in the current results (for playing it), or null.</summary>
+        public VideoEntry FindEntry(int id) => Session.Results.AllEntries().FirstOrDefault(e => e.Id == id);
+
+        /// <summary>
+        /// Marks a copy as not a duplicate of the other copies in its group: the pairs are saved in
+        /// falsepositives.json (by content, so moving the files doesn't matter) and the copy leaves the group.
+        /// Returns a message for the user.
+        /// </summary>
+        public string MarkFalsePositive(int id)
+        {
+            var group = Session.GroupOf(id);
+            if (group == null) return "This video is not in a group of copies.";
+            var ids = group.Members.Select(m => m.Id).ToHashSet();
+            var videos = CachedMedia().Where(v => ids.Contains(v.id)).ToDictionary(v => v.id);
+            if (!videos.TryGetValue(id, out var video)) return "This video is no longer in the database. Scan again first.";
+            var others = group.Members.Where(m => m.Id != id && videos.ContainsKey(m.Id)).Select(m => videos[m.Id]).ToList();
+            FalsePositives.Add(video, others);
+            Session.RemoveFromGroup(id);
+            return $"Marked {System.IO.Path.GetFileName(video.path)} as not a duplicate. It won't be matched with these copies again.";
+        }
+
+        /// <summary>Forgets a false positive; "Compare again" can then find the pair again.</summary>
+        public bool RemoveFalsePositive(string key) => FalsePositives.Remove(key);
 
         /// <summary>
         /// Videos in the scope that could be re-encoded (not duplicates or broken), highest average bitrate first.

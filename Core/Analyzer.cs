@@ -68,12 +68,51 @@ namespace deepduplicates
                 }
                 group.Members.Add(VideoEntry.From(v));
             }
+            if (FalsePositives.Count > 0)
+                foreach (var g in groups.Values.ToList())
+                    if (!DropFalsePositives(g, byId)) groups.Remove(g.Id);
             // Biggest savings first
             result.Groups = groups.Values
                 .OrderByDescending(g => g.Members.Skip(1).Sum(m => m.SizeBytes))
                 .ToList();
             result.Broken = result.Broken.OrderBy(b => b.Path, StringComparer.OrdinalIgnoreCase).ToList();
             return result;
+        }
+
+        /// <summary>
+        /// Takes out the copies marked as "not a duplicate" (see FalsePositives): a copy marked against the
+        /// kept one, or a kept one marked against all the others. The ones taken out count as normal videos.
+        /// Returns false when fewer than two copies are left.
+        /// </summary>
+        private static bool DropFalsePositives(DuplicateGroup g, Dictionary<int, VideoInfo> byId)
+        {
+            var prints = new Dictionary<int, string>();
+            string Print(int id) => prints.TryGetValue(id, out var p) ? p : prints[id] = byId.TryGetValue(id, out var v) ? FalsePositives.Fingerprint(v) : null;
+            void Release(VideoEntry e)
+            {
+                g.Members.Remove(e);
+                if (byId.TryGetValue(e.Id, out var v)) { v.remove = false; v.triggerId = 0; v.reason = null; }
+            }
+
+            bool changed = true;
+            while (changed && g.Members.Count >= 2)
+            {
+                changed = false;
+                var root = g.Members[0];
+                foreach (var m in g.Members.Skip(1).ToList())
+                    if (FalsePositives.IsPair(Print(m.Id), Print(root.Id))) { Release(m); changed = true; }
+                if (g.Members.Count >= 2 && g.Members.Skip(1).All(m => FalsePositives.IsPair(Print(root.Id), Print(m.Id))))
+                {
+                    // The kept copy was marked as not a duplicate of the rest: keep the next one instead
+                    Release(root);
+                    if (byId.TryGetValue(g.Members[0].Id, out var next)) { next.remove = false; next.reason = null; }
+                    g.SuggestedKeepId = g.Members[0].Id;
+                    changed = true;
+                }
+            }
+            if (g.Members.Count >= 2) return true;
+            foreach (var m in g.Members.ToList()) Release(m);
+            return false;
         }
     }
 }

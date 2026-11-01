@@ -7,6 +7,12 @@ namespace deepduplicates
 {
     public sealed record ExecuteFailure(VideoEntry Entry, string Error);
 
+    /// <summary>How far deleting has come: Done of Total files, then updating the database.</summary>
+    public sealed record DeleteProgress(int Done, int Total, string CurrentFile, int Failed, bool UpdatingDatabase = false)
+    {
+        public double Fraction => Total == 0 || UpdatingDatabase ? 1 : Done / (double)Total;
+    }
+
     public sealed class ExecuteReport
     {
         public List<VideoEntry> Removed { get; } = new();
@@ -152,20 +158,57 @@ namespace deepduplicates
         public void UnselectFolder(string folder) =>
             Change(() => { foreach (var e in Results.AllEntries().Where(e => e.Folder == folder)) selected.Remove(e.Id); });
 
+        // --- False positives ---
+
+        /// <summary>The group this copy is in, or null (broken videos have none).</summary>
+        public DuplicateGroup GroupOf(int id) { lock (sync) return groupOf.TryGetValue(id, out var g) ? g : null; }
+
+        /// <summary>
+        /// Takes a copy out of its group after it was marked as not a duplicate. A group with one file left
+        /// is gone; when the kept copy is taken out, another one is kept. Saves the results.
+        /// </summary>
+        public void RemoveFromGroup(int id)
+        {
+            Change(() =>
+            {
+                if (!groupOf.TryGetValue(id, out var g)) return;
+                selected.Remove(id);
+                groupOf.Remove(id);
+                g.Members.RemoveAll(m => m.Id == id);
+                if (g.Members.Count < 2)
+                {
+                    Results.Groups.Remove(g);
+                    keep.Remove(g.Id);
+                    foreach (var m in g.Members) { groupOf.Remove(m.Id); selected.Remove(m.Id); }
+                    return;
+                }
+                if (keep[g.Id] == id)
+                {
+                    var next = g.Members.FirstOrDefault(m => !selected.Contains(m.Id)) ?? g.Members[0];
+                    keep[g.Id] = next.Id;
+                    selected.Remove(next.Id);
+                }
+                g.SuggestedKeepId = keep[g.Id];
+            });
+            try { Results.Save(); } catch (Exception e) { Console.WriteLine("Could not save results: " + e.Message); }
+        }
+
         // --- Removing ---
 
         /// <summary>
         /// Deletes the selected files, takes them out of the database and the results,
         /// and saves the results. Files that fail stay selected and are reported.
         /// </summary>
-        public ExecuteReport Execute(FileHandler fileHandler)
+        public ExecuteReport Execute(FileHandler fileHandler, IProgress<DeleteProgress> progress = null)
         {
             var report = new ExecuteReport();
             List<VideoEntry> targets;
             lock (sync) targets = Results.AllEntries().Where(e => selected.Contains(e.Id)).ToList();
 
-            foreach (var entry in targets)
+            for (int i = 0; i < targets.Count; i++)
             {
+                var entry = targets[i];
+                progress?.Report(new DeleteProgress(i, targets.Count, entry.FileName, report.Failed.Count));
                 try
                 {
                     if (File.Exists(entry.Path)) File.Delete(entry.Path);
@@ -178,6 +221,7 @@ namespace deepduplicates
                 }
             }
 
+            progress?.Report(new DeleteProgress(targets.Count, targets.Count, "", report.Failed.Count, UpdatingDatabase: true));
             RemoveFromDatabase(report.Removed, fileHandler);
 
             Change(() =>
