@@ -79,7 +79,7 @@ namespace deepduplicates
         public static bool[] Exist(IReadOnlyList<string> files)
         {
             var exists = new bool[files.Count];
-            System.Threading.Tasks.Parallel.For(0, files.Count, new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = 16 },
+            System.Threading.Tasks.Parallel.For(0, files.Count, new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = 32 },
                 i => { try { exists[i] = File.Exists(files[i]); } catch { } });
             return exists;
         }

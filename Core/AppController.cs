@@ -5,6 +5,9 @@ using System.Linq;
 
 namespace deepduplicates
 {
+    /// <summary>The encoding script: where it was written (null when nothing was left), how many videos, and the missing files left out.</summary>
+    public sealed record EncodeScriptResult(string Path, int Videos, List<EncodeCandidate> Missing);
+
     /// <summary>A false positive with the two videos as they are in the database now (null when gone).</summary>
     public sealed record FalsePositiveDetail(FalsePositive Pair, VideoEntry NowA, VideoEntry NowB)
     {
@@ -19,6 +22,7 @@ namespace deepduplicates
     public sealed class AppController
     {
         private List<VideoInfo> cachedMedia;
+        private List<VideoInfo> currentMedia;
         private readonly object cacheLock = new();
 
         public string DataFolder { get; }
@@ -154,20 +158,30 @@ namespace deepduplicates
 
         /// <summary>
         /// Videos in the scope that could be re-encoded (not duplicates or broken), highest average bitrate first.
-        /// Only files the last scan found, and each one is checked to still exist.
+        /// Only files the last scan found on disk (see CurrentMedia); the picked ones are checked again when the
+        /// script is written.
         /// </summary>
         public List<EncodeCandidate> EncodeCandidates()
         {
             var media = ScanEngine.InScope(CurrentMedia(), Settings);
             var (_, analyzed) = Analyzer.Analyze(media, Settings);
-            var candidates = EncodePlanner.Candidates(analyzed, Settings.EncodeOrDefault());
-            var exists = LastScan.Exist(candidates.Select(c => c.Path).ToList());
-            return candidates.Where((c, i) => exists[i]).ToList();
+            return EncodePlanner.Candidates(analyzed, Settings.EncodeOrDefault());
         }
 
-        /// <summary>Writes output/encode_selected.ps1 (Windows) or .sh (Linux) for these videos. Returns its path.</summary>
-        public string WriteEncodeScript(IEnumerable<EncodeCandidate> videos) =>
-            EncodePlanner.WriteScript(CreateFileHandler().outputFolder, EncodeScriptName, videos, Settings.EncodeOrDefault());
+        /// <summary>
+        /// Writes output/encode_selected.ps1 (Windows) or .sh (Linux) for these videos. Files that no longer
+        /// exist are left out and counted in Missing.
+        /// </summary>
+        public EncodeScriptResult WriteEncodeScript(IEnumerable<EncodeCandidate> videos)
+        {
+            var list = videos.ToList();
+            var exists = LastScan.Exist(list.Select(c => c.Path).ToList());
+            var present = list.Where((c, i) => exists[i]).ToList();
+            var missing = list.Where((c, i) => !exists[i]).ToList();
+            string path = present.Count == 0 ? null
+                : EncodePlanner.WriteScript(CreateFileHandler().outputFolder, EncodeScriptName, present, Settings.EncodeOrDefault());
+            return new EncodeScriptResult(path, present.Count, missing);
+        }
 
         public const string EncodeScriptName = "encode_selected";
 
@@ -202,7 +216,11 @@ namespace deepduplicates
         /// The database rows of the files the last scan found on disk. The database itself keeps dormant rows
         /// (moved, renamed or unreachable files) and must not be taken as the list of files that exist.
         /// </summary>
-        private List<VideoInfo> CurrentMedia() => LastScan.Filter(CachedMedia());
+        private List<VideoInfo> CurrentMedia()
+        {
+            // Kept with the cache: without a scan list, the fallback checks every row on disk, which is slow on shares
+            lock (cacheLock) return currentMedia ??= LastScan.Filter(CachedMedia());
+        }
 
         /// <summary>
         /// Deletes one video file (from Re-encode) and takes it out of the database and the scan list.
@@ -223,7 +241,7 @@ namespace deepduplicates
 
         private void InvalidateCache()
         {
-            lock (cacheLock) cachedMedia = null;
+            lock (cacheLock) { cachedMedia = null; currentMedia = null; }
         }
 
         private void ReplaceSession(ResultSet results)

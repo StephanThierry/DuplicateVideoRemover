@@ -30,9 +30,11 @@ one of those videos has to be read again. Do not run it automatically, and do no
   whose path is in this list: `AppController.CurrentMedia()`. This is used by "Compare again" and by
   Re-encode. Without the filter, a moved folder's dormant rows would be matched with the current rows as
   duplicates, and the review could suggest deleting the real file.
-- **A check on disk** - Re-encode additionally checks that each listed file still exists
-  (`LastScan.Exist`), so files deleted since the scan are not offered. If there is no `lastscan.json` yet
-  (first start after an update), `LastScan.Filter` falls back to checking every row on disk.
+- **A check on disk** - when the encoding script is written, the picked files are checked again
+  (`LastScan.Exist`) and missing ones are left out and reported. If there is no `lastscan.json` yet (first
+  start after an update), `LastScan.Filter` falls back to checking every row on disk. That is slow on network
+  shares (minutes for 100,000 rows), so the result is kept until the data changes; the next scan replaces it
+  with the scan list. Checking every listed file on each load was tried and was too slow for the same reason.
 - The scan itself works on the files it found (`VideoHandler.saveVideoMetadataAndScreenshots` joins the
   file listing with the database), so its results are always current.
 
