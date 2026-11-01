@@ -11,13 +11,14 @@ namespace deepduplicates
     /// </summary>
     public static class Analyzer
     {
-        public static (ResultSet results, List<VideoInfo> analyzed) Analyze(IReadOnlyList<VideoInfo> media, Settings settings)
+        /// <param name="progress">Optional: share of the comparing done (0..1)</param>
+        public static (ResultSet results, List<VideoInfo> analyzed) Analyze(IReadOnlyList<VideoInfo> media, Settings settings, Action<double> progress = null)
         {
             var list = media.Select(Baseline).ToList();
             var rh = new RecommendationHandler();
             rh.removingShortVideos(list, settings.minVideoLength, settings.minVideoSizeKb);
             rh.removingIncompleteVideos(list);
-            rh.checkChecksumOfAllSimilarVideos_Optimized(list, settings);
+            rh.checkChecksumOfAllSimilarVideos_Optimized(list, settings, progress);
             return (BuildResults(list), list);
         }
 

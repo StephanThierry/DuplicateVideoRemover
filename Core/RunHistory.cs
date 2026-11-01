@@ -21,6 +21,8 @@ namespace deepduplicates
         public bool Completed { get; set; }
         /// <summary>Seconds spent finding the files (walking the folders), for the progress bar.</summary>
         public double FindSeconds { get; set; }
+        /// <summary>Seconds spent comparing the videos, for the progress bar.</summary>
+        public double CompareSeconds { get; set; }
     }
 
     public static class RunHistory
@@ -77,6 +79,14 @@ namespace deepduplicates
             var scope = ScopeKey(settings);
             var last = Load().LastOrDefault(r => r.ScopeKey == scope && r.FindSeconds > 0);
             return last?.FindSeconds;
+        }
+
+        /// <summary>How long comparing took in the last scan of this scope that recorded it, or null.</summary>
+        public static double? CompareSeconds(Settings settings)
+        {
+            var scope = ScopeKey(settings);
+            var last = Load().LastOrDefault(r => r.ScopeKey == scope && r.CompareSeconds > 0);
+            return last?.CompareSeconds;
         }
 
         /// <summary>How many files the last scan of this scope found, or null.</summary>

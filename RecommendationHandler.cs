@@ -50,7 +50,8 @@ namespace deepduplicates
             public int count;
         }        
 
-public List<VideoInfo> checkChecksumOfAllSimilarVideos_Optimized(List<VideoInfo> mediaList, Settings settings)
+/// <param name="progress">Optional: share of the comparing done (0..1), measured in pairs of videos compared</param>
+public List<VideoInfo> checkChecksumOfAllSimilarVideos_Optimized(List<VideoInfo> mediaList, Settings settings, Action<double> progress = null)
 {
     // 1. PRE-FILTERING & GROUPING:
     var videosToProcess = mediaList.Where(v => !(v.remove ?? false) && v.duration.HasValue && v.path != null);
@@ -61,6 +62,17 @@ public List<VideoInfo> checkChecksumOfAllSimilarVideos_Optimized(List<VideoInfo>
     
     // Use a HashSet for priority folder lookups 
     var priorityFolderSet = new HashSet<string>(settings.priorityFolders);
+
+    // Work in pairs: a group of n videos of the same length compares about n*n/2 pairs
+    long PairsAt(int i)
+    {
+        long n = videosByDuration[sortedDurations[i]].Count();
+        if (i + 1 < sortedDurations.Count && sortedDurations[i + 1] == sortedDurations[i] + 1) n += videosByDuration[sortedDurations[i + 1]].Count();
+        return n < 2 ? 0 : n * (n - 1) / 2;
+    }
+    long totalPairs = 0, pairsDone = 0;
+    if (progress != null) for (int i = 0; i < sortedDurations.Count; i++) totalPairs += PairsAt(i);
+    var lastReport = System.Diagnostics.Stopwatch.StartNew();
 
     for (int i = 0; i < sortedDurations.Count; i++)
     {
@@ -82,6 +94,11 @@ public List<VideoInfo> checkChecksumOfAllSimilarVideos_Optimized(List<VideoInfo>
             .ToList();
 
         CompareVideosInGroup(comparisonGroup, settings);
+        if (progress != null)
+        {
+            pairsDone += PairsAt(i);
+            if (lastReport.ElapsedMilliseconds >= 250 && totalPairs > 0) { lastReport.Restart(); progress(Math.Min(pairsDone / (double)totalPairs, 1)); }
+        }
     }
     
     // 3. POST-PROCESSING (Switch Priority Logic):

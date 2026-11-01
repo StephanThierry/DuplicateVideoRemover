@@ -132,6 +132,25 @@ if (Environment.GetEnvironmentVariable("SHOT_PHASES") == "1")
         FindRemaining = TimeSpan.FromMinutes(6.5), Elapsed = TimeSpan.FromMinutes(3.2) }, "d_phase_a");
     Show(new ScanProgress { Phase = ScanPhase.ReadingVideos, Message = "Reading new videos", FilesFound = 67612, ExpectedFiles = 67569, FilesListed = true,
         FindTime = TimeSpan.FromMinutes(7.4), Checked = 30000, NewTotal = 282, NewDone = 94, Remaining = TimeSpan.FromMinutes(2), SecondsPerNewFile = 0.6,
+        ReadShare = 0.74, CompareEstimate = TimeSpan.FromSeconds(57),
         Elapsed = TimeSpan.FromMinutes(8.5) }, "d_phase_b");
+    Show(new ScanProgress { Phase = ScanPhase.Comparing, Message = "Comparing videos", FilesFound = 67612, ExpectedFiles = 67569, FilesListed = true,
+        FindTime = TimeSpan.FromMinutes(7.4), Checked = 67612, NewTotal = 282, NewDone = 282, ReadShare = 0.74, CompareFraction = 0.4,
+        CompareEstimate = TimeSpan.FromSeconds(57), CompareRemaining = TimeSpan.FromSeconds(35), Elapsed = TimeSpan.FromMinutes(11) }, "d_phase_compare");
     Show(new ScanProgress { Phase = ScanPhase.FindingFiles, Message = "Finding video files", FilesFound = 1800, Elapsed = TimeSpan.FromSeconds(40) }, "d_phase_first");
+}
+// SHOT_COMPARE=1: how long comparing the whole library takes (the second run has the database cached)
+if (Environment.GetEnvironmentVariable("SHOT_COMPARE") == "1")
+{
+    for (int run = 1; run <= 2; run++)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        controller.ReanalyzeFromDatabase();
+        Console.WriteLine($"compare run {run}: {sw.Elapsed.TotalSeconds:0.0} s, {controller.Session.Results.VideosInScope:N0} videos");
+    }
+    var media = ScanEngine.InScope(ScanEngine.LoadAllCached(), controller.Settings);
+    var steps = new System.Collections.Generic.List<double>();
+    var t = System.Diagnostics.Stopwatch.StartNew();
+    Analyzer.Analyze(media, controller.Settings, f => steps.Add(f));
+    Console.WriteLine($"analyze only: {t.Elapsed.TotalSeconds:0.0} s for {media.Count:N0} videos, {steps.Count} progress reports, last {(steps.Count > 0 ? steps[^1] : 0):P0}");
 }

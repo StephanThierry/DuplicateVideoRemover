@@ -63,11 +63,31 @@ namespace deepduplicates
         /// <summary>Phase B, 0..1: new videos read of those that need reading (or files checked, when none are new).</summary>
         public double ProcessFraction => Phase switch
         {
-            ScanPhase.Done or ScanPhase.Comparing => 1,
-            ScanPhase.ReadingVideos when NewTotal > 0 => NewDone / (double)NewTotal,
-            ScanPhase.ReadingVideos when FilesFound > 0 => Checked / (double)FilesFound,
+            ScanPhase.Done => 1,
+            ScanPhase.Comparing => ReadShare + (1 - ReadShare) * CompareFraction,
+            ScanPhase.ReadingVideos => ReadShare * ReadFraction,
             _ => 0
         };
+
+        // Phase B has two steps: 1) reading the new videos, 2) comparing all of them (about a minute for
+        // 70,000 videos). ReadShare is the part of the B bar for step 1, set from the expected time of each
+        // step when the file list is complete, so the bar keeps moving through both.
+
+        /// <summary>Part of the processing bar for reading (the rest is comparing).</summary>
+        public double ReadShare { get; init; } = 0.5;
+
+        /// <summary>Step 1, 0..1: new videos read (or files checked, when none are new).</summary>
+        public double ReadFraction =>
+            NewTotal > 0 ? NewDone / (double)NewTotal : FilesFound > 0 ? Checked / (double)FilesFound : 0;
+
+        /// <summary>Step 2, 0..1: pairs of videos compared.</summary>
+        public double CompareFraction { get; init; }
+
+        /// <summary>Expected time of comparing (the last scan's, or a default by number of videos).</summary>
+        public TimeSpan? CompareEstimate { get; init; }
+
+        /// <summary>Estimated time left of comparing, while comparing.</summary>
+        public TimeSpan? CompareRemaining { get; init; }
     }
 
     public enum PhaseState { Waiting, Active, Done }
@@ -116,20 +136,26 @@ namespace deepduplicates
             switch (p.Phase)
             {
                 case ScanPhase.Done: return "Done";
-                case ScanPhase.Comparing: return "Comparing videos";
+                case ScanPhase.Comparing:
+                    return $"Step 2 of 2: comparing {p.FilesFound:N0} videos - {Percent(p.CompareFraction)}% compared";
                 case ScanPhase.ReadingVideos when p.Checked == 0 && p.NewTotal == 0: return p.Message;
                 case ScanPhase.ReadingVideos when p.NewTotal > 0:
-                    return $"{p.NewDone:N0} of {Fmt.Plural(p.NewTotal, "new video", "new videos")} read, {Math.Max(p.FilesFound - p.NewTotal, 0):N0} already known";
-                case ScanPhase.ReadingVideos: return $"No new videos - all {p.FilesFound:N0} were read before";
+                    return $"Step 1 of 2: reading new videos - {p.NewDone:N0} of {p.NewTotal:N0} read, {Math.Max(p.FilesFound - p.NewTotal, 0):N0} already known";
+                case ScanPhase.ReadingVideos: return $"Step 1 of 2: no new videos - all {p.FilesFound:N0} were read before";
                 default: return p.FilesListed ? "" : "Starts when all files are found";
             }
         }
 
+        /// <summary>Time left of the whole processing phase: reading what is left, then comparing.</summary>
         public static string ProcessLeft(ScanProgress p)
         {
-            if (p.Phase != ScanPhase.ReadingVideos || p.NewTotal == 0) return "";
+            if (p.Phase == ScanPhase.Comparing)
+                return p.CompareRemaining is TimeSpan c ? Fmt.Approx(c) + " left" : "";
+            if (p.Phase != ScanPhase.ReadingVideos || (p.Checked == 0 && p.NewTotal == 0)) return "";
+            TimeSpan compare = p.CompareEstimate ?? TimeSpan.Zero;
+            if (p.NewTotal == 0) return compare > TimeSpan.Zero ? Fmt.Approx(compare) + " left (comparing)" : "";
             if (p.Remaining is not TimeSpan r) return "Estimating time left...";
-            return Fmt.Approx(r) + " left" + (p.EstimateFromHistory ? " (from earlier scans)" : "");
+            return Fmt.Approx(r + compare) + " left" + (p.EstimateFromHistory ? " (from earlier scans)" : "");
         }
 
         public static int Percent(double fraction) => (int)Math.Floor(fraction * 100);

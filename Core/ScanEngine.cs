@@ -127,11 +127,45 @@ namespace deepduplicates
                 using var db = new VideoInfoContext();
                 db.Database.EnsureCreated();
                 videoHandler = new VideoHandler(fileHandler, new ImageHandler());
-                var progress = new Progress(p => Report(p with { Elapsed = total.Elapsed, ExpectedFiles = expected, FilesListed = true, FindTime = findTime }));
+                // Phase B has two steps: reading the new videos, then comparing all of them. How the bar is shared
+                // between them is set once, when the number of new videos is known, from the expected time of each.
+                double? lastCompareSeconds = RunHistory.CompareSeconds(settings);
+                // Without a recorded time: about 0.9 ms per video (measured: 57 s for 67,500 videos)
+                var compareEstimate = TimeSpan.FromSeconds(lastCompareSeconds ?? Math.Max(fileHandler.allFilesCount * 0.0009, 1));
+                double? readShare = null;
+                double ReadShareFor(ScanProgress p)
+                {
+                    if (readShare is double known) return known;
+                    if (p.Checked == 0 && p.NewTotal == 0) return 0.5;   // still loading the database
+                    double readSeconds = p.NewTotal * (p.SecondsPerNewFile ?? 3.0);
+                    double share = readSeconds / (readSeconds + compareEstimate.TotalSeconds);
+                    readShare = Math.Clamp(share, 0.05, 0.95);
+                    return readShare.Value;
+                }
+                var progress = new Progress(p => Report(p with
+                {
+                    Elapsed = total.Elapsed, ExpectedFiles = expected, FilesListed = true, FindTime = findTime,
+                    ReadShare = ReadShareFor(p), CompareEstimate = compareEstimate
+                }));
                 var media = await videoHandler.saveVideoMetadataAndScreenshots(db, progress, ct, RunHistory.SecondsPerNewFile(settings));
 
-                Report(Current with { Phase = ScanPhase.Comparing, Message = "Comparing videos", Remaining = null, Elapsed = total.Elapsed });
-                var (results, analyzed) = Analyzer.Analyze(media, settings);
+                var compare = Stopwatch.StartNew();
+                ScanProgress Comparing(double done)
+                {
+                    // The pace so far once a little is done, before that the expected time
+                    TimeSpan left = done >= 0.05
+                        ? TimeSpan.FromSeconds(compare.Elapsed.TotalSeconds * (1 - done) / done)
+                        : compareEstimate - compare.Elapsed;
+                    return Current with
+                    {
+                        Phase = ScanPhase.Comparing, Message = "Comparing videos", Remaining = null, CompareFraction = done,
+                        CompareRemaining = left > TimeSpan.Zero ? left : TimeSpan.Zero, ReadShare = readShare ?? 0.5,
+                        CompareEstimate = compareEstimate, Elapsed = total.Elapsed
+                    };
+                }
+                Report(Comparing(0));
+                var (results, analyzed) = Analyzer.Analyze(media, settings, done => Report(Comparing(done)));
+                record.CompareSeconds = compare.Elapsed.TotalSeconds;
                 results.Save();
 
                 // The command-line outputs are still written, for anyone who prefers them
