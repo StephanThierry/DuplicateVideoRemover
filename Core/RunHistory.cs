@@ -19,6 +19,8 @@ namespace deepduplicates
         public int NewFiles { get; set; }
         public double NewFileSeconds { get; set; }
         public bool Completed { get; set; }
+        /// <summary>Seconds spent finding the files (walking the folders), for the progress bar.</summary>
+        public double FindSeconds { get; set; }
     }
 
     public static class RunHistory
@@ -67,6 +69,27 @@ namespace deepduplicates
             if (pick.Count == 0) pick = useful.TakeLast(5).ToList();
             if (pick.Count == 0) return null;
             return pick.Sum(r => r.NewFileSeconds) / pick.Sum(r => r.NewFiles);
+        }
+
+        /// <summary>Share of the progress bar for finding files when there is no timing yet.</summary>
+        public const double DefaultFindShare = 0.25;
+
+        /// <summary>
+        /// Part of the last completed scan of this scope spent finding files (5-60%), for the progress bar.
+        /// </summary>
+        public static double FindShare(Settings settings)
+        {
+            var scope = ScopeKey(settings);
+            var last = Load().LastOrDefault(r => r.ScopeKey == scope && r.Completed && r.FindSeconds > 0 && r.TotalSeconds > 0);
+            return last == null ? DefaultFindShare : Math.Clamp(last.FindSeconds / last.TotalSeconds, 0.05, 0.6);
+        }
+
+        /// <summary>How many files the last scan of this scope found, or null.</summary>
+        public static int? ExpectedFiles(Settings settings)
+        {
+            var scope = ScopeKey(settings);
+            var last = Load().LastOrDefault(r => r.ScopeKey == scope && r.Completed && r.FilesInScope > 0);
+            return last?.FilesInScope;
         }
 
         public static RunRecord LastRun(Settings settings)

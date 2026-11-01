@@ -37,12 +37,26 @@ namespace deepduplicates
         /// <summary>True when the estimate is still based on earlier runs, not this one.</summary>
         public bool EstimateFromHistory { get; init; }
 
-        /// <summary>Overall progress 0..1 (finding files is not counted, its total is unknown).</summary>
+        /// <summary>How many video files the last scan of the same folders found (null: never scanned).</summary>
+        public int? ExpectedFiles { get; init; }
+
+        /// <summary>
+        /// Part of the progress bar given to finding files, from the last scan's timing. On a large library on
+        /// network drives, walking the folders can take as long as everything else.
+        /// </summary>
+        public double FindShare { get; init; } = RunHistory.DefaultFindShare;
+
+        /// <summary>
+        /// Overall progress 0..1. Finding files fills its share by the count expected from the last scan;
+        /// reading fills the rest up to 95%.
+        /// </summary>
         public double Fraction => Phase switch
         {
             ScanPhase.Done => 1,
-            ScanPhase.ReadingVideos when NewTotal > 0 => 0.05 + 0.9 * NewDone / NewTotal,
-            ScanPhase.ReadingVideos when FilesFound > 0 => 0.05 + 0.9 * Checked / FilesFound,
+            ScanPhase.Preparing => 0.01,
+            ScanPhase.FindingFiles when ExpectedFiles > 0 => Math.Max(0.02, FindShare * Math.Min(FilesFound / (double)ExpectedFiles.Value, 0.98)),
+            ScanPhase.ReadingVideos when NewTotal > 0 => FindShare + (0.95 - FindShare) * NewDone / NewTotal,
+            ScanPhase.ReadingVideos when FilesFound > 0 => FindShare + (0.95 - FindShare) * Checked / FilesFound,
             ScanPhase.Comparing => 0.97,
             _ => 0.02
         };

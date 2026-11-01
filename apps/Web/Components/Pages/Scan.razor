@@ -186,6 +186,7 @@
 
     private string RemainingText()
     {
+        if (p.Phase == ScanPhase.FindingFiles && p.ExpectedFiles > 0) return $"About {p.ExpectedFiles.Value:N0} videos last time";
         if (p.Phase == ScanPhase.FindingFiles || p.Phase == ScanPhase.Preparing) return "Counting videos...";
         if (p.Phase != ScanPhase.ReadingVideos) return "";
         if (p.NewTotal == 0) return "No new videos to read";

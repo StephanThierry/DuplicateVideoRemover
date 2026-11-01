@@ -74,22 +74,38 @@ namespace deepduplicates
                 await FileHandler.EnsureFFmpegAsync();
 
                 var fileHandler = new FileHandler(settings);
-                Report(new ScanProgress { Phase = ScanPhase.FindingFiles, Message = "Finding video files" });
+                // From the last scan of these folders: how many files to expect and how long finding them takes
+                int? expected = RunHistory.ExpectedFiles(settings);
+                double findShare = RunHistory.FindShare(settings);
+                Report(new ScanProgress { Phase = ScanPhase.FindingFiles, Message = "Finding video files", ExpectedFiles = expected, FindShare = findShare });
                 fileHandler.FindFiles(count => Report(new ScanProgress
                 {
                     Phase = ScanPhase.FindingFiles,
                     Message = "Finding video files",
                     FilesFound = count,
+                    ExpectedFiles = expected,
+                    FindShare = findShare,
                     Elapsed = total.Elapsed
                 }), ct);
                 record.FilesInScope = fileHandler.allFilesCount;
+                record.FindSeconds = total.Elapsed.TotalSeconds;
+                // Loading the database can take a while on a large library - say so instead of looking stuck
+                Report(new ScanProgress
+                {
+                    Phase = ScanPhase.FindingFiles,
+                    Message = "Loading the videos read before",
+                    FilesFound = fileHandler.allFilesCount,
+                    ExpectedFiles = fileHandler.allFilesCount,
+                    FindShare = findShare,
+                    Elapsed = total.Elapsed
+                });
                 // What is on disk now - the database also holds dormant rows of moved or missing files
                 try { LastScan.Save(fileHandler.allFiles); } catch (Exception e) { Console.WriteLine("Could not save lastscan.json: " + e.Message); }
 
                 using var db = new VideoInfoContext();
                 db.Database.EnsureCreated();
                 videoHandler = new VideoHandler(fileHandler, new ImageHandler());
-                var progress = new Progress(p => Report(p with { Elapsed = total.Elapsed }));
+                var progress = new Progress(p => Report(p with { Elapsed = total.Elapsed, FindShare = findShare, ExpectedFiles = fileHandler.allFilesCount }));
                 var media = await videoHandler.saveVideoMetadataAndScreenshots(db, progress, ct, RunHistory.SecondsPerNewFile(settings));
 
                 Report(Current with { Phase = ScanPhase.Comparing, Message = "Comparing videos", Remaining = null, Elapsed = total.Elapsed });

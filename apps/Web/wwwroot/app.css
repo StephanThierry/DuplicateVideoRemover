@@ -143,7 +143,7 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
 .row + .row { border-top: 1px solid var(--rule); }
 .row.is-selected { background: var(--grease-wash); }
 .row.is-kept .name::after {
-  content: "Kept"; margin-left: 10px; font-size: .75rem; font-weight: 650; color: var(--keep);
+  content: "Keep"; margin-left: 10px; font-size: .75rem; font-weight: 650; color: var(--keep);
   background: var(--keep-wash); padding: 1px 8px; border-radius: 10px; vertical-align: 2px;
 }
 

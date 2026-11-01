@@ -97,6 +97,7 @@ public partial class ScanViewModel : ObservableObject
         CurrentFile = p.Phase == ScanPhase.ReadingVideos && p.CurrentFile.Length > 0 ? "Reading " + p.CurrentFile : "";
         Remaining = p.Phase switch
         {
+            ScanPhase.FindingFiles when p.ExpectedFiles > 0 => $"About {p.ExpectedFiles.Value:N0} videos last time",
             ScanPhase.Preparing or ScanPhase.FindingFiles => "Counting videos...",
             ScanPhase.ReadingVideos when p.NewTotal == 0 => "No new videos to read",
             ScanPhase.ReadingVideos when p.Remaining is TimeSpan r => Fmt.Approx(r) + " left" + (p.EstimateFromHistory ? " (from earlier scans)" : ""),
