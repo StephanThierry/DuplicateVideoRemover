@@ -202,10 +202,11 @@ namespace deepduplicates
             bool retainStructure = (settings.retainStructure.Length > 0);
             foreach (VideoInfo item in mediaList.Where(x => (x.remove ?? false) && !String.IsNullOrEmpty(x.path)).OrderBy(p => p.triggerId))
             {
+                VideoInfo org = mediaList.Where(x => x.id == item.triggerId).FirstOrDefault();
+                if (org != null) filetext += "REM DEL \"" + org.pathForBatchFile + "\" /f" + Environment.NewLine;
                 filetext += "DEL \"" + item.pathForBatchFile + "\" /f" + Environment.NewLine;
                 if (retainStructure && settings.retainStructure.Where(p => item.path.ToLower().StartsWith(p.ToLower())).Any())
                 {
-                    VideoInfo org = mediaList.Where(x => x.id == item.triggerId).FirstOrDefault();
                     if (org == null) continue;
                     filetext += "MOVE \"" + org.pathForBatchFile + "\" \""+ item.pathForBatchFile + "\"" + Environment.NewLine;
                 }
