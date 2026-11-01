@@ -3,10 +3,8 @@ output/**
 **/obj/
 **/bin/
 ffmpeg/**
-deepdupes.db
-deepdupes.db-shm
-deepdupes.db-wal
-settings.json
+deepdupes.db*
+settings.json*
 pathmapping.json
 runhistory.json
 .vs/
