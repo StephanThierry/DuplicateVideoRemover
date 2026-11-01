@@ -5,6 +5,13 @@ using System.Linq;
 
 namespace deepduplicates
 {
+    /// <summary>A false positive with the two videos as they are in the database now (null when gone).</summary>
+    public sealed record FalsePositiveDetail(FalsePositive Pair, VideoEntry NowA, VideoEntry NowB)
+    {
+        public string PathA => NowA?.Path ?? PathMapper.ToLocal(Pair.PathA);
+        public string PathB => NowB?.Path ?? PathMapper.ToLocal(Pair.PathB);
+    }
+
     /// <summary>
     /// Everything the web and desktop interfaces share: the data folder, settings and path mappings,
     /// scanning, the live preview and the review session.
@@ -116,6 +123,26 @@ namespace deepduplicates
             FalsePositives.Add(video, others);
             Session.RemoveFromGroup(id);
             return $"Marked {System.IO.Path.GetFileName(video.path)} as not a duplicate. It won't be matched with these copies again.";
+        }
+
+        /// <summary>
+        /// The marked pairs, newest first, with where each video is now (found by its fingerprint in the
+        /// database, so moved files show their new place; null when it is no longer in the database).
+        /// </summary>
+        public List<FalsePositiveDetail> FalsePositiveDetails()
+        {
+            var all = FalsePositives.All();
+            if (all.Count == 0) return new();
+            var wanted = all.SelectMany(p => new[] { p.A, p.B }).ToHashSet();
+            var found = new Dictionary<string, VideoEntry>();
+            foreach (var v in CachedMedia())
+            {
+                var print = FalsePositives.Fingerprint(v);
+                if (wanted.Contains(print) && !found.ContainsKey(print)) found[print] = VideoEntry.From(v);
+            }
+            return all.Select(p => new FalsePositiveDetail(p,
+                found.TryGetValue(p.A, out var a) ? a : null,
+                found.TryGetValue(p.B, out var b) ? b : null)).ToList();
         }
 
         /// <summary>Forgets a false positive; "Compare again" can then find the pair again.</summary>

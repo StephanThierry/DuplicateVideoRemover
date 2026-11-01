@@ -10,10 +10,12 @@
   --muted: #5b6875;
   --rule: #d3dae0;
   --accent: #1f5c8a;       /* actions */
+  --accent-hover: #1a6fb0;
   --accent-ink: #ffffff;
   --keep: #2f6b4f;
   --keep-wash: #e3f0e8;
   --grease: #cf2f2f;       /* the removal mark */
+  --grease-hover: #e23a3a;
   --grease-wash: #fbeceb;
   --frame: #2a3036;        /* film frame behind thumbnails */
   --focus: #f0b429;
@@ -24,8 +26,8 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --table: #15191d; --sheet: #1e2429; --ink: #e5eaee; --muted: #9aa7b2; --rule: #2e363d;
-    --accent: #5b9fd6; --accent-ink: #0d1a24; --keep: #6cc196; --keep-wash: #1b2d24;
-    --grease: #ff6b5e; --grease-wash: #351c1b; --frame: #0b0e10; color-scheme: dark;
+    --accent: #5b9fd6; --accent-hover: #7db8ea; --accent-ink: #0d1a24; --keep: #6cc196; --keep-wash: #1b2d24;
+    --grease: #ff6b5e; --grease-hover: #ff8478; --grease-wash: #351c1b; --frame: #0b0e10; color-scheme: dark;
   }
 }
 
@@ -262,3 +264,44 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
 /* Blazor's own error bar */
 #blazor-error-ui { display: none; position: fixed; bottom: 0; left: 0; right: 0; padding: 10px 20px; background: #fff3cd; color: #3d2b00; z-index: 1000; }
 #blazor-error-ui .dismiss { cursor: pointer; float: right; }
+
+/* ---------- Tags, icon buttons, selection size ---------- */
+a.button { display: inline-block; text-decoration: none; }
+a.button:hover { border-color: var(--muted); }
+button.primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+button.danger:hover:not(:disabled) { background: var(--grease-hover); border-color: var(--grease-hover); }
+button.icon { display: inline-grid; place-items: center; width: 34px; height: 34px; padding: 0; border-radius: 50%; color: var(--accent); }
+button.icon:hover:not(:disabled) { border-color: var(--accent); background: var(--table); }
+.row-actions { display: flex; gap: 8px; align-items: center; }
+
+.tags { list-style: none; margin: 6px 0 12px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.tags li {
+  background: var(--table); border: 1px solid var(--rule); border-radius: 14px;
+  padding: 3px 12px; font-size: .88rem; font-weight: 550; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.actionbar .selection { display: flex; align-items: baseline; gap: 10px; }
+.actionbar .selection .size { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.01em; color: var(--muted); }
+.actionbar .selection.has .size { color: var(--grease); }
+.actionbar .selection .what { color: var(--muted); }
+
+/* Deleting, failures, player */
+.dialog .fail { color: var(--grease); font-weight: 600; }
+.dialog .num { word-break: break-all; }
+.failures table { width: 100%; border-collapse: collapse; }
+.failures th { text-align: left; color: var(--muted); font-weight: 550; font-size: .8rem; padding: 4px 8px; border-bottom: 1px solid var(--rule); position: sticky; top: 0; background: var(--sheet); }
+.failures td { padding: 6px 8px; border-bottom: 1px solid var(--rule); vertical-align: top; word-break: break-word; }
+.dialog .failures { padding-left: 0; max-height: 320px; }
+.dialog.player { width: min(1100px, 100%); }
+.player-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+.player-head h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dialog.player video { width: 100%; max-height: 70vh; background: #000; border-radius: 3px; display: block; }
+.dialog.player p { margin: 10px 0 0; }
+
+/* False positives */
+.crumb { margin-bottom: 4px; }
+.fp-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.row.fp-row { grid-template-columns: auto 1fr; }
+.strip-missing { width: 372px; height: 90px; display: grid; place-items: center; background: var(--table); color: var(--muted); border-radius: 3px; font-size: .85rem; }
+@media (max-width: 960px) { .strip-missing { width: 100%; } }

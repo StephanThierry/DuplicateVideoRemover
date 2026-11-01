@@ -14,7 +14,7 @@
 
     <div class="settings-grid">
         <div>
-            <section class="panel">
+            <section class="panel" id="folders">
                 <h2>Folders</h2>
                 <div class="field">
                     <span class="label">Folders to scan</span>
@@ -109,6 +109,15 @@
                 }
             </section>
 
+            <section class="panel" id="false-positives">
+                <h2>False positives</h2>
+                <p class="muted" style="margin-bottom:12px">
+                    Videos you marked as "Not a duplicate" in Review are never matched with each other again, even after they are moved or renamed.
+                    @(falsePositiveCount == 0 ? "None are marked yet." : $"{Fmt.Plural(falsePositiveCount, "pair is", "pairs are")} marked.")
+                </p>
+                <a class="button" href="settings/false-positives">Review false positives</a>
+            </section>
+
             <section class="panel" id="encoding">
                 <h2>Re-encoding</h2>
                 <p class="muted" style="margin-bottom:16px">How the Re-encode screen makes smaller copies of large videos. The defaults are the recommended settings.</p>
@@ -144,22 +153,6 @@
         </div>
 
         <aside class="panel preview" aria-live="polite">
-            <h2>With these settings</h2>
-            @if (preview == null)
-            {
-                <p class="muted" style="margin-top:12px">@(previewError ?? "Working out the result...")</p>
-            }
-            else
-            {
-                <div class="big" style="margin-top:12px">@preview.Duplicates.ToString("N0")</div>
-                <div class="muted">duplicates would be found</div>
-                <dl>
-                    <dt>Groups of copies</dt><dd>@preview.Groups.ToString("N0")</dd>
-                    <dt>Broken or short</dt><dd>@preview.Broken.ToString("N0")</dd>
-                    <dt>Space in duplicates</dt><dd>@Fmt.Size(preview.DuplicateBytes)</dd>
-                </dl>
-                <p class="muted" style="font-size:.85rem;margin-bottom:16px">Based on the @preview.VideosInScope.ToString("N0") videos already read in these folders. New videos count after the next scan.</p>
-            }
             <div class="buttons">
                 <button class="primary" @onclick="Save" disabled="@(!dirty)">Save settings</button>
                 <button @onclick="SaveAndCompare" disabled="@App.Scanner.IsRunning" title="Saves, then updates the review with the videos already read">Save and compare again</button>
@@ -189,12 +182,10 @@
     private List<string> contentFolders = new(), excludePaths = new(), priorityFolders = new();
     private List<PathMapping> mappings = new();
     private List<switchPrioritySet> switches = new();
-    private PreviewResult preview;
-    private string previewError;
     private string testPath = "";
     private bool dirty;
     private string savedMessage;
-    private CancellationTokenSource debounce;
+    private int falsePositiveCount;
     // Synonyms (other names for the same place) and their checks
     private List<PathSynonym> synonyms = new();
     private readonly System.Collections.Concurrent.ConcurrentDictionary<PathSynonym, MappingCheck> synChecks = new();
@@ -214,8 +205,7 @@
         priorityFolders = settings.priorityFolders.ToList();
         switches = settings.switchPriority.ToList();
         mappings = PathMapper.Mappings.Select(m => new PathMapping { Windows = m.Windows, Linux = m.Linux }).ToList();
-        SchedulePreview(0);
-        App.DataChanged += OnDataChanged;
+        falsePositiveCount = FalsePositives.Count;
         foreach (var m in mappings) StartCheck(m, 0);
         synonyms = PathMapper.Synonyms.Select(s => new PathSynonym { Main = s.Main, Alias = s.Alias }).ToList();
         foreach (var s in synonyms) StartSynonymCheck(s, 0);
@@ -313,8 +303,6 @@
         });
     }
 
-    private void OnDataChanged() => SchedulePreview(0);
-
     private deepduplicates.Settings Current()
     {
         settings.contentFolders = contentFolders.Where(s => !string.IsNullOrWhiteSpace(s)).ToArray();
@@ -328,7 +316,6 @@
     {
         dirty = true;
         savedMessage = null;
-        SchedulePreview(400);
     }
 
     private void AddSwitch()
@@ -341,29 +328,6 @@
     {
         settings.matchSettings_sameFolder = (bool)e.Value! ? settings.matchSettings.Clone() : null;
         Edited();
-    }
-
-    // Re-runs the comparison on videos already read, a moment after the last change
-    private void SchedulePreview(int delayMs)
-    {
-        debounce?.Cancel();
-        debounce = new CancellationTokenSource();
-        var token = debounce.Token;
-        var snapshot = Current().Clone();
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await Task.Delay(delayMs, token);
-                var result = App.Preview(snapshot);
-                if (token.IsCancellationRequested) return;
-                preview = result;
-                previewError = null;
-            }
-            catch (OperationCanceledException) { return; }
-            catch (Exception ex) { previewError = "Could not work out the result: " + ex.Message; preview = null; }
-            await InvokeAsync(StateHasChanged);
-        });
     }
 
     private void Save()
@@ -390,9 +354,7 @@
 
     public void Dispose()
     {
-        debounce?.Cancel();
         foreach (var run in checkRuns.Values) run.Cancel();
         foreach (var run in synRuns.Values) run.Cancel();
-        App.DataChanged -= OnDataChanged;
     }
 }

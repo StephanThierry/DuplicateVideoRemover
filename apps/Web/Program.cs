@@ -93,6 +93,21 @@ app.MapGet("/shots/{name}", (string name) =>
     return File.Exists(path) ? Results.File(path, "image/png", enableRangeProcessing: false) : Results.NotFound();
 });
 
+// A video from the review, for the player: /video/123. Only videos in the current results are served.
+var videoTypes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+{
+    [".mp4"] = "video/mp4", [".m4v"] = "video/mp4", [".mov"] = "video/quicktime", [".webm"] = "video/webm",
+    [".mkv"] = "video/x-matroska", [".ogv"] = "video/ogg", [".avi"] = "video/x-msvideo", [".wmv"] = "video/x-ms-wmv",
+    [".ts"] = "video/mp2t", [".m2ts"] = "video/mp2t", [".mpg"] = "video/mpeg", [".mpeg"] = "video/mpeg", [".3gp"] = "video/3gpp"
+};
+app.MapGet("/video/{id:int}", (int id) =>
+{
+    var entry = controller.FindEntry(id);
+    if (entry == null || !File.Exists(entry.Path)) return Results.NotFound();
+    var type = videoTypes.TryGetValue(Path.GetExtension(entry.Path), out var t) ? t : "application/octet-stream";
+    return Results.File(entry.Path, type, enableRangeProcessing: true);
+});
+
 // The encoding script made on the Re-encode page: /output/encode_selected.sh or .ps1
 app.MapGet("/output/{name}", (string name) =>
 {

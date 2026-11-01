@@ -103,13 +103,13 @@
                 }
                 else
                 {
-                    <ul>@foreach (var f in App.Settings.contentFolders) { <li>@f</li> }</ul>
+                    <ul class="tags" aria-label="Folders to scan">@foreach (var f in App.Settings.contentFolders) { <li title="@f">@f</li> }</ul>
                 }
                 @if (App.Settings.excludePaths.Length > 0)
                 {
-                    <p class="muted">Skipping paths that contain: @string.Join(", ", App.Settings.excludePaths)</p>
+                    <p class="muted">There @(App.Settings.excludePaths.Length == 1 ? "is" : "are") @Fmt.Plural(App.Settings.excludePaths.Length, "active path filtering rule", "active path filtering rules").</p>
                 }
-                <p style="margin-top:12px"><button class="link" @onclick='() => Nav.NavigateTo("settings")'>Change folders and rules</button></p>
+                <p style="margin-top:12px"><button @onclick='() => Nav.NavigateTo("settings#folders")'>Change folders and rules</button></p>
             </section>
             <section class="panel">
                 <h2>Last scan</h2>

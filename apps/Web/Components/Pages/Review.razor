@@ -40,6 +40,13 @@
             <aside class="folders" aria-label="Folders with duplicates">
                 <h2>Folders</h2>
                 <ul>
+                    <li>
+                        <button class="folder-item @(folderFilter == null ? "active" : "")" @onclick="() => FilterFolder(null)">
+                            <span class="name">All folders</span>
+                            <span class="n num">@folders.Sum(f => f.Count)</span>
+                            @if (Session.SelectedCount > 0) { <span class="sel num">@Session.SelectedCount selected</span> }
+                        </button>
+                    </li>
                     @foreach (var f in folders)
                     {
                         <li>
@@ -98,7 +105,9 @@
                                         @if (m.Id != keepId && !string.IsNullOrEmpty(m.Reason)) { <div class="reason">@CleanReason(m.Reason)</div> }
                                     </div>
                                     <div class="row-actions">
+                                        <button class="icon" @onclick="() => playing = m" title="Play" aria-label="Play @m.FileName">@PlayIcon</button>
                                         @if (m.Id != keepId) { <button @onclick="() => Session.KeepInstead(m.Id)">Keep this one</button> }
+                                        <button @onclick="() => MarkFalsePositive(m.Id)" title="These videos only look alike: take this one out of the group and don't match them again">Not a duplicate</button>
                                     </div>
                                 </div>
                             }
@@ -126,7 +135,9 @@
                                     <div class="meta"><span>@Fmt.Size(b.SizeBytes)</span><span>@Fmt.Duration(b.DurationSeconds)</span></div>
                                     <div class="reason">@CleanReason(b.Reason)</div>
                                 </div>
-                                <div></div>
+                                <div class="row-actions">
+                                    <button class="icon" @onclick="() => playing = b" title="Play" aria-label="Play @b.FileName">@PlayIcon</button>
+                                </div>
                             </div>
                         }
                     </article>
@@ -145,9 +156,10 @@
 
         <div class="actionbar">
             <div class="inner">
-                <div class="count num">
-                    @Fmt.Plural(Session.SelectedCount, "file", "files") selected
-                    <small>@Fmt.Size(Session.SelectedBytes)</small>
+                @{ long selectedBytes = Session.SelectedBytes; }
+                <div class="selection num @(Session.SelectedCount > 0 ? "has" : "")" aria-live="polite">
+                    <span class="size">@Fmt.Size(selectedBytes)</span>
+                    <span class="what">@(Session.SelectedCount == 0 ? "nothing selected for deleting" : $"selected for deleting in {Fmt.Plural(Session.SelectedCount, "file", "files")}")</span>
                 </div>
                 <button class="danger big" style="margin-left:auto" disabled="@(Session.SelectedCount == 0 || busy)" @onclick="() => confirming = true">
                     Delete @Fmt.Plural(Session.SelectedCount, "file", "files")
@@ -157,7 +169,7 @@
     }
 </div>
 
-@if (confirming)
+@if (confirming && !busy)
 {
     <div class="dialog-backdrop" @onclick="() => confirming = false">
         <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" @onclick:stopPropagation="true">
@@ -165,10 +177,27 @@
             <p>@Fmt.Size(Session.SelectedBytes) will be deleted. This can't be undone.</p>
             <div class="buttons">
                 <button @onclick="() => confirming = false">Cancel</button>
-                <button class="danger" @onclick="Execute" disabled="@busy">
-                    @(busy ? "Deleting..." : "Delete permanently")
-                </button>
+                <button class="danger" @onclick="Execute">Delete permanently</button>
             </div>
+        </div>
+    </div>
+}
+
+@if (busy)
+{
+    var dp = deleteProgress;
+    <div class="dialog-backdrop">
+        <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="deleting-title">
+            <h2 id="deleting-title">Deleting files</h2>
+            <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@((int)((dp?.Fraction ?? 0) * 100))" style="margin-top:16px">
+                <div style="width:@(((dp?.Fraction ?? 0) * 100).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))%"></div>
+            </div>
+            <p class="num">
+                @if (dp == null) { <text>Starting...</text> }
+                else if (dp.UpdatingDatabase) { <text>Updating the database...</text> }
+                else { <text>@((dp.Done + 1).ToString("N0")) of @dp.Total.ToString("N0"): @dp.CurrentFile</text> }
+                @if (dp?.Failed > 0) { <br /><span class="fail">@Fmt.Plural(dp.Failed, "file", "files") could not be deleted so far</span> }
+            </p>
         </div>
     </div>
 }
@@ -176,13 +205,42 @@
 @if (report != null && report.Failed.Count > 0 && showFailures)
 {
     <div class="dialog-backdrop" @onclick="() => showFailures = false">
-        <div class="dialog wide" role="dialog" aria-modal="true" @onclick:stopPropagation="true">
-            <h2>@Fmt.Plural(report.Failed.Count, "file was", "files were") not removed</h2>
-            <p>They are still selected. Close any program using them, check that you may change the folder, and try again.</p>
-            <ul class="failures">
-                @foreach (var f in report.Failed) { <li><strong>@f.Entry.Path</strong><br />@f.Error</li> }
-            </ul>
+        <div class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="fail-title" @onclick:stopPropagation="true">
+            <h2 id="fail-title">@Fmt.Plural(report.Failed.Count, "file was", "files were") not deleted</h2>
+            <p>
+                @if (report.Removed.Count > 0) { <text>Deleted @Fmt.Plural(report.Removed.Count, "file", "files") (@Fmt.Size(report.BytesFreed)). </text> }
+                The files below are still selected. Close any program using them, check that you may change the folder, and try again.
+            </p>
+            <div class="failures">
+                <table>
+                    <thead><tr><th>File</th><th>Reason</th></tr></thead>
+                    <tbody>
+                        @foreach (var f in report.Failed)
+                        {
+                            <tr><td><strong>@f.Entry.FileName</strong><br /><span class="muted">@f.Entry.Folder</span></td><td>@f.Error</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
             <div class="buttons"><button class="primary" @onclick="() => showFailures = false">Close</button></div>
+        </div>
+    </div>
+}
+
+@if (playing != null)
+{
+    var ext = System.IO.Path.GetExtension(playing.Path).ToLowerInvariant();
+    <div class="dialog-backdrop" @onclick="() => playing = null">
+        <div class="dialog player" role="dialog" aria-modal="true" aria-labelledby="player-title" @onclick:stopPropagation="true">
+            <div class="player-head">
+                <h2 id="player-title">@playing.FileName</h2>
+                <button @onclick="() => playing = null">Close</button>
+            </div>
+            <video src="video/@playing.Id" controls autoplay preload="metadata" @key="playing.Id"></video>
+            <p class="muted">
+                @Fmt.Size(playing.SizeBytes), @Fmt.Duration(playing.DurationSeconds)
+                @if (ext is not (".mp4" or ".m4v" or ".webm" or ".mov" or ".ogv")) { <text> - browsers often can't play @ext files; if nothing shows, </text><a href="video/@playing.Id" target="_blank" rel="noopener">open it in a new tab</a><text> to download it.</text> }
+            </p>
         </div>
     </div>
 }
@@ -207,6 +265,12 @@
     private int shown = PageSize, shownBroken = PageSize * 2;
     private bool confirming, busy, showFailures;
     private ExecuteReport report;
+    private DeleteProgress deleteProgress;
+    private VideoEntry playing;
+    private DateTime lastProgressRender;
+
+    private static readonly RenderFragment PlayIcon =
+        @<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 1.5v11l9-5.5z" fill="currentColor" /></svg>;
     private string toast;
     private CancellationTokenSource toastTimer;
 
@@ -272,17 +336,31 @@
     private async Task Execute()
     {
         busy = true;
+        deleteProgress = null;
         StateHasChanged();
-        report = await Task.Run(App.Execute);
-        busy = false;
-        confirming = false;
+        // Redraw the progress at most ~8 times a second, and always for the last step
+        var progress = new SyncProgress<DeleteProgress>(p =>
+        {
+            deleteProgress = p;
+            if (p.UpdatingDatabase || DateTime.UtcNow - lastProgressRender > TimeSpan.FromMilliseconds(120))
+            {
+                lastProgressRender = DateTime.UtcNow;
+                InvokeAsync(StateHasChanged);
+            }
+        });
+        try { report = await Task.Run(() => App.Execute(progress)); }
+        finally { busy = false; confirming = false; }
         folders = Session.Folders();
         // The folder may be empty now - then show everything again
         if (folderFilter != null && !folders.Any(f => f.Folder == folderFilter)) FilterFolder(null);
         var text = $"Deleted {Fmt.Plural(report.Removed.Count, "file", "files")}, {Fmt.Size(report.BytesFreed)}.";
-        if (report.Failed.Count > 0) text += $" {Fmt.Plural(report.Failed.Count, "file", "files")} could not be removed.";
+        if (report.Failed.Count > 0) text += $" {Fmt.Plural(report.Failed.Count, "file", "files")} could not be deleted.";
+        // Failures are shown straight away, with the reason for each file
+        showFailures = report.Failed.Count > 0;
         ShowToast(text, report.Failed.Count > 0 ? 12000 : 6000);
     }
+
+    private void MarkFalsePositive(int id) => ShowToast(App.MarkFalsePositive(id), 6000);
 
     private void Reanalyze()
     {

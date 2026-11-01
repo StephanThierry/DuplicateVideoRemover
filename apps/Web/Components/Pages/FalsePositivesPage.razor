@@ -1,0 +1,73 @@
+@page "/settings/false-positives"
+@inject AppController App
+
+<PageTitle>False positives</PageTitle>
+
+<div class="page">
+    <div class="page-head">
+        <div>
+            <p class="crumb"><a href="settings">Settings</a> /</p>
+            <h1>False positives</h1>
+            <p>Videos marked as "Not a duplicate" in Review. They are recognised by their content, so a mark still applies after the files are moved or renamed.</p>
+        </div>
+        <a class="button" href="settings">Back to settings</a>
+    </div>
+
+    @if (pairs == null)
+    {
+        <p class="muted">Loading...</p>
+    }
+    else if (pairs.Count == 0)
+    {
+        <div class="empty">
+            <h2>No false positives</h2>
+            <p>When two videos only look alike, use "Not a duplicate" on the Review page. They are listed here.</p>
+        </div>
+    }
+    else
+    {
+        <div class="section-title"><h2>Marked pairs</h2><span>@pairs.Count.ToString("N0")</span></div>
+        @foreach (var p in pairs)
+        {
+            <article class="group fp" @key="p.Pair.Key">
+                <div class="group-head fp-head">
+                    <span>Marked @Fmt.Ago(p.Pair.MarkedUtc), @Fmt.Duration(p.Pair.DurationSeconds) long</span>
+                    <button @onclick="() => Remove(p)" title="These two can be found as duplicates again">Remove</button>
+                </div>
+                @Video(p.NowA, p.PathA, p.Pair.SizeA)
+                @Video(p.NowB, p.PathB, p.Pair.SizeB)
+            </article>
+        }
+        <p class="muted">After removing a pair, use "Compare again" on the Review page to find it again.</p>
+    }
+</div>
+
+@if (toast != null)
+{
+    <div class="toast" role="status">@toast</div>
+}
+
+@code {
+    private List<FalsePositiveDetail> pairs;
+    private string toast;
+
+    protected override async Task OnInitializedAsync() => pairs = await Task.Run(App.FalsePositiveDetails);
+
+    private RenderFragment Video(VideoEntry now, string path, long size) =>
+        @<div class="row fp-row">
+            @if (now != null) { <Strip VideoId="now.Id" Title="@now.FileName" /> } else { <div class="strip-missing">Not in the database</div> }
+            <div class="info">
+                <div class="name">@System.IO.Path.GetFileName(path)</div>
+                <div class="folderlink">@System.IO.Path.GetDirectoryName(path)</div>
+                <div class="meta"><span>@Fmt.Size(now?.SizeBytes ?? size)</span></div>
+            </div>
+        </div>;
+
+    private void Remove(FalsePositiveDetail p)
+    {
+        if (!App.RemoveFalsePositive(p.Pair.Key)) return;
+        pairs.Remove(p);
+        toast = "Removed. Compare again on the Review page to find these two as duplicates again.";
+        _ = Task.Delay(5000).ContinueWith(_ => { toast = null; InvokeAsync(StateHasChanged); });
+    }
+}
