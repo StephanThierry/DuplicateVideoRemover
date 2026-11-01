@@ -87,5 +87,24 @@ if (Environment.GetEnvironmentVariable("SHOT_ENCODE") == "1")
     Console.WriteLine($"x265 crf: {vm.Settings.Encoding.CrfValue} {vm.Settings.Encoding.QualityLabel}");
 }
 vm.SelectedTab = 3; Pump(1500); Shot("d_settings");
-vm.Settings.Match.ShapeMatch = 396; Pump(1500); Shot("d_settings_strict");
-Console.WriteLine("preview strict: " + vm.Settings.PreviewDuplicates);
+vm.SelectedTab = 1; Shot("d_scan_scope");
+vm.Settings.OpenFalsePositivesCommand.Execute(null); vm.SelectedTab = 3; Pump(1500); Shot("d_false_positives");
+vm.Settings.CloseFalsePositivesCommand.Execute(null);
+// SHOT_FP=1: mark a copy as not a duplicate, then check that comparing again leaves it out too
+// (writes falsepositives.json and results.json in the data folder - use a copy)
+if (Environment.GetEnvironmentVariable("SHOT_FP") == "1")
+{
+    vm.SelectedTab = 0;
+    controller.ReanalyzeFromDatabase();
+    bool Together(int a, int b) => controller.Session.Results.Groups.Any(x => x.Members.Any(m => m.Id == a) && x.Members.Any(m => m.Id == b));
+    var g = controller.Session.Results.Groups.First(x => x.Members.Count == 2);
+    var copy = g.Members.First(m => m.Id != controller.Session.KeepId(g));
+    var keptId = controller.Session.KeepId(g);
+    Console.WriteLine($"fp: before marking, grouped together: {Together(copy.Id, keptId)}");
+    Console.WriteLine("fp: " + controller.MarkFalsePositive(copy.Id));
+    Console.WriteLine($"fp: right after marking: {Together(copy.Id, keptId)}");
+    controller.ReanalyzeFromDatabase();
+    Console.WriteLine($"fp: after compare again: {Together(copy.Id, keptId)}, pairs {FalsePositives.Count}");
+    Shot("d_review_after_fp");
+    vm.SelectedTab = 3; vm.Settings.OpenFalsePositivesCommand.Execute(null); Pump(2000); Shot("d_false_positives_one");
+}
