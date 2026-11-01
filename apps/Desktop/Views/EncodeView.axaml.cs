@@ -1,6 +1,7 @@
 using System.IO;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using DuplicateVideoRemover.Desktop.ViewModels;
 
 namespace DuplicateVideoRemover.Desktop.Views;
@@ -17,6 +18,14 @@ public partial class EncodeView : UserControl
                 {
                     var top = TopLevel.GetTopLevel(this);
                     if (top != null) await top.Launcher.LaunchUriAsync(new System.Uri(Path.GetFullPath(folder)));
+                };
+            if (DataContext is EncodeViewModel model)
+                model.CopyText = async text =>
+                {
+                    var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+                    if (clipboard == null) return false;
+                    await clipboard.SetTextAsync(text);
+                    return true;
                 };
         };
     }

@@ -105,6 +105,66 @@
     <Style Selector="Button.icon:pointerover /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Foreground" Value="{DynamicResource AccentHover}"/>
     </Style>
+    <!-- Small buttons in list rows -->
+    <Style Selector="Button.small">
+      <Setter Property="Padding" Value="9,3"/>
+      <Setter Property="FontSize" Value="12"/>
+    </Style>
+    <Style Selector="Button.dangerOutline">
+      <Setter Property="Background" Value="{DynamicResource Sheet}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Grease}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Foreground" Value="{DynamicResource Grease}"/>
+    </Style>
+    <Style Selector="Button.dangerOutline:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource GreaseWash}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Grease}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Grease}"/>
+    </Style>
+
+    <!-- Scrollbars: always shown at full width (Fluent hides them to a hairline), a clear thumb that is easy to
+         grab, and the accent colour while hovered or dragged -->
+    <Style Selector="ScrollViewer">
+      <Setter Property="AllowAutoHide" Value="False"/>
+    </Style>
+    <Style Selector="ScrollBar">
+      <Setter Property="AllowAutoHide" Value="False"/>
+      <Setter Property="Background" Value="{DynamicResource Table}"/>
+    </Style>
+    <Style Selector="ScrollBar:vertical">
+      <Setter Property="Width" Value="16"/>
+      <Setter Property="MinWidth" Value="16"/>
+    </Style>
+    <Style Selector="ScrollBar:horizontal">
+      <Setter Property="Height" Value="16"/>
+      <Setter Property="MinHeight" Value="16"/>
+    </Style>
+    <!-- Fluent draws the scrollbar over the content: keep a gutter free for it in lists and pages -->
+    <Style Selector="ScrollViewer.gutter">
+      <Setter Property="Padding" Value="0,0,20,0"/>
+    </Style>
+    <Style Selector="ListBox.rows">
+      <Setter Property="Padding" Value="0,0,20,0"/>
+    </Style>
+    <Style Selector="ScrollBar /template/ Thumb">
+      <Setter Property="Background" Value="{DynamicResource Muted}"/>
+      <Setter Property="CornerRadius" Value="6"/>
+    </Style>
+    <Style Selector="ScrollBar:vertical /template/ Thumb">
+      <Setter Property="Width" Value="10"/>
+      <Setter Property="MinHeight" Value="40"/>
+    </Style>
+    <Style Selector="ScrollBar:horizontal /template/ Thumb">
+      <Setter Property="Height" Value="10"/>
+      <Setter Property="MinWidth" Value="40"/>
+    </Style>
+    <Style Selector="ScrollBar /template/ Thumb:pointerover /template/ Border">
+      <Setter Property="Background" Value="{DynamicResource Accent}"/>
+    </Style>
+    <Style Selector="ScrollBar /template/ Thumb:pressed /template/ Border">
+      <Setter Property="Background" Value="{DynamicResource AccentPressed}"/>
+    </Style>
+
     <!-- A folder shown as a tag -->
     <Style Selector="Border.tag">
       <Setter Property="Background" Value="{DynamicResource Table}"/>

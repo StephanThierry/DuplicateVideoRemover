@@ -23,6 +23,21 @@ public partial class EncodeViewModel : ObservableObject
     /// <summary>Set by the view: opens a folder in the file manager.</summary>
     public Func<string, Task>? OpenFolder { get; set; }
 
+    /// <summary>Set by the view: puts text on the clipboard (false when there is none).</summary>
+    public Func<string, Task<bool>>? CopyText { get; set; }
+
+    // Folders hidden with "Exclude folder", until "Unhide folders"
+    private readonly HashSet<string> hidden = new(StringComparer.OrdinalIgnoreCase);
+    private System.Threading.CancellationTokenSource? toastTimer;
+    [ObservableProperty] private bool hasHidden;
+    [ObservableProperty] private string unhideText = "";
+    [ObservableProperty] private string? toast;
+    // "Delete" confirmation for one video
+    [ObservableProperty] private EncodeRow? deleting;
+    [ObservableProperty] private string deleteTitle = "";
+    [ObservableProperty] private string deleteText = "";
+    public bool DeleteVisible => Deleting != null;
+
     [ObservableProperty] private string settingsSummary = "";
     [ObservableProperty] private string qualitySummary = "";
     [ObservableProperty] private string search = "";
@@ -65,7 +80,7 @@ public partial class EncodeViewModel : ObservableObject
         Loading = true;
         var picked = all.Where(r => r.IsPicked).Select(r => r.Candidate.Id).ToHashSet();
         var candidates = await Task.Run(app.EncodeCandidates);
-        all = candidates.Select(c => new EncodeRow(c, picked.Contains(c.Id), EncodeEstimator.EstimatedBytes(c, e, target), UpdatePicked)).ToList();
+        all = candidates.Select(c => new EncodeRow(c, picked.Contains(c.Id), EncodeEstimator.EstimatedBytes(c, e, target), UpdatePicked, this)).ToList();
         anchor = null;
         HasVideos = all.Count > 0;
         Loading = false;
@@ -73,7 +88,7 @@ public partial class EncodeViewModel : ObservableObject
     }
 
     private IEnumerable<EncodeRow> Visible() => all.Where(r =>
-        r.Candidate.AverageKbps >= (double)MinKbps &&
+        r.Candidate.AverageKbps >= (double)MinKbps && !hidden.Contains(r.Candidate.Folder) &&
         (string.IsNullOrWhiteSpace(Search) || r.Candidate.Path.Contains(Search.Trim(), StringComparison.OrdinalIgnoreCase)));
 
     private void Filter()
@@ -133,6 +148,79 @@ public partial class EncodeViewModel : ObservableObject
 
     [RelayCommand] private void CancelCreate() => ConfirmVisible = false;
 
+    // --- Per video: exclude its folder, copy its path, delete it ---
+
+    /// <summary>Hides every video in the folder (they are unpicked, so the script only holds what can be seen).</summary>
+    internal void HideFolder(EncodeRow row)
+    {
+        string folder = row.Candidate.Folder;
+        hidden.Add(folder);
+        foreach (var r in all.Where(r => string.Equals(r.Candidate.Folder, folder, StringComparison.OrdinalIgnoreCase))) r.IsPicked = false;
+        UpdateHidden();
+        Filter();
+        ShowToast($"Hid the videos in {folder}.");
+    }
+
+    [RelayCommand]
+    private void UnhideFolders()
+    {
+        hidden.Clear();
+        UpdateHidden();
+        Filter();
+    }
+
+    private void UpdateHidden()
+    {
+        HasHidden = hidden.Count > 0;
+        UnhideText = $"Unhide folders ({hidden.Count})";
+    }
+
+    internal async Task CopyPath(EncodeRow row)
+    {
+        try
+        {
+            bool ok = CopyText != null && await CopyText(row.Candidate.Path);
+            ShowToast(ok ? "Copied: " + row.Candidate.Path : "Could not reach the clipboard.");
+        }
+        catch (Exception e) { ShowToast("Could not copy: " + e.Message); }
+    }
+
+    partial void OnDeletingChanged(EncodeRow? value) => OnPropertyChanged(nameof(DeleteVisible));
+
+    internal void AskDelete(EncodeRow row)
+    {
+        Deleting = row;
+        DeleteTitle = "Delete this video permanently?";
+        DeleteText = $"{row.FileName}\n{row.Folder}\n{row.Size} will be deleted. This can't be undone.";
+    }
+
+    [RelayCommand] private void CancelDelete() => Deleting = null;
+
+    [RelayCommand]
+    private void ConfirmDelete()
+    {
+        var row = Deleting;
+        Deleting = null;
+        if (row == null) return;
+        var error = app.DeleteVideoFile(row.Candidate.Id, row.Candidate.Path);
+        if (error != null) { ShowToast($"Could not delete {row.FileName}: {error}", 10000); return; }
+        row.IsPicked = false;
+        all.Remove(row);
+        Rows.Remove(row);
+        HasVideos = all.Count > 0;
+        UpdatePicked();
+        ShowToast($"Deleted {row.FileName} ({row.Size}).");
+    }
+
+    private void ShowToast(string text, int ms = 4000)
+    {
+        Toast = text;
+        toastTimer?.Cancel();
+        toastTimer = new System.Threading.CancellationTokenSource();
+        var token = toastTimer.Token;
+        Task.Delay(ms, token).ContinueWith(t => { if (!t.IsCanceled) Dispatcher.UIThread.Post(() => Toast = null); });
+    }
+
     [RelayCommand]
     private void Create()
     {
@@ -140,8 +228,22 @@ public partial class EncodeViewModel : ObservableObject
         // In list order: highest bitrate first
         var videos = all.Where(r => r.IsPicked).Select(r => r.Candidate).ToList();
         if (videos.Count == 0) return;
-        ScriptPath = app.WriteEncodeScript(videos);
-        ResultText = $"Created a script for {Fmt.Plural(videos.Count, "video", "videos")}: {ScriptPath}";
+        var result = app.WriteEncodeScript(videos);
+        // Files that are gone since the scan are left out of the script and the list
+        foreach (var gone in result.Missing.Select(m => all.FirstOrDefault(r => r.Candidate.Id == m.Id)).Where(r => r != null).ToList())
+        {
+            gone!.IsPicked = false;
+            all.Remove(gone);
+            Rows.Remove(gone);
+        }
+        string missingText = result.Missing.Count == 0 ? "" : $" {Fmt.Plural(result.Missing.Count, "file was", "files were")} not found any more and left out.";
+        if (result.Path == null)
+        {
+            ShowToast("No script created:" + missingText, 10000);
+            return;
+        }
+        ScriptPath = result.Path;
+        ResultText = $"Created a script for {Fmt.Plural(result.Videos, "video", "videos")}: {ScriptPath}.{missingText}";
         RunText = (ScriptFile.IsWindows ? $"Run it with: powershell -ExecutionPolicy Bypass -File \"{ScriptPath}\"" : $"Run it with: sh \"{ScriptPath}\"")
                   + ". The new files are saved next to the originals, which are not changed.";
     }
@@ -187,13 +289,20 @@ public partial class EncodeRow : ObservableObject
 
     [ObservableProperty] private bool isPicked;
 
-    public EncodeRow(EncodeCandidate candidate, bool picked, long estimatedBytes, Action changed)
+    private readonly EncodeViewModel owner;
+
+    public EncodeRow(EncodeCandidate candidate, bool picked, long estimatedBytes, Action changed, EncodeViewModel owner)
     {
         Candidate = candidate;
         isPicked = picked;
         EstimatedBytes = estimatedBytes;
         this.changed = changed;
+        this.owner = owner;
     }
 
     partial void OnIsPickedChanged(bool value) => changed();
+
+    [RelayCommand] private void ExcludeFolder() => owner.HideFolder(this);
+    [RelayCommand] private Task CopyPath() => owner.CopyPath(this);
+    [RelayCommand] private void Delete() => owner.AskDelete(this);
 }

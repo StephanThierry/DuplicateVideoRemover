@@ -5,7 +5,7 @@
              xmlns:sys="using:System"
              x:Class="DuplicateVideoRemover.Desktop.Views.ScanView"
              x:DataType="vm:ScanViewModel">
-  <ScrollViewer>
+  <ScrollViewer Classes="gutter">
     <Grid RowDefinitions="Auto,*" Margin="12,16,12,12">
       <DockPanel Grid.Row="0" Margin="0,0,0,16">
         <Panel DockPanel.Dock="Right" VerticalAlignment="Bottom">

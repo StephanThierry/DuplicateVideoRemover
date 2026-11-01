@@ -40,7 +40,9 @@
     <WrapPanel Grid.Row="3" Margin="0,0,0,10" IsVisible="{Binding HasVideos}">
       <Button Content="Select all" Command="{Binding SelectAllCommand}" Margin="0,0,8,6"/>
       <Button Content="Select top 20" Command="{Binding SelectTopCommand}" Margin="0,0,8,6"/>
-      <Button Content="Select none" Command="{Binding SelectNoneCommand}" IsEnabled="{Binding HasPicked}" Margin="0,0,16,6"/>
+      <Button Content="Select none" Command="{Binding SelectNoneCommand}" IsEnabled="{Binding HasPicked}" Margin="0,0,8,6"/>
+      <Button Content="{Binding UnhideText}" Command="{Binding UnhideFoldersCommand}" IsVisible="{Binding HasHidden}" Margin="0,0,8,6"/>
+      <Panel Width="8"/>
       <TextBlock Text="Only above" VerticalAlignment="Center" Margin="0,0,6,6"/>
       <NumericUpDown Value="{Binding MinKbps}" Minimum="0" Increment="500" FormatString="0" Width="140" Margin="0,0,6,6"/>
       <TextBlock Text="kbit/s" VerticalAlignment="Center" Margin="0,0,16,6"/>
@@ -57,7 +59,7 @@
 
     <Border Grid.Row="4" BorderBrush="{DynamicResource Rule}" BorderThickness="1" CornerRadius="6" ClipToBounds="True" IsVisible="{Binding HasVideos}">
       <DockPanel>
-        <Border DockPanel.Dock="Top" Background="{DynamicResource Table}" Padding="12,6">
+        <Border DockPanel.Dock="Top" Background="{DynamicResource Table}" Padding="12,6,32,6">
           <Grid ColumnDefinitions="32,316,*,120,90,160">
             <TextBlock Grid.Column="2" Text="Video" Classes="muted small" FontWeight="SemiBold"/>
             <TextBlock Grid.Column="3" Text="Bitrate" Classes="muted small" FontWeight="SemiBold" HorizontalAlignment="Right"/>
@@ -83,6 +85,12 @@
                     <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                     <TextBlock Text="{Binding Folder}" Classes="muted small" TextTrimming="CharacterEllipsis"/>
                     <TextBlock Text="{Binding Length}" Classes="muted small"/>
+                    <!-- Buttons take the click, so they don't pick the row -->
+                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
+                      <Button Classes="small" Content="Exclude folder" Command="{Binding ExcludeFolderCommand}" ToolTip.Tip="{Binding Folder, StringFormat='Hide every video in {0}'}"/>
+                      <Button Classes="small" Content="Copy path" Command="{Binding CopyPathCommand}" ToolTip.Tip="Copy the full path"/>
+                      <Button Classes="small dangerOutline" Content="Delete" Command="{Binding DeleteCommand}" ToolTip.Tip="Delete this file"/>
+                    </StackPanel>
                   </StackPanel>
                   <TextBlock Grid.Column="3" Text="{Binding Bitrate}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                   <TextBlock Grid.Column="4" Text="{Binding Size}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
@@ -107,6 +115,27 @@
         </StackPanel>
       </DockPanel>
     </Border>
+
+    <!-- Toast -->
+    <Border Grid.Row="4" Grid.RowSpan="2" IsVisible="{Binding Toast, Converter={x:Static ObjectConverters.IsNotNull}}"
+            Background="{DynamicResource Ink}" CornerRadius="4" Padding="14,10" Margin="0,0,0,80"
+            HorizontalAlignment="Center" VerticalAlignment="Bottom" MaxWidth="680">
+      <TextBlock Text="{Binding Toast}" Foreground="{DynamicResource Sheet}" TextWrapping="Wrap"/>
+    </Border>
+
+    <!-- Confirmation before deleting one video -->
+    <Grid Grid.RowSpan="6" Margin="-12,-16,-12,0" Background="#80000000" IsVisible="{Binding DeleteVisible}">
+      <Border Classes="panel" Width="560" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
+        <StackPanel Spacing="12">
+          <TextBlock Classes="h2" Text="{Binding DeleteTitle}" TextWrapping="Wrap"/>
+          <TextBlock Classes="muted" Text="{Binding DeleteText}" TextWrapping="Wrap"/>
+          <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="Cancel" Command="{Binding CancelDeleteCommand}"/>
+            <Button Classes="danger" Content="Delete permanently" Command="{Binding ConfirmDeleteCommand}"/>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Grid>
 
     <!-- Confirmation before the script is written -->
     <Grid Grid.RowSpan="6" Margin="-12,-16,-12,0" Background="#80000000" IsVisible="{Binding ConfirmVisible}">

@@ -70,7 +70,7 @@
       <!-- Folders -->
       <DockPanel Grid.Column="0" Margin="0,0,20,0">
         <TextBlock DockPanel.Dock="Top" Classes="h2" Text="Folders" Margin="0,0,0,8"/>
-        <ScrollViewer>
+        <ScrollViewer Classes="gutter">
           <ItemsControl ItemsSource="{Binding Folders}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:FolderItem">
@@ -233,7 +233,7 @@
             <TextBlock Grid.Column="1" Classes="muted small" Text="Reason" FontWeight="SemiBold"/>
           </Grid>
           <Button DockPanel.Dock="Bottom" Classes="primary" Content="Close" Command="{Binding CloseFailuresCommand}" HorizontalAlignment="Right" Margin="0,12,0,0"/>
-          <ScrollViewer>
+          <ScrollViewer Classes="gutter">
             <ItemsControl ItemsSource="{Binding Failures}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="core:ExecuteFailure">
