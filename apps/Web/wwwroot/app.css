@@ -332,3 +332,16 @@ button.icon:hover:not(:disabled) { border-color: var(--accent); background: var(
 }
 @keyframes stripe { to { background-position: 34px 0; } }
 @media (prefers-reduced-motion: reduce) { .bar.unknown > div { animation: none; } }
+
+/* ---------- All files ---------- */
+.toolbar input.files-search { flex: 1 1 360px; font-size: 1.05rem; padding: 9px 12px; }
+.files-list { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius-sheet); overflow: hidden; }
+.file-row { display: grid; grid-template-columns: auto 34px 1fr; gap: 14px; align-items: center; padding: 10px 14px; }
+.file-row + .file-row { border-top: 1px solid var(--rule); }
+/* The screenshots at the size they are stored */
+.strip.full img { width: 240px; height: 160px; }
+.strip.full { cursor: default; }
+@media (max-width: 960px) {
+  .file-row { grid-template-columns: 1fr; }
+  .strip.full img { width: calc((100vw - 80px) / 3); height: auto; aspect-ratio: 3 / 2; }
+}

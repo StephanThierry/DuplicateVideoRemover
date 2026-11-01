@@ -84,7 +84,7 @@ if (Environment.GetEnvironmentVariable("SHOT_ENCODE") == "1")
     vm.Encode.AskCreateCommand.Execute(null); Shot("d_encode_confirm");
     vm.Encode.CreateCommand.Execute(null); Pump(300);
     Console.WriteLine("encode: " + vm.Encode.ResultText);
-    vm.SelectedTab = 3; Pump(1200);
+    vm.SelectedTab = MainViewModel.SettingsTab; Pump(1200);
     var editor = window.GetVisualDescendants().OfType<EncodeSettingsEditor>().First();
     var scroller = editor.GetVisualAncestors().OfType<Avalonia.Controls.ScrollViewer>().First();
     var pos = editor.TranslatePoint(new Avalonia.Point(0, 0), scroller.Content as Avalonia.Visual ?? scroller) ?? new Avalonia.Point(0, 0);
@@ -95,9 +95,9 @@ if (Environment.GetEnvironmentVariable("SHOT_ENCODE") == "1")
     Shot("d_enc_settings");
     Console.WriteLine($"x265 crf: {vm.Settings.Encoding.CrfValue} {vm.Settings.Encoding.QualityLabel}");
 }
-vm.SelectedTab = 3; Pump(1500); Shot("d_settings");
+vm.SelectedTab = MainViewModel.SettingsTab; Pump(1500); Shot("d_settings");
 vm.SelectedTab = 1; Shot("d_scan_scope");
-vm.Settings.OpenFalsePositivesCommand.Execute(null); vm.SelectedTab = 3; Pump(1500); Shot("d_false_positives");
+vm.Settings.OpenFalsePositivesCommand.Execute(null); vm.SelectedTab = MainViewModel.SettingsTab; Pump(1500); Shot("d_false_positives");
 vm.Settings.CloseFalsePositivesCommand.Execute(null);
 // SHOT_FP=1: mark a copy as not a duplicate, then check that comparing again leaves it out too
 // (writes falsepositives.json and results.json in the data folder - use a copy)
@@ -115,7 +115,7 @@ if (Environment.GetEnvironmentVariable("SHOT_FP") == "1")
     controller.ReanalyzeFromDatabase();
     Console.WriteLine($"fp: after compare again: {Together(copy.Id, keptId)}, pairs {FalsePositives.Count}");
     Shot("d_review_after_fp");
-    vm.SelectedTab = 3; vm.Settings.OpenFalsePositivesCommand.Execute(null); Pump(2000); Shot("d_false_positives_one");
+    vm.SelectedTab = MainViewModel.SettingsTab; vm.Settings.OpenFalsePositivesCommand.Execute(null); Pump(2000); Shot("d_false_positives_one");
 }
 // SHOT_PHASES=1: the scan screen with made-up progress (both phases), without running a scan
 if (Environment.GetEnvironmentVariable("SHOT_PHASES") == "1")
@@ -162,4 +162,24 @@ if (Environment.GetEnvironmentVariable("SHOT_READONLY") == "1")
     File.SetAttributes(ro, FileAttributes.ReadOnly);
     try { VideoFile.Delete(ro); Console.WriteLine("read-only delete: " + (File.Exists(ro) ? "still there" : "deleted")); }
     catch (Exception e) { Console.WriteLine("read-only delete failed: " + e.Message); }
+}
+// SHOT_FILES=1: the All files screen, a search, and how long searching takes over all files
+if (Environment.GetEnvironmentVariable("SHOT_FILES") == "1")
+{
+    vm.SelectedTab = MainViewModel.FilesTab; Pump(500);
+    var start = DateTime.UtcNow;
+    while ((vm.Files.Loading || vm.Files.Rows.Count == 0) && DateTime.UtcNow - start < TimeSpan.FromMinutes(5)) Pump(200);
+    Console.WriteLine($"all files: {vm.Files.ResultText} after {(DateTime.UtcNow - start).TotalSeconds:0} s");
+    Shot("d_files");
+    var index = controller.AllFiles();
+    foreach (var q in new[] { "dji", "dji 2024 -0002", "\"lisa mc\" -cirkler", "mp4 -dji -3xfeed", "xyz-nothing" })
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        int n = 0;
+        for (int r = 0; r < 20; r++) n = index.Search(q).Count;
+        Console.WriteLine($"search '{q}': {n:N0} of {index.Count:N0} in {sw.Elapsed.TotalMilliseconds / 20:0.0} ms");
+    }
+    vm.Files.Search = "dji 2024 -0002"; Pump(800);
+    Console.WriteLine($"after typing: {vm.Files.ResultText}");
+    Shot("d_files_search");
 }

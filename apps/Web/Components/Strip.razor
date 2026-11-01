@@ -1,5 +1,5 @@
 @* Three screenshots of a video as a film strip. Crossed out in red when picked for removal. *@
-<div class="strip" @onclick="OnClick" title="@Title">
+<div class="strip @(Full ? "full" : "")" @onclick="OnClick" title="@Title">
     @for (int i = 1; i <= 3; i++)
     {
         <img loading="lazy" src="shots/@(VideoId)_@(i).png" alt="" onerror="this.classList.add('missing')" />
@@ -14,4 +14,6 @@
     [Parameter] public int VideoId { get; set; }
     [Parameter] public string Title { get; set; } = "";
     [Parameter] public EventCallback OnClick { get; set; }
+    /// <summary>The screenshots at the size they are stored (240 x 160) instead of half size.</summary>
+    [Parameter] public bool Full { get; set; }
 }

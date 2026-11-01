@@ -1,0 +1,108 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DuplicateVideoRemover.Desktop.ViewModels"
+             x:Class="DuplicateVideoRemover.Desktop.Views.AllFilesView"
+             x:DataType="vm:AllFilesViewModel">
+  <UserControl.Styles>
+    <!-- The list is for reading and buttons, not for selecting rows -->
+    <Style Selector="ListBox.rows ListBoxItem"><Setter Property="Padding" Value="0"/></Style>
+    <Style Selector="ListBox.rows ListBoxItem:selected /template/ ContentPresenter"><Setter Property="Background" Value="Transparent"/></Style>
+    <Style Selector="ListBox.rows ListBoxItem:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="Transparent"/></Style>
+    <Style Selector="Border.filerow">
+      <Setter Property="Background" Value="{DynamicResource Sheet}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Rule}"/>
+      <Setter Property="BorderThickness" Value="0,0,0,1"/>
+      <Setter Property="Padding" Value="12,10"/>
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,*" Margin="12,16,12,0">
+    <StackPanel Grid.Row="0" Margin="0,0,0,12">
+      <TextBlock Classes="h1" Text="All files"/>
+      <TextBlock Classes="muted" TextWrapping="Wrap" Margin="0,4,0,0"
+                 Text="Every video the last scan found. Search: all words must be in the path, -word leaves out paths with that word, &quot;two words&quot; searches a phrase. Not case sensitive."/>
+    </StackPanel>
+
+    <DockPanel Grid.Row="1" Margin="0,0,0,10" IsVisible="{Binding HasFiles}">
+      <TextBlock DockPanel.Dock="Right" Text="{Binding ResultText}" Classes="muted" VerticalAlignment="Center" Margin="12,0,0,0"/>
+      <Button DockPanel.Dock="Right" Content="{Binding UnhideText}" Command="{Binding UnhideFoldersCommand}" IsVisible="{Binding HasHidden}" Margin="8,0,0,0"/>
+      <TextBox Text="{Binding Search}" PlaceholderText="e.g. vacation lisbon 2026 -ocean" FontSize="15" x:Name="SearchBox"/>
+    </DockPanel>
+
+    <TextBlock Grid.Row="2" Text="Loading the files..." Classes="muted" IsVisible="{Binding Loading}" VerticalAlignment="Top"/>
+
+    <Border Grid.Row="2" Classes="panel" Padding="40" VerticalAlignment="Top" IsVisible="{Binding !HasFiles}">
+      <StackPanel HorizontalAlignment="Center" Spacing="10">
+        <TextBlock Classes="h2" Text="No files yet" HorizontalAlignment="Center"/>
+        <TextBlock Classes="muted" Text="Scan your folders first. The files the scan finds are listed here." HorizontalAlignment="Center"/>
+        <Button Classes="primary" Content="Go to scan" Command="{Binding GoToScanCommand}" HorizontalAlignment="Center"/>
+      </StackPanel>
+    </Border>
+
+    <TextBlock Grid.Row="2" Text="No path contains all the words of the search." Classes="muted" VerticalAlignment="Top"
+               IsVisible="{Binding !HasMatches}"/>
+
+    <Border Grid.Row="2" BorderBrush="{DynamicResource Rule}" BorderThickness="1" CornerRadius="6" ClipToBounds="True" Margin="0,0,0,12">
+      <Border.IsVisible>
+        <MultiBinding Converter="{x:Static BoolConverters.And}">
+          <Binding Path="HasFiles"/>
+          <Binding Path="HasMatches"/>
+        </MultiBinding>
+      </Border.IsVisible>
+      <!-- Virtualized: only the rows on screen exist and load their screenshots -->
+      <ListBox Classes="rows" ItemsSource="{Binding Rows}" Background="Transparent">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:FileRow">
+            <Border Classes="filerow">
+              <Grid ColumnDefinitions="Auto,48,*" ColumnSpacing="12">
+                <!-- The screenshots at the size they are stored (240 x 160) -->
+                <Border Background="{DynamicResource Frame}" CornerRadius="3" Padding="4">
+                  <StackPanel Orientation="Horizontal" Spacing="3">
+                    <Image Source="{Binding Shot1}" Width="240" Height="160" Stretch="UniformToFill"/>
+                    <Image Source="{Binding Shot2}" Width="240" Height="160" Stretch="UniformToFill"/>
+                    <Image Source="{Binding Shot3}" Width="240" Height="160" Stretch="UniformToFill"/>
+                  </StackPanel>
+                </Border>
+                <Button Grid.Column="1" Classes="icon" Command="{Binding PlayCommand}" ToolTip.Tip="Play (opens the default player)"
+                        VerticalAlignment="Center" HorizontalAlignment="Center">
+                  <Path Data="M3,1.5 L3,12.5 L12,7 Z" Fill="{Binding $parent[Button].Foreground}" Width="14" Height="14"/>
+                </Button>
+                <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="3">
+                  <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                  <TextBlock Text="{Binding Folder}" Classes="muted small" TextWrapping="Wrap"/>
+                  <TextBlock Text="{Binding Meta}" Classes="muted small"/>
+                  <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
+                    <Button Classes="small" Content="Exclude folder" Command="{Binding ExcludeFolderCommand}" ToolTip.Tip="{Binding Folder, StringFormat='Hide every video in {0}'}"/>
+                    <Button Classes="small" Content="Copy path" Command="{Binding CopyPathCommand}" ToolTip.Tip="Copy the full path"/>
+                    <Button Classes="small dangerOutline" Content="Delete" Command="{Binding DeleteCommand}" ToolTip.Tip="Delete this file"/>
+                  </StackPanel>
+                </StackPanel>
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </Border>
+
+    <!-- Toast -->
+    <Border Grid.Row="2" IsVisible="{Binding Toast, Converter={x:Static ObjectConverters.IsNotNull}}"
+            Background="{DynamicResource Ink}" CornerRadius="4" Padding="14,10" Margin="0,0,0,30"
+            HorizontalAlignment="Center" VerticalAlignment="Bottom" MaxWidth="680">
+      <TextBlock Text="{Binding Toast}" Foreground="{DynamicResource Sheet}" TextWrapping="Wrap"/>
+    </Border>
+
+    <!-- Confirmation before deleting one video -->
+    <Grid Grid.RowSpan="3" Margin="-12,-16,-12,0" Background="#80000000" IsVisible="{Binding DeleteVisible}">
+      <Border Classes="panel" Width="560" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
+        <StackPanel Spacing="12">
+          <TextBlock Classes="h2" Text="Delete this video permanently?" TextWrapping="Wrap"/>
+          <TextBlock Classes="muted" Text="{Binding DeleteText}" TextWrapping="Wrap"/>
+          <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="Cancel" Command="{Binding CancelDeleteCommand}"/>
+            <Button Classes="danger" Content="Delete permanently" Command="{Binding ConfirmDeleteCommand}"/>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

@@ -23,6 +23,7 @@ namespace deepduplicates
     {
         private List<VideoInfo> cachedMedia;
         private List<VideoInfo> currentMedia;
+        private FileIndex fileIndex;
         private readonly object cacheLock = new();
 
         public string DataFolder { get; }
@@ -109,6 +110,15 @@ namespace deepduplicates
             InvalidateCache();
             DataChanged?.Invoke();
             return report;
+        }
+
+        /// <summary>
+        /// Every video the last scan found (the All files screen), indexed for searching. Built once and kept
+        /// until the data changes; the database's dormant rows are left out (see CurrentMedia).
+        /// </summary>
+        public FileIndex AllFiles()
+        {
+            lock (cacheLock) return fileIndex ??= new FileIndex(CurrentMedia().Where(v => !string.IsNullOrEmpty(v.path)).Select(VideoEntry.From));
         }
 
         /// <summary>A video in the current results or found by the last scan (for playing it), or null.</summary>
@@ -248,7 +258,7 @@ namespace deepduplicates
 
         private void InvalidateCache()
         {
-            lock (cacheLock) { cachedMedia = null; currentMedia = null; }
+            lock (cacheLock) { cachedMedia = null; currentMedia = null; fileIndex = null; }
         }
 
         private void ReplaceSession(ResultSet results)

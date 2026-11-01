@@ -1,0 +1,197 @@
+@page "/files"
+@implements IDisposable
+@inject AppController App
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>All files</PageTitle>
+
+<div class="page">
+    <div class="page-head">
+        <div>
+            <h1>All files</h1>
+            <p>Every video the last scan found. Search: all words must be in the path, <code>-word</code> leaves out paths with that word, <code>"two words"</code> searches a phrase. Not case sensitive.</p>
+        </div>
+    </div>
+
+    @if (index == null)
+    {
+        <p class="muted">Loading the files...</p>
+    }
+    else if (index.Count == 0)
+    {
+        <div class="empty">
+            <h2>No files yet</h2>
+            <p>Scan your folders first. The files the scan finds are listed here.</p>
+            <button class="primary big" @onclick='() => Nav.NavigateTo("scan")'>Go to scan</button>
+        </div>
+    }
+    else
+    {
+        <div class="toolbar">
+            <input type="search" class="files-search" placeholder='e.g. vacation lisbon 2026 -ocean' value="@search" @oninput="OnSearch"
+                   aria-label="Search in the file paths" autofocus />
+            @if (hidden.Count > 0)
+            {
+                <button @onclick="Unhide" title="@string.Join("\n", hidden)">Unhide folders (@hidden.Count)</button>
+            }
+            <span class="muted num">@ResultText()</span>
+        </div>
+
+        @if (matches.Count == 0)
+        {
+            <div class="empty"><h2>No matches</h2><p>No path contains all the words@(query.Exclude.Length > 0 ? " without the left-out ones" : "").</p></div>
+        }
+        else
+        {
+            <div class="files-list">
+                @foreach (var f in matches.Take(shown))
+                {
+                    <article class="file-row" @key="f.Id">
+                        <Strip VideoId="f.Id" Full="true" Title="@f.FileName" />
+                        <button class="icon" @onclick="() => playing = f" title="Play" aria-label="Play @f.FileName">@VideoPlayer.Icon</button>
+                        <div class="info">
+                            <div class="name">@f.FileName</div>
+                            <div class="folderlink">@f.Folder</div>
+                            <div class="meta"><span>@Fmt.Size(f.SizeBytes)</span><span>@Fmt.Duration(f.DurationSeconds)</span><span>@Fmt.Bitrate(f.Bitrate)</span></div>
+                            <div class="enc-actions">
+                                <button class="small" @onclick="() => HideFolder(f.Folder)" title="Hide every video in @f.Folder">Exclude folder</button>
+                                <button class="small" @onclick="() => CopyPath(f)" title="Copy the full path">Copy path</button>
+                                <button class="small danger-outline" @onclick="() => deleting = f" title="Delete this file">Delete</button>
+                            </div>
+                        </div>
+                    </article>
+                }
+            </div>
+            @if (matches.Count > shown)
+            {
+                <div class="more"><button @onclick="() => shown += PageSize">Show @Math.Min(PageSize, matches.Count - shown) more</button></div>
+            }
+        }
+    }
+</div>
+
+<VideoPlayer Video="playing" OnClose="() => playing = null" />
+
+@if (deleting != null)
+{
+    <div class="dialog-backdrop" @onclick="() => deleting = null">
+        <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="files-del" @onclick:stopPropagation="true">
+            <h2 id="files-del">Delete this video permanently?</h2>
+            <p><strong>@deleting.FileName</strong><br />@deleting.Folder<br />@Fmt.Size(deleting.SizeBytes) will be deleted. This can't be undone.</p>
+            <div class="buttons">
+                <button @onclick="() => deleting = null">Cancel</button>
+                <button class="danger" @onclick="DeleteFile">Delete permanently</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (toast != null)
+{
+    <div class="toast" role="status">@toast</div>
+}
+
+@code {
+    private const int PageSize = 50;
+    private FileIndex index;
+    private List<VideoEntry> matches = new();
+    private SearchQuery query = SearchQuery.Parse("");
+    private string search = "";
+    private int shown = PageSize;
+    private readonly HashSet<string> hidden = new(StringComparer.OrdinalIgnoreCase);   // "Exclude folder"
+    private readonly HashSet<int> deleted = new();
+    private VideoEntry playing, deleting;
+    private string toast;
+    private CancellationTokenSource debounce, toastTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        App.DataChanged += OnDataChanged;
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        index = await Task.Run(App.AllFiles);
+        Filter();
+    }
+
+    private void OnDataChanged() => InvokeAsync(async () => { await Load(); StateHasChanged(); });
+
+    // Searches a moment after the last key press, not on every key
+    private void OnSearch(ChangeEventArgs e)
+    {
+        search = e.Value?.ToString() ?? "";
+        debounce?.Cancel();
+        debounce = new CancellationTokenSource();
+        var token = debounce.Token;
+        _ = Task.Delay(150, token).ContinueWith(t =>
+        {
+            if (t.IsCanceled) return;
+            InvokeAsync(() => { Filter(); StateHasChanged(); });
+        });
+    }
+
+    private void Filter()
+    {
+        if (index == null) return;
+        query = SearchQuery.Parse(search);
+        matches = index.Search(query, f => !hidden.Contains(f.Folder) && !deleted.Contains(f.Id));
+        shown = PageSize;
+    }
+
+    private string ResultText()
+    {
+        string n = query.IsEmpty && hidden.Count == 0 ? $"{index.Count - deleted.Count:N0} files" : $"{matches.Count:N0} of {index.Count - deleted.Count:N0} files";
+        return n;
+    }
+
+    private void HideFolder(string folder)
+    {
+        hidden.Add(folder);
+        Filter();
+        ShowToast($"Hid the videos in {folder}.");
+    }
+
+    private void Unhide() { hidden.Clear(); Filter(); }
+
+    private async Task CopyPath(VideoEntry f)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("dvr.copy", f.Path);
+            ShowToast("Copied: " + f.Path);
+        }
+        catch (Exception e) { ShowToast("Could not copy: " + e.Message); }
+    }
+
+    private void DeleteFile()
+    {
+        var f = deleting;
+        deleting = null;
+        if (f == null) return;
+        var error = App.DeleteVideoFile(f.Id, f.Path);
+        if (error != null) { ShowToast($"Could not delete {f.FileName}: {error}", 10000); return; }
+        // Kept out of the list; the index is built again next time the page opens
+        deleted.Add(f.Id);
+        matches.Remove(f);
+        ShowToast($"Deleted {f.FileName} ({Fmt.Size(f.SizeBytes)}).");
+    }
+
+    private void ShowToast(string text, int ms = 4000)
+    {
+        toast = text;
+        toastTimer?.Cancel();
+        toastTimer = new CancellationTokenSource();
+        var token = toastTimer.Token;
+        _ = Task.Delay(ms, token).ContinueWith(t => { if (t.IsCanceled) return; toast = null; InvokeAsync(StateHasChanged); });
+    }
+
+    public void Dispose()
+    {
+        App.DataChanged -= OnDataChanged;
+        debounce?.Cancel();
+        toastTimer?.Cancel();
+    }
+}
