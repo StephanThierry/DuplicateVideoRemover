@@ -117,3 +117,21 @@ if (Environment.GetEnvironmentVariable("SHOT_FP") == "1")
     Shot("d_review_after_fp");
     vm.SelectedTab = 3; vm.Settings.OpenFalsePositivesCommand.Execute(null); Pump(2000); Shot("d_false_positives_one");
 }
+// SHOT_PHASES=1: the scan screen with made-up progress (both phases), without running a scan
+if (Environment.GetEnvironmentVariable("SHOT_PHASES") == "1")
+{
+    vm.SelectedTab = 1;
+    var apply = typeof(ScanViewModel).GetMethod("Apply", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+    void Show(ScanProgress p, string name)
+    {
+        apply.Invoke(vm.Scan, new object[] { p });
+        Console.WriteLine($"{name}: A {p.FindFraction:P0} '{ScanText.FindDetail(p)}' '{ScanText.FindLeft(p)}' | B {p.ProcessFraction:P0} '{ScanText.ProcessDetail(p)}' '{ScanText.ProcessLeft(p)}'");
+        Shot(name);
+    }
+    Show(new ScanProgress { Phase = ScanPhase.FindingFiles, Message = "Finding video files", FilesFound = 22300, ExpectedFiles = 67569,
+        FindRemaining = TimeSpan.FromMinutes(6.5), Elapsed = TimeSpan.FromMinutes(3.2) }, "d_phase_a");
+    Show(new ScanProgress { Phase = ScanPhase.ReadingVideos, Message = "Reading new videos", FilesFound = 67612, ExpectedFiles = 67569, FilesListed = true,
+        FindTime = TimeSpan.FromMinutes(7.4), Checked = 30000, NewTotal = 282, NewDone = 94, Remaining = TimeSpan.FromMinutes(2), SecondsPerNewFile = 0.6,
+        Elapsed = TimeSpan.FromMinutes(8.5) }, "d_phase_b");
+    Show(new ScanProgress { Phase = ScanPhase.FindingFiles, Message = "Finding video files", FilesFound = 1800, Elapsed = TimeSpan.FromSeconds(40) }, "d_phase_first");
+}

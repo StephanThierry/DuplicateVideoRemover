@@ -71,17 +71,12 @@ namespace deepduplicates
             return pick.Sum(r => r.NewFileSeconds) / pick.Sum(r => r.NewFiles);
         }
 
-        /// <summary>Share of the progress bar for finding files when there is no timing yet.</summary>
-        public const double DefaultFindShare = 0.25;
-
-        /// <summary>
-        /// Part of the last completed scan of this scope spent finding files (5-60%), for the progress bar.
-        /// </summary>
-        public static double FindShare(Settings settings)
+        /// <summary>How long finding the files took in the last scan of this scope that recorded it, or null.</summary>
+        public static double? FindSeconds(Settings settings)
         {
             var scope = ScopeKey(settings);
-            var last = Load().LastOrDefault(r => r.ScopeKey == scope && r.Completed && r.FindSeconds > 0 && r.TotalSeconds > 0);
-            return last == null ? DefaultFindShare : Math.Clamp(last.FindSeconds / last.TotalSeconds, 0.05, 0.6);
+            var last = Load().LastOrDefault(r => r.ScopeKey == scope && r.FindSeconds > 0);
+            return last?.FindSeconds;
         }
 
         /// <summary>How many files the last scan of this scope found, or null.</summary>

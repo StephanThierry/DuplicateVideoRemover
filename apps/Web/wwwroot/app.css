@@ -311,3 +311,24 @@ button.icon:hover:not(:disabled) { border-color: var(--accent); background: var(
 .match-divider::before, .match-divider::after { content: ""; flex: 1; border-top: 1px solid var(--rule); }
 .match-divider button { border-radius: 12px; color: var(--muted); }
 .match-divider button:hover:not(:disabled) { color: var(--grease); border-color: var(--grease); }
+
+/* Scan: two phases, each with its own bar - A) finding files, B) processing */
+.phase + .phase { margin-top: 22px; }
+.phase-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+.phase-name { font-size: 1.1rem; font-weight: 650; }
+.phase-letter {
+  display: inline-grid; place-items: center; width: 24px; height: 24px; margin-right: 6px; border-radius: 50%;
+  background: var(--table); color: var(--muted); font-size: .85rem; font-weight: 700; vertical-align: 1px;
+}
+.phase.active .phase-letter { background: var(--accent); color: var(--accent-ink); }
+.phase.done .phase-letter { background: var(--keep); color: #fff; }
+.phase-pct { font-size: 1.6rem; font-weight: 650; letter-spacing: -0.02em; }
+.phase-detail { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 6px; font-size: .92rem; }
+.phase.waiting .phase-name, .phase.waiting .phase-detail { color: var(--muted); }
+/* No total to measure against yet (first scan): a moving stripe instead of a percentage */
+.bar.unknown > div {
+  background: repeating-linear-gradient(-45deg, var(--accent) 0 12px, color-mix(in srgb, var(--accent) 60%, transparent) 12px 24px);
+  background-size: 34px 34px; animation: stripe 1s linear infinite;
+}
+@keyframes stripe { to { background-position: 34px 0; } }
+@media (prefers-reduced-motion: reduce) { .bar.unknown > div { animation: none; } }

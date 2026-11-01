@@ -74,29 +74,51 @@ namespace deepduplicates
                 await FileHandler.EnsureFFmpegAsync();
 
                 var fileHandler = new FileHandler(settings);
-                // From the last scan of these folders: how many files to expect and how long finding them takes
+                // Phase A: finding the files. From the last scan of these folders: how many to expect, how long it took
                 int? expected = RunHistory.ExpectedFiles(settings);
-                double findShare = RunHistory.FindShare(settings);
-                Report(new ScanProgress { Phase = ScanPhase.FindingFiles, Message = "Finding video files", ExpectedFiles = expected, FindShare = findShare });
-                fileHandler.FindFiles(count => Report(new ScanProgress
+                double? lastFindSeconds = RunHistory.FindSeconds(settings);
+                var find = Stopwatch.StartNew();
+                ScanProgress Finding(int count)
                 {
-                    Phase = ScanPhase.FindingFiles,
-                    Message = "Finding video files",
-                    FilesFound = count,
-                    ExpectedFiles = expected,
-                    FindShare = findShare,
-                    Elapsed = total.Elapsed
-                }), ct);
+                    // The pace so far once there is enough to go on, before that the last scan's timing
+                    TimeSpan? left = null;
+                    bool fromHistory = false;
+                    if (expected is int exp && exp > count)
+                    {
+                        if (count >= 500 && find.Elapsed.TotalSeconds >= 5)
+                            left = TimeSpan.FromSeconds(find.Elapsed.TotalSeconds * (exp - count) / count);
+                        else if (lastFindSeconds is double s)
+                        {
+                            left = TimeSpan.FromSeconds(Math.Max(s - find.Elapsed.TotalSeconds, 0));
+                            fromHistory = true;
+                        }
+                    }
+                    return new ScanProgress
+                    {
+                        Phase = ScanPhase.FindingFiles,
+                        Message = "Finding video files",
+                        FilesFound = count,
+                        ExpectedFiles = expected,
+                        FindRemaining = left,
+                        EstimateFromHistory = fromHistory,
+                        Elapsed = total.Elapsed
+                    };
+                }
+                Report(Finding(0));
+                fileHandler.FindFiles(count => Report(Finding(count)), ct);
+                var findTime = find.Elapsed;
                 record.FilesInScope = fileHandler.allFilesCount;
-                record.FindSeconds = total.Elapsed.TotalSeconds;
-                // Loading the database can take a while on a large library - say so instead of looking stuck
+                record.FindSeconds = findTime.TotalSeconds;
+
+                // Phase B: processing. Loading the database can take a while on a large library - say so
                 Report(new ScanProgress
                 {
-                    Phase = ScanPhase.FindingFiles,
+                    Phase = ScanPhase.ReadingVideos,
                     Message = "Loading the videos read before",
                     FilesFound = fileHandler.allFilesCount,
-                    ExpectedFiles = fileHandler.allFilesCount,
-                    FindShare = findShare,
+                    ExpectedFiles = expected,
+                    FilesListed = true,
+                    FindTime = findTime,
                     Elapsed = total.Elapsed
                 });
                 // What is on disk now - the database also holds dormant rows of moved or missing files
@@ -105,7 +127,7 @@ namespace deepduplicates
                 using var db = new VideoInfoContext();
                 db.Database.EnsureCreated();
                 videoHandler = new VideoHandler(fileHandler, new ImageHandler());
-                var progress = new Progress(p => Report(p with { Elapsed = total.Elapsed, FindShare = findShare, ExpectedFiles = fileHandler.allFilesCount }));
+                var progress = new Progress(p => Report(p with { Elapsed = total.Elapsed, ExpectedFiles = expected, FilesListed = true, FindTime = findTime }));
                 var media = await videoHandler.saveVideoMetadataAndScreenshots(db, progress, ct, RunHistory.SecondsPerNewFile(settings));
 
                 Report(Current with { Phase = ScanPhase.Comparing, Message = "Comparing videos", Remaining = null, Elapsed = total.Elapsed });

@@ -5,6 +5,37 @@
              xmlns:sys="using:System"
              x:Class="DuplicateVideoRemover.Desktop.Views.ScanView"
              x:DataType="vm:ScanViewModel">
+  <UserControl.DataTemplates>
+    <DataTemplate DataType="vm:PhaseItem">
+      <StackPanel Spacing="6">
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Right" Text="{Binding PercentText}" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Bottom"/>
+          <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+            <Panel Width="24" Height="24">
+              <Ellipse Fill="{DynamicResource Table}"/>
+              <Ellipse Fill="{DynamicResource Accent}" IsVisible="{Binding IsActive}"/>
+              <Ellipse Fill="{DynamicResource Keep}" IsVisible="{Binding IsDone}"/>
+              <TextBlock Text="{Binding Letter}" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"
+                         Foreground="{DynamicResource Muted}" IsVisible="{Binding IsWaiting}"/>
+              <TextBlock Text="{Binding Letter}" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"
+                         Foreground="White" IsVisible="{Binding !IsWaiting}"/>
+            </Panel>
+            <TextBlock Text="{Binding Name}" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center"/>
+          </StackPanel>
+        </DockPanel>
+        <!-- Moving bar while the total isn't known (first scan of these folders) -->
+        <ProgressBar Value="{Binding Percent}" Maximum="100" Height="14" CornerRadius="7" IsIndeterminate="{Binding UnknownTotal}"
+                     Classes.done="{Binding IsDone}"/>
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Right" Classes="muted" Text="{Binding Left}" Margin="12,0,0,0"/>
+          <TextBlock Text="{Binding Detail}" TextWrapping="Wrap"/>
+        </DockPanel>
+      </StackPanel>
+    </DataTemplate>
+  </UserControl.DataTemplates>
+  <UserControl.Styles>
+    <Style Selector="ProgressBar.done"><Setter Property="Foreground" Value="{DynamicResource Keep}"/></Style>
+  </UserControl.Styles>
   <ScrollViewer Classes="gutter">
     <Grid RowDefinitions="Auto,*" Margin="12,16,12,12">
       <DockPanel Grid.Row="0" Margin="0,0,0,16">
@@ -21,34 +52,13 @@
       <Grid Grid.Row="1" ColumnDefinitions="*,340" ColumnSpacing="20">
         <Border Classes="panel" VerticalAlignment="Top">
           <StackPanel Spacing="14">
-            <ItemsControl ItemsSource="{Binding Steps}">
-              <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Rows="1"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:StepItem">
-                  <StackPanel Margin="0,0,8,0">
-                    <Panel Height="4">
-                      <Border Background="{DynamicResource Rule}"/>
-                      <Border Background="{DynamicResource Keep}" IsVisible="{Binding IsDone}"/>
-                      <Border Background="{DynamicResource Accent}" IsVisible="{Binding IsCurrent}"/>
-                    </Panel>
-                    <TextBlock Text="{Binding Label}" FontWeight="SemiBold" Margin="0,8,0,0"/>
-                  </StackPanel>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-
             <TextBlock IsVisible="{Binding IsIdle}" Classes="muted" TextWrapping="Wrap"
-                       Text="No scan running. Videos already in the database are not read again, so later scans are much faster."/>
+                       Text="No scan running. A scan has two parts: A) finding all video files in your folders, B) reading the new ones and comparing. Videos already in the database are not read again, so later scans are much faster."/>
 
             <StackPanel Spacing="14" IsVisible="{Binding !IsIdle}">
-              <ProgressBar Value="{Binding Percent}" Maximum="100" Height="14" CornerRadius="7"/>
-              <DockPanel>
-                <TextBlock DockPanel.Dock="Right" Classes="muted" Text="{Binding Remaining}" VerticalAlignment="Bottom"/>
-                <StackPanel Orientation="Horizontal" Spacing="10">
-                  <TextBlock Text="{Binding PercentText}" FontSize="34" FontWeight="SemiBold"/>
-                  <TextBlock Text="{Binding Message}" Classes="muted" VerticalAlignment="Bottom" Margin="0,0,0,7" TextWrapping="Wrap"/>
-                </StackPanel>
-              </DockPanel>
+              <!-- A) finding the files, B) processing them - each with its own bar -->
+              <ContentControl Content="{Binding FindPhase}"/>
+              <ContentControl Content="{Binding ProcessPhase}" Margin="0,8,0,0"/>
 
               <UniformGrid Columns="3">
                 <StackPanel Margin="0,0,0,12"><TextBlock Classes="muted small" Text="Videos found"/><TextBlock Text="{Binding Found}" FontSize="17" FontWeight="SemiBold"/></StackPanel>

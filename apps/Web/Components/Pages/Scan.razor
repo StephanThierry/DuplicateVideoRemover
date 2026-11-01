@@ -23,27 +23,14 @@
 
     <div class="scan-grid">
         <section class="panel" aria-live="polite">
-            <ol class="steps">
-                @foreach (var (phase, label) in Steps)
-                {
-                    <li class="@StepClass(phase)">@label</li>
-                }
-            </ol>
-
             @if (p.Phase == ScanPhase.Idle)
             {
-                <p class="muted">No scan running. Videos already in the database are not read again, so later scans are much faster.</p>
+                <p class="muted">No scan running. A scan has two parts: A) finding all video files in your folders, B) reading the new ones and comparing. Videos already in the database are not read again, so later scans are much faster.</p>
             }
             else
             {
-                <div class="bar @(p.Phase == ScanPhase.Done ? "done" : "")" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@((int)(p.Fraction * 100))">
-                    <div style="width:@((p.Fraction * 100).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))%"></div>
-                </div>
-
-                <div class="headline">
-                    <div class="left">@((int)(p.Fraction * 100))%<small>@p.Message</small></div>
-                    <div class="muted">@RemainingText()</div>
-                </div>
+                @PhaseBlock("A", "Finding files", ScanText.FindState(p), p.FindFraction, ScanText.FindUnknownTotal(p), ScanText.FindDetail(p), ScanText.FindLeft(p))
+                @PhaseBlock("B", "Processing", ScanText.ProcessState(p), p.ProcessFraction, false, ScanText.ProcessDetail(p), ScanText.ProcessLeft(p))
 
                 <dl class="stats">
                     <div><dt>Videos found</dt><dd>@p.FilesFound.ToString("N0")</dd></div>
@@ -128,18 +115,24 @@
 </div>
 
 @code {
-    private static readonly (ScanPhase, string)[] Steps =
-    {
-        (ScanPhase.FindingFiles, "Find videos"),
-        (ScanPhase.ReadingVideos, "Read new videos"),
-        (ScanPhase.Comparing, "Compare"),
-        (ScanPhase.Done, "Done")
-    };
-
     private ScanProgress p = new();
     private readonly List<int> recent = new();
     private RunRecord last;
     private bool stopping;
+
+    // One phase: name, its own bar (striped while the total isn't known) and what it is doing
+    private RenderFragment PhaseBlock(string letter, string name, PhaseState state, double fraction, bool unknownTotal, string detail, string left) =>
+        @<div class="phase @state.ToString().ToLowerInvariant()">
+            <div class="phase-head">
+                <span class="phase-name"><span class="phase-letter">@letter</span> @name</span>
+                <span class="phase-pct num">@(state == PhaseState.Waiting || unknownTotal ? "" : ScanText.Percent(fraction) + "%")</span>
+            </div>
+            <div class="bar @(state == PhaseState.Done ? "done" : "") @(unknownTotal ? "unknown" : "")" role="progressbar" aria-label="@name"
+                 aria-valuemin="0" aria-valuemax="100" aria-valuenow="@(unknownTotal ? (int?)null : ScanText.Percent(fraction))">
+                <div style="width:@((unknownTotal ? 100 : fraction * 100).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))%"></div>
+            </div>
+            <div class="phase-detail"><span>@detail</span><span class="muted">@left</span></div>
+        </div>;
 
     protected override void OnInitialized()
     {
@@ -176,23 +169,6 @@
         App.Scanner.Cancel();
     }
 
-    private string StepClass(ScanPhase step)
-    {
-        var current = p.Phase is ScanPhase.Preparing ? ScanPhase.FindingFiles : p.Phase;
-        if (current is ScanPhase.Idle or ScanPhase.Cancelled or ScanPhase.Failed) return "";
-        if (current == ScanPhase.Done || step < current) return "done";
-        return step == current ? "current" : "";
-    }
-
-    private string RemainingText()
-    {
-        if (p.Phase == ScanPhase.FindingFiles && p.ExpectedFiles > 0) return $"About {p.ExpectedFiles.Value:N0} videos last time";
-        if (p.Phase == ScanPhase.FindingFiles || p.Phase == ScanPhase.Preparing) return "Counting videos...";
-        if (p.Phase != ScanPhase.ReadingVideos) return "";
-        if (p.NewTotal == 0) return "No new videos to read";
-        if (p.Remaining is not TimeSpan r) return "Estimating time left...";
-        return Fmt.Approx(r) + " left" + (p.EstimateFromHistory ? " (from earlier scans)" : "");
-    }
 
     public void Dispose() => App.Scanner.ProgressChanged -= OnProgress;
 }
