@@ -1,0 +1,56 @@
+@* Edits a list of paths or text values. *@
+<div class="list-edit">
+    @for (int i = 0; i < Items.Count; i++)
+    {
+        int index = i;
+        <div class="item">
+            <input type="text" value="@Items[index]" @onchange="e => Update(index, e.Value?.ToString())" aria-label="@Label @(index + 1)" />
+            <button @onclick="() => Remove(index)" aria-label="Remove @Items[index]">Remove</button>
+        </div>
+    }
+    <div class="add">
+        <input type="text" placeholder="@Placeholder" @bind="newValue" @bind:event="oninput" @onkeydown="Key" aria-label="Add @Label" />
+        @if (Browse) { <button @onclick="() => picking = true">Browse</button> } else { <span></span> }
+        <button @onclick="Add" disabled="@string.IsNullOrWhiteSpace(newValue)">Add</button>
+    </div>
+</div>
+<FolderPicker @bind-Open="picking" Start="@newValue" OnChosen="Chosen" />
+
+@code {
+    [Parameter] public List<string> Items { get; set; } = new();
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string Placeholder { get; set; } = "";
+    [Parameter] public bool Browse { get; set; }
+    [Parameter] public EventCallback Changed { get; set; }
+
+    private string newValue = "";
+    private bool picking;
+
+    private async Task Add()
+    {
+        if (string.IsNullOrWhiteSpace(newValue)) return;
+        Items.Add(newValue.Trim());
+        newValue = "";
+        await Changed.InvokeAsync();
+    }
+
+    private async Task Key(KeyboardEventArgs e) { if (e.Key == "Enter") await Add(); }
+
+    private async Task Update(int i, string value)
+    {
+        Items[i] = value ?? "";
+        await Changed.InvokeAsync();
+    }
+
+    private async Task Remove(int i)
+    {
+        Items.RemoveAt(i);
+        await Changed.InvokeAsync();
+    }
+
+    private async Task Chosen(string path)
+    {
+        newValue = path;
+        await Add();
+    }
+}

@@ -154,8 +154,9 @@ private void CompareVideosInGroup(List<VideoInfo> group, Settings settings)
             }
 
             // Determine which match settings to use
+            // (falls back to matchSettings when matchSettings_sameFolder is not set in settings.json)
             var currentMatchset = new System.IO.FileInfo(video1.path).Directory.Name == new System.IO.FileInfo(video2.path).Directory.Name
-                ? settings.matchSettings_sameFolder
+                ? settings.matchSettings_sameFolder ?? settings.matchSettings
                 : settings.matchSettings;
 
             // Name match check

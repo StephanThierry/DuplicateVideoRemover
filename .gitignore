@@ -1,15 +1,13 @@
 _screens**/**
 output/**
-obj/**
-bin/**
+**/obj/
+**/bin/
 ffmpeg/**
-deepdupes.db
-deepdupes.db-shm
-deepdupes.db-wal
-settings.json
-.vs/slnx.sqlite
-.vs/VSWorkspaceState.json
-.vs/DuplicateVideoRemover/config/applicationhost.config
-.vs/DuplicateVideoRemover/v16/.suo
+deepdupes.db*
+settings.json*
+falsepositives.json*
+pathmapping.json
+runhistory.json
+.vs/
 
 .fake

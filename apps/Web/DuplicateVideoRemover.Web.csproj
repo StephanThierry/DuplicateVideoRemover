@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    Browser interface. Runs on the machine with the videos (also a headless Linux server or NAS)
+    and is used from any browser. Start: DuplicateVideoRemover.Web, with the data folder as argument (see Program.cs)
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <AssemblyName>DuplicateVideoRemover.Web</AssemblyName>
+    <!-- Made from ressource/appicon.png with tools/make-icons.ps1 -->
+    <ApplicationIcon>appicon.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../duplicatevideoremover.csproj" />
+    <!-- SkiaSharp's native library for Linux, without extra system dependencies (servers, NAS) -->
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.4" />
+  </ItemGroup>
+
+</Project>

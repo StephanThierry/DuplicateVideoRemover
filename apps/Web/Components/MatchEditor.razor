@@ -1,0 +1,40 @@
+@* The three match rules of one set of match settings. *@
+<div class="field">
+    <label for="@(Id)-color">Colour difference allowed</label>
+    <div class="help">How different the colours of the screenshots may be. Lower is stricter. Recommended: 35.</div>
+    <div class="slider">
+        <input id="@(Id)-color" type="range" min="5" max="100" step="1" value="@Value.colorTolerance" @oninput="e => Set(() => Value.colorTolerance = int.Parse(e.Value!.ToString()!))" />
+        <output>@Value.colorTolerance</output>
+    </div>
+</div>
+<div class="field">
+    <label for="@(Id)-shape">Shapes that must match</label>
+    <div class="help">How much of the picture's light and dark shapes must be the same. Higher is stricter. Recommended: 70%.</div>
+    <div class="slider">
+        <input id="@(Id)-shape" type="range" min="200" max="396" step="4" value="@Value.shapeMatch" @oninput="e => Set(() => Value.shapeMatch = int.Parse(e.Value!.ToString()!))" />
+        <output>@(Value.shapeMatch / 4)%</output>
+    </div>
+</div>
+<div class="field">
+    <label for="@(Id)-fault">Checks allowed to disagree</label>
+    <div class="help">Each pair of videos gets 6 checks (colour and shape at 3 points). 0 means all must agree. Above 1 gives many wrong matches.</div>
+    <div class="slider">
+        <input id="@(Id)-fault" type="range" min="0" max="3" step="1" value="@Value.faultTolerance" @oninput="e => Set(() => Value.faultTolerance = int.Parse(e.Value!.ToString()!))" />
+        <output>@Value.faultTolerance of 6</output>
+    </div>
+</div>
+<div class="field">
+    <label class="inline"><input type="checkbox" checked="@Value.triggerOnNameMatch" @onchange="e => Set(() => Value.triggerOnNameMatch = (bool)e.Value!)" /> Same length and one name starts with the other also counts as a duplicate</label>
+</div>
+
+@code {
+    [Parameter] public matchSettingsSet Value { get; set; } = matchSettingsSet.Recommended();
+    [Parameter] public string Id { get; set; } = "m";
+    [Parameter] public EventCallback Changed { get; set; }
+
+    private Task Set(Action change)
+    {
+        change();
+        return Changed.InvokeAsync();
+    }
+}

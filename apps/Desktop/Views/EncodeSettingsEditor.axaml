@@ -1,0 +1,109 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DuplicateVideoRemover.Desktop.ViewModels"
+             xmlns:core="using:deepduplicates"
+             x:Class="DuplicateVideoRemover.Desktop.Views.EncodeSettingsEditor"
+             x:DataType="vm:EncodeSettingsViewModel">
+  <StackPanel Spacing="16">
+    <StackPanel Spacing="4">
+      <TextBlock Text="Video format" FontWeight="SemiBold"/>
+      <ComboBox ItemsSource="{Binding Codecs}" SelectedItem="{Binding Codec}" MinWidth="260">
+        <ComboBox.ItemTemplate><DataTemplate x:DataType="core:CodecOption"><TextBlock Text="{Binding Label}"/></DataTemplate></ComboBox.ItemTemplate>
+      </ComboBox>
+      <TextBlock Classes="muted small" Text="{Binding Codec.Help}" TextWrapping="Wrap"/>
+    </StackPanel>
+
+    <StackPanel Spacing="4">
+      <TextBlock Text="Resolution" FontWeight="SemiBold"/>
+      <ComboBox ItemsSource="{Binding Resolutions}" SelectedItem="{Binding Resolution}" MinWidth="260">
+        <ComboBox.ItemTemplate><DataTemplate x:DataType="core:ResolutionOption"><TextBlock Text="{Binding Label}"/></DataTemplate></ComboBox.ItemTemplate>
+      </ComboBox>
+      <TextBlock Classes="muted small" Text="The width follows the video's own shape. Videos that are already smaller keep their size." TextWrapping="Wrap"/>
+    </StackPanel>
+
+    <StackPanel Spacing="4">
+      <TextBlock Text="Quality" FontWeight="SemiBold"/>
+      <TextBlock Classes="muted small" Text="{Binding QualityHelp}" TextWrapping="Wrap"/>
+      <!-- Right = better quality: CRF goes the other way, so the slider runs reversed -->
+      <Grid ColumnDefinitions="*,80">
+        <Slider Minimum="{Binding Codec.MinCrf}" Maximum="{Binding Codec.MaxCrf}" IsDirectionReversed="True"
+                TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding Crf}"/>
+        <TextBlock Grid.Column="1" Text="{Binding CrfText}" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center"
+                   ToolTip.Tip="CRF value: lower means better quality"/>
+      </Grid>
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <TextBlock Classes="muted small" Text="Smaller files"/>
+        <TextBlock Grid.Column="1" Text="{Binding QualityLabel}" FontWeight="SemiBold" HorizontalAlignment="Center"
+                   Foreground="{DynamicResource Ink}"/>
+        <TextBlock Grid.Column="2" Classes="muted small" Text="Better quality"/>
+      </Grid>
+      <Button Classes="link" Content="{Binding RecommendedText}" Command="{Binding UseRecommendedCommand}" IsVisible="{Binding !IsRecommended}"/>
+    </StackPanel>
+
+    <StackPanel Spacing="4">
+      <TextBlock Text="Speed" FontWeight="SemiBold"/>
+      <ComboBox ItemsSource="{Binding Presets}" SelectedItem="{Binding Preset}" MinWidth="320">
+        <ComboBox.ItemTemplate><DataTemplate x:DataType="core:ChoiceOption"><TextBlock Text="{Binding Label}"/></DataTemplate></ComboBox.ItemTemplate>
+      </ComboBox>
+      <TextBlock Classes="muted small" Text="Slower encoding makes smaller files at the same quality."/>
+    </StackPanel>
+
+    <StackPanel Spacing="4">
+      <TextBlock Text="Sound" FontWeight="SemiBold"/>
+      <ComboBox ItemsSource="{Binding AudioChoices}" SelectedItem="{Binding Audio}" MinWidth="320">
+        <ComboBox.ItemTemplate><DataTemplate x:DataType="core:ChoiceOption"><TextBlock Text="{Binding Label}"/></DataTemplate></ComboBox.ItemTemplate>
+      </ComboBox>
+    </StackPanel>
+
+    <StackPanel Spacing="4">
+      <TextBlock Text="File type" FontWeight="SemiBold"/>
+      <ComboBox ItemsSource="{Binding Containers}" SelectedItem="{Binding Container}" MinWidth="260">
+        <ComboBox.ItemTemplate><DataTemplate x:DataType="core:ChoiceOption"><TextBlock Text="{Binding Label}"/></DataTemplate></ComboBox.ItemTemplate>
+      </ComboBox>
+    </StackPanel>
+
+    <CheckBox IsChecked="{Binding AppleCompatible}" IsVisible="{Binding ShowApple}" Content="Make the files play on Apple devices (iPhone, Mac, Apple TV)"/>
+
+    <StackPanel Spacing="4">
+      <TextBlock Text="Name of the new files" FontWeight="SemiBold"/>
+      <TextBlock Classes="muted small" TextWrapping="Wrap" Text="The new file is saved next to the original, with this added to the name. The original is not changed."/>
+      <StackPanel Orientation="Horizontal" Spacing="10">
+        <TextBox Text="{Binding FileSuffix}" PlaceholderText="{Binding SuffixPlaceholder}" Width="220"/>
+        <TextBlock Classes="muted" Text="{Binding ExampleName}" VerticalAlignment="Center"/>
+      </StackPanel>
+    </StackPanel>
+
+    <CheckBox IsChecked="{Binding NeverOverwrite}" Content="Never overwrite a file that already exists"/>
+
+    <StackPanel Spacing="4">
+      <TextBlock Text="Leave out" FontWeight="SemiBold"/>
+      <TextBlock Classes="muted small" Text="Videos of these types (their length is often read wrong), and very short videos."/>
+      <ItemsControl ItemsSource="{Binding SkipItems}">
+        <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:SkipItem"><CheckBox IsChecked="{Binding IsChecked}" Content="{Binding Extension}" Margin="0,0,14,0"/></DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <TextBlock Text="Videos of" VerticalAlignment="Center"/>
+        <NumericUpDown Value="{Binding MinDuration}" Minimum="1" Increment="1" FormatString="0" Width="120"/>
+        <TextBlock Text="seconds or shorter" VerticalAlignment="Center"/>
+      </StackPanel>
+    </StackPanel>
+
+    <Expander Header="Advanced">
+      <StackPanel Spacing="4">
+        <TextBlock Text="Extra video filter" FontWeight="SemiBold"/>
+        <TextBlock Classes="muted small" TextWrapping="Wrap" Text="An FFmpeg filter applied before scaling, for example yadif to remove interlacing lines. Leave empty if unsure."/>
+        <TextBox Text="{Binding ExtraFilter}"/>
+      </StackPanel>
+    </Expander>
+
+    <StackPanel Spacing="4">
+      <TextBlock Text="Example" FontWeight="SemiBold"/>
+      <Border Background="{DynamicResource Table}" CornerRadius="4" Padding="10,8">
+        <SelectableTextBlock Text="{Binding ExampleCommand}" FontFamily="Consolas, Menlo, monospace" FontSize="12" TextWrapping="Wrap"/>
+      </Border>
+    </StackPanel>
+  </StackPanel>
+</UserControl>

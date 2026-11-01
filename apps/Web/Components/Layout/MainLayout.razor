@@ -1,0 +1,63 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject AppController App
+
+<header class="topbar">
+    <div class="brand">
+        <img src="appicon-32.png" width="24" height="24" alt="" />
+        Duplicate Video Remover
+    </div>
+    <nav class="tabs">
+        <NavLink href="" Match="NavLinkMatch.All">Review <span class="count num">@App.Session.Results.DuplicateCount.ToString("N0")</span></NavLink>
+        <NavLink href="scan">Scan @if (App.Scanner.IsRunning) { <span class="live" title="Scanning"></span> }</NavLink>
+        <NavLink href="encode">Re-encode</NavLink>
+        <NavLink href="settings">Settings</NavLink>
+    </nav>
+    <div class="datafolder" title="Data folder: @App.DataFolder&#10;Database: @App.DatabaseFolder">@App.DataFolder</div>
+</header>
+
+@Body
+
+<div id="blazor-error-ui" data-nosnippet>
+    Something went wrong. <a href="." class="reload">Reload the page</a>
+    <span class="dismiss">✕</span>
+</div>
+
+@code {
+    private bool wasRunning;
+    private ResultSession session;
+
+    protected override void OnInitialized()
+    {
+        App.Scanner.ProgressChanged += OnProgress;
+        App.SessionReplaced += OnSession;
+        Watch();
+    }
+
+    // The duplicate count in the tab follows removals in the review
+    private void Watch()
+    {
+        if (session != null) session.Changed -= OnChanged;
+        session = App.Session;
+        session.Changed += OnChanged;
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    // Only re-render the top bar when the scan starts or stops
+    private void OnProgress(ScanProgress p)
+    {
+        if (wasRunning == App.Scanner.IsRunning) return;
+        wasRunning = App.Scanner.IsRunning;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnSession() { Watch(); InvokeAsync(StateHasChanged); }
+
+    public void Dispose()
+    {
+        App.Scanner.ProgressChanged -= OnProgress;
+        App.SessionReplaced -= OnSession;
+        if (session != null) session.Changed -= OnChanged;
+    }
+}

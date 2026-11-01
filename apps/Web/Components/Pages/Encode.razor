@@ -1,0 +1,278 @@
+@page "/encode"
+@implements IDisposable
+@inject AppController App
+@inject NavigationManager Nav
+
+<PageTitle>Re-encode</PageTitle>
+
+<div class="page">
+    <div class="page-head">
+        <div>
+            <h1>Re-encode</h1>
+            <p>Videos with the highest bitrate first - they usually shrink the most. Click a video to pick it, Shift-click to pick everything in between, then create the encoding script.</p>
+        </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:16px">
+        <div class="enc-summary">
+            <strong>@EncodeOptions.Codec(enc.codec).Label, @(enc.resolution)p, quality @enc.crf</strong>
+            <span class="muted">@EncodeOptions.QualityLabel(enc.codec, enc.crf ?? 0)</span>
+            <span class="muted">Speed: @enc.preset, @(enc.audio == "copy" ? "original sound" : "AAC sound"), @enc.container.ToUpperInvariant()</span>
+            <button class="link" @onclick='() => Nav.NavigateTo("settings#encoding")'>Change in Settings</button>
+        </div>
+    </div>
+
+    @if (scriptPath != null)
+    {
+        <div class="result" role="status">
+            <p><strong>Created a script for @Fmt.Plural(scriptCount, "video", "videos").</strong></p>
+            <p style="margin-top:6px">Saved as <code>@scriptPath</code>. <a href="output/@System.IO.Path.GetFileName(scriptPath)" download>Download it</a></p>
+            <p class="muted" style="margin-top:6px">Run it on the computer with the videos:
+                <code>@(ScriptFile.IsWindows ? $"powershell -ExecutionPolicy Bypass -File \"{scriptPath}\"" : $"sh \"{scriptPath}\"")</code>.
+                The new files are saved next to the originals, which are not changed.</p>
+        </div>
+    }
+
+    @if (candidates == null)
+    {
+        <p class="muted">Loading videos and checking that the files still exist...</p>
+    }
+    else if (candidates.Count == 0)
+    {
+        <div class="empty">
+            <h2>No videos to re-encode</h2>
+            <p>Scan your folders first. Duplicates, broken videos and left-out file types are not listed.</p>
+            <button class="primary big" @onclick='() => Nav.NavigateTo("scan")'>Go to scan</button>
+        </div>
+    }
+    else
+    {
+        <div class="toolbar">
+            <button @onclick="SelectVisible">Select all</button>
+            <button @onclick="() => SelectTop(20)">Select top 20</button>
+            <button @onclick="() => picked.Clear()" disabled="@(picked.Count == 0)">Select none</button>
+            @if (hidden.Count > 0)
+            {
+                <button @onclick="() => { hidden.Clear(); ResetPaging(); }" title="@string.Join("\n", hidden)">Unhide folders (@hidden.Count)</button>
+            }
+            <label class="inline">Only above <input type="number" min="0" step="500" @bind="minKbps" @bind:after="ResetPaging" aria-label="Minimum bitrate" /> kbit/s</label>
+            <input type="search" placeholder="Filter by file or folder name" @bind="search" @bind:event="oninput" @bind:after="ResetPaging" aria-label="Filter by file or folder name" />
+        </div>
+
+        var visible = Visible().ToList();
+        <p class="muted" style="font-size:.85rem;margin:0 0 8px">Estimated sizes are rough: the real result depends on each video's resolution and content.</p>
+        <div class="enc-list">
+            <div class="enc-row head"><span></span><span></span><span>Video</span><span class="num">Bitrate</span><span class="num">Size now</span><span class="num">Estimated after</span></div>
+            @foreach (var c in visible.Take(shown))
+            {
+                bool on = picked.Contains(c.Id);
+                long est = EncodeEstimator.EstimatedBytes(c, enc, targetKbps);
+                <div class="enc-row @(on ? "is-picked" : "")" @key="c.Id" @onclick="e => RowClick(c.Id, e)" role="checkbox" aria-checked="@(on ? "true" : "false")" tabindex="0"
+                     @onkeydown="e => RowKey(c.Id, e)" aria-label="@c.FileName">
+                    <input type="checkbox" checked="@on" tabindex="-1" aria-hidden="true" />
+                    <div class="enc-strip">
+                        @for (int i = 1; i <= 3; i++) { <img loading="lazy" src="shots/@(c.Id)_@(i).png" alt="" onerror="this.style.visibility='hidden'" /> }
+                    </div>
+                    <div class="info">
+                        <div class="name">@c.FileName</div><div class="muted" style="font-size:.85rem;word-break:break-all">@c.Folder</div><div class="muted" style="font-size:.85rem">@Fmt.Duration(c.DurationSeconds)</div>
+                        <div class="enc-actions" @onclick:stopPropagation="true" @onkeydown:stopPropagation="true">
+                            <button class="small" @onclick="() => HideFolder(c.Folder)" title="Hide every video in @c.Folder">Exclude folder</button>
+                            <button class="small" @onclick="() => CopyPath(c)" title="Copy the full path">Copy path</button>
+                            <button class="small danger-outline" @onclick="() => deleting = c" title="Delete this file">Delete</button>
+                        </div>
+                    </div>
+                    <span class="num">@c.AverageKbps.ToString("N0") kbit/s</span>
+                    <span class="num">@Fmt.Size(c.SizeBytes)</span>
+                    <span class="num">@Fmt.Size(est)<br /><small class="@(c.SizeBytes - est > c.SizeBytes / 10 ? "saving" : "muted")">@SavingText(c.SizeBytes, est)</small></span>
+                </div>
+            }
+        </div>
+        @if (visible.Count > shown)
+        {
+            <div class="more"><button @onclick="() => shown += 100">Show @Math.Min(100, visible.Count - shown) more</button></div>
+        }
+
+        <div class="actionbar">
+            <div class="inner">
+                <div class="count num">
+                    @Fmt.Plural(picked.Count, "video", "videos") picked
+                    <small>@Fmt.Size(PickedBytes) now, about @Fmt.Size(PickedEstimate) after. Saves about @Fmt.Size(PickedBytes - PickedEstimate)@PercentText(PickedBytes, PickedEstimate)</small>
+                </div>
+                <button class="primary big" style="margin-left:auto" disabled="@(picked.Count == 0)" @onclick="() => confirming = true">Create encoding script</button>
+            </div>
+        </div>
+    }
+</div>
+
+@if (confirming)
+{
+    <div class="dialog-backdrop" @onclick="() => confirming = false">
+        <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="enc-confirm" @onclick:stopPropagation="true">
+            <h2 id="enc-confirm">Create an encoding script for @Fmt.Plural(picked.Count, "video", "videos")?</h2>
+            <p>@EncodeOptions.Codec(enc.codec).Label, @(enc.resolution)p, quality @enc.crf. Now @Fmt.Size(PickedBytes), about @Fmt.Size(PickedEstimate) after, saving about @Fmt.Size(PickedBytes - PickedEstimate). The script makes new files next to the originals; nothing changes until you run it.</p>
+            <div class="buttons">
+                <button @onclick="() => confirming = false">Cancel</button>
+                <button class="primary" @onclick="Create">Create script</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (deleting != null)
+{
+    <div class="dialog-backdrop" @onclick="() => deleting = null">
+        <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="del-confirm" @onclick:stopPropagation="true">
+            <h2 id="del-confirm">Delete this video permanently?</h2>
+            <p><strong>@deleting.FileName</strong><br />@deleting.Folder<br />@Fmt.Size(deleting.SizeBytes) will be deleted. This can't be undone.</p>
+            <div class="buttons">
+                <button @onclick="() => deleting = null">Cancel</button>
+                <button class="danger" @onclick="DeleteFile">Delete permanently</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (toast != null)
+{
+    <div class="toast" role="status">@toast</div>
+}
+
+@code {
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+    private readonly HashSet<string> hidden = new(StringComparer.OrdinalIgnoreCase);   // folders hidden with "Exclude folder"
+    private EncodeCandidate deleting;
+    private string toast;
+    private CancellationTokenSource toastTimer;
+    private EncodeSettings enc = EncodeSettings.CreateDefault();
+    private List<EncodeCandidate> candidates;
+    private readonly HashSet<int> picked = new();
+    private string search = "";
+    private int minKbps;
+    private int shown = 100;
+    private string scriptPath;
+    private int scriptCount;
+    private bool confirming;
+    private double targetKbps;
+    private int? anchorId;          // last clicked video, for Shift-click ranges
+    private bool anchorState = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        App.DataChanged += OnDataChanged;
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        enc = App.Settings.EncodeOrDefault();
+        targetKbps = EncodeEstimator.TargetKbps(enc);
+        candidates = await Task.Run(App.EncodeCandidates);
+        picked.IntersectWith(candidates.Select(c => c.Id));
+    }
+
+    private void OnDataChanged() => InvokeAsync(async () => { await Load(); StateHasChanged(); });
+
+    private IEnumerable<EncodeCandidate> Visible() => candidates.Where(c =>
+        c.AverageKbps >= minKbps && !hidden.Contains(c.Folder) &&
+        (string.IsNullOrWhiteSpace(search) || c.Path.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase)));
+
+    private long PickedBytes => candidates?.Where(c => picked.Contains(c.Id)).Sum(c => c.SizeBytes) ?? 0;
+
+    private long PickedEstimate => candidates?.Where(c => picked.Contains(c.Id)).Sum(c => EncodeEstimator.EstimatedBytes(c, enc, targetKbps)) ?? 0;
+
+    private static string SavingText(long now, long after) =>
+        now - after < now / 20 ? "little or no saving" : $"saves {Fmt.Size(now - after)}{PercentText(now, after)}";
+
+    private static string PercentText(long now, long after) => now > 0 ? $" ({(now - after) * 100 / now}%)" : "";
+
+    // Click: pick or unpick one video. Shift-click: give every video between the last click and this one
+    // the same state as that last click.
+    private void RowClick(int id, MouseEventArgs e)
+    {
+        var visible = Visible().ToList();
+        if (e.ShiftKey && anchorId is int anchor)
+        {
+            int a = visible.FindIndex(c => c.Id == anchor), b = visible.FindIndex(c => c.Id == id);
+            if (a >= 0 && b >= 0)
+            {
+                foreach (var c in visible.Skip(Math.Min(a, b)).Take(Math.Abs(a - b) + 1))
+                    if (anchorState) picked.Add(c.Id); else picked.Remove(c.Id);
+                return;
+            }
+        }
+        anchorState = !picked.Contains(id);
+        if (anchorState) picked.Add(id); else picked.Remove(id);
+        anchorId = id;
+    }
+
+    private void RowKey(int id, KeyboardEventArgs e)
+    {
+        if (e.Key == " " || e.Key == "Enter") RowClick(id, new MouseEventArgs { ShiftKey = e.ShiftKey });
+    }
+
+    private void SelectTop(int n) { foreach (var c in Visible().Take(n)) picked.Add(c.Id); }
+
+    private void SelectVisible() { foreach (var c in Visible()) picked.Add(c.Id); }
+
+    private void ResetPaging() => shown = 100;
+
+    // Hidden videos are unpicked too, so the script only holds what can be seen
+    private void HideFolder(string folder)
+    {
+        hidden.Add(folder);
+        foreach (var c in candidates.Where(c => string.Equals(c.Folder, folder, StringComparison.OrdinalIgnoreCase))) picked.Remove(c.Id);
+        ShowToast($"Hid the videos in {folder}.");
+    }
+
+    private async Task CopyPath(EncodeCandidate c)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("dvr.copy", c.Path);
+            ShowToast("Copied: " + c.Path);
+        }
+        catch (Exception e) { ShowToast("Could not copy: " + e.Message); }
+    }
+
+    private void DeleteFile()
+    {
+        var c = deleting;
+        deleting = null;
+        if (c == null) return;
+        var error = App.DeleteVideoFile(c.Id, c.Path);
+        if (error != null) { ShowToast($"Could not delete {c.FileName}: {error}", 10000); return; }
+        candidates.Remove(c);
+        picked.Remove(c.Id);
+        ShowToast($"Deleted {c.FileName} ({Fmt.Size(c.SizeBytes)}).");
+    }
+
+    private void ShowToast(string text, int ms = 4000)
+    {
+        toast = text;
+        toastTimer?.Cancel();
+        toastTimer = new CancellationTokenSource();
+        var token = toastTimer.Token;
+        _ = Task.Delay(ms, token).ContinueWith(t => { if (t.IsCanceled) return; toast = null; InvokeAsync(StateHasChanged); });
+    }
+
+    private void Create()
+    {
+        confirming = false;
+        // In list order: highest bitrate first
+        var videos = candidates.Where(c => picked.Contains(c.Id)).ToList();
+        var result = App.WriteEncodeScript(videos);
+        // Files that are gone since the scan are left out of the script and the list
+        foreach (var gone in result.Missing) { candidates.RemoveAll(c => c.Id == gone.Id); picked.Remove(gone.Id); }
+        if (result.Missing.Count > 0)
+            ShowToast($"{Fmt.Plural(result.Missing.Count, "file was", "files were")} not found any more and left out.", 10000);
+        if (result.Path == null) return;
+        scriptPath = result.Path;
+        scriptCount = result.Videos;
+    }
+
+    public void Dispose()
+    {
+        App.DataChanged -= OnDataChanged;
+        toastTimer?.Cancel();
+    }
+}

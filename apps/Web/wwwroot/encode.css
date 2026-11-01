@@ -1,0 +1,35 @@
+/* Re-encode page and encoding settings */
+pre.command { font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; background: var(--table); border-radius: var(--radius-control); padding: 10px 12px; white-space: pre-wrap; word-break: break-all; margin: 4px 0 0; }
+select { cursor: pointer; }
+.panel input[type=checkbox], .enc-list input[type=checkbox] { accent-color: var(--accent); }
+
+/* ---------- Re-encode ---------- */
+.enc-list { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius-sheet); overflow: hidden; }
+.enc-row { display: grid; grid-template-columns: 22px auto 1fr 110px 90px 150px; gap: 14px; align-items: center; padding: 8px 14px; cursor: pointer; user-select: none; }
+.enc-row:not(.head):hover { background: var(--table); }
+.enc-row:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
+.enc-row input[type=checkbox] { pointer-events: none; }
+.enc-strip { display: flex; gap: 3px; padding: 4px; background: var(--frame); border-radius: 3px; }
+.enc-strip img { width: 96px; height: 64px; object-fit: cover; display: block; background: #3a424a; }
+.enc-row .saving { color: var(--keep); font-weight: 600; }
+.enc-row + .enc-row { border-top: 1px solid var(--rule); }
+.enc-row.head { font-size: .8rem; color: var(--muted); font-weight: 600; background: var(--table); }
+.enc-row.is-picked, .enc-row.is-picked:hover { background: var(--keep-wash); }
+.enc-row .num { text-align: right; }
+.enc-summary { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; }
+.result { background: var(--keep-wash); border-radius: var(--radius-sheet); padding: 16px 18px; margin-bottom: 16px; }
+.result code { word-break: break-all; }
+
+/* ---------- Path pair check (Settings) ---------- */
+.mapcheck { font-size: .85rem; margin: 4px 0 8px; padding: 6px 10px; border-radius: var(--radius-control); word-break: break-word; }
+.mapcheck.checking, .mapcheck.info { color: var(--muted); background: var(--table); }
+.mapcheck.ok { color: var(--keep); background: var(--keep-wash); font-weight: 600; }
+.mapcheck.warning { color: #8a4b00; background: #fff3d6; font-weight: 600; }
+.mapcheck.error { color: var(--grease); background: var(--grease-wash); font-weight: 600; }
+@media (prefers-color-scheme: dark) { .mapcheck.warning { color: #ffc46b; background: #33270f; } }
+
+/* Per-video actions: exclude the folder, copy the path, delete */
+.enc-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+button.small { padding: 3px 10px; font-size: .82rem; font-weight: 500; }
+button.danger-outline { color: var(--grease); border-color: var(--grease); background: var(--sheet); }
+button.danger-outline:hover:not(:disabled) { background: var(--grease-wash); border-color: var(--grease); }

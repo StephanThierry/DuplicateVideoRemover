@@ -1,0 +1,29 @@
+# Duplicate Video Remover on a Synology NAS (Container Manager > Project > Create > paste this file)
+# or any Docker host:  docker compose up -d
+#
+# Before starting:
+#   1. Create the folder for the data, e.g. /volume1/docker/duplicate-video-remover
+#   2. Find your NAS user's id: Control Panel > Terminal > SSH, then `id <your user>`
+#      (for example uid=1026, gid=100) and put it in "user" below. The container then has the same
+#      rights as you to the video folders - needed to move or delete duplicates.
+#   3. Change the paths of the video folders below.
+#
+# Open http://<nas address>:8095/?token=<token>
+# The token is in the container log (Container Manager > Container > Log) and in /data/.token.
+services:
+  duplicate-video-remover:
+    image: ghcr.io/stephanthierry/duplicatevideoremover:latest
+    # Or build it on the NAS from this repository:
+    # build: .
+    container_name: duplicate-video-remover
+    restart: unless-stopped
+    user: "1026:100"
+    ports:
+      - "8095:8080"          # NAS port : container port
+    environment:
+      - TZ=Europe/Copenhagen
+      # - DVR_TOKEN=choose-a-long-secret   # otherwise one is generated
+    volumes:
+      - /volume1/docker/duplicate-video-remover:/data
+      - /volume1/video:/videos/video
+      # - /volume1/homes/me/Downloads:/videos/downloads

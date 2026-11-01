@@ -1,0 +1,197 @@
+@page "/scan"
+@implements IDisposable
+@inject AppController App
+@inject NavigationManager Nav
+
+<PageTitle>Scan</PageTitle>
+
+<div class="page">
+    <div class="page-head">
+        <div>
+            <h1>Scan</h1>
+            <p>Finds the videos in your folders, reads the new ones and compares them all.</p>
+        </div>
+        @if (App.Scanner.IsRunning)
+        {
+            <button class="big" @onclick="Stop" disabled="@stopping">@(stopping ? "Stopping..." : "Stop scan")</button>
+        }
+        else
+        {
+            <button class="primary big" @onclick="Start" disabled="@(App.Settings.contentFolders.Length == 0)">Start scan</button>
+        }
+    </div>
+
+    <div class="scan-grid">
+        <section class="panel" aria-live="polite">
+            <ol class="steps">
+                @foreach (var (phase, label) in Steps)
+                {
+                    <li class="@StepClass(phase)">@label</li>
+                }
+            </ol>
+
+            @if (p.Phase == ScanPhase.Idle)
+            {
+                <p class="muted">No scan running. Videos already in the database are not read again, so later scans are much faster.</p>
+            }
+            else
+            {
+                <div class="bar @(p.Phase == ScanPhase.Done ? "done" : "")" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@((int)(p.Fraction * 100))">
+                    <div style="width:@((p.Fraction * 100).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))%"></div>
+                </div>
+
+                <div class="headline">
+                    <div class="left">@((int)(p.Fraction * 100))%<small>@p.Message</small></div>
+                    <div class="muted">@RemainingText()</div>
+                </div>
+
+                <dl class="stats">
+                    <div><dt>Videos found</dt><dd>@p.FilesFound.ToString("N0")</dd></div>
+                    @if (p.Phase >= ScanPhase.ReadingVideos)
+                    {
+                        <div><dt>Already read before</dt><dd>@Math.Max(p.FilesFound - p.NewTotal, 0).ToString("N0")</dd></div>
+                        <div><dt>New videos read</dt><dd>@p.NewDone.ToString("N0") of @p.NewTotal.ToString("N0")</dd></div>
+                        <div><dt>Could not read</dt><dd>@p.Failed.ToString("N0")</dd></div>
+                    }
+                    <div><dt>Time so far</dt><dd>@Fmt.Time(p.Elapsed)</dd></div>
+                    @if (p.SecondsPerNewFile is double s)
+                    {
+                        <div><dt>Per new video</dt><dd>@s.ToString("0.0") s</dd></div>
+                    }
+                </dl>
+
+                @if (p.Phase == ScanPhase.ReadingVideos && !string.IsNullOrEmpty(p.CurrentFile))
+                {
+                    <div class="nowreading">Reading @p.CurrentFile</div>
+                }
+
+                @if (recent.Count > 0)
+                {
+                    <div class="recent" aria-label="Screenshots of the latest videos read">
+                        @foreach (var id in recent) { <img src="shots/@(id)_2.png" alt="" onerror="this.style.display='none'" /> }
+                    </div>
+                }
+
+                @if (p.Phase == ScanPhase.Done)
+                {
+                    <div class="notice">
+                        <p><strong>@p.Message.</strong></p>
+                        <p style="margin-top:10px">
+                            <button class="primary" @onclick='() => Nav.NavigateTo("")'>Review results</button>
+                            <button @onclick='() => Nav.NavigateTo("encode")'>Re-encode large videos</button>
+                        </p>
+                        <p class="muted" style="margin-top:8px">Delete duplicates first, then re-encode: deleted videos are left out of the re-encode list.</p>
+                    </div>
+                }
+                else if (p.Phase == ScanPhase.Cancelled)
+                {
+                    <div class="notice warn"><p>@p.Message</p></div>
+                }
+                else if (p.Phase == ScanPhase.Failed)
+                {
+                    <div class="notice warn"><p><strong>The scan stopped with an error:</strong> @p.Message</p></div>
+                }
+            }
+        </section>
+
+        <aside>
+            <section class="panel scope">
+                <h2>What is scanned</h2>
+                @if (App.Settings.contentFolders.Length == 0)
+                {
+                    <p class="muted">No folders yet. Add the folders with your videos in Settings.</p>
+                }
+                else
+                {
+                    <ul class="tags" aria-label="Folders to scan">@foreach (var f in App.Settings.contentFolders) { <li title="@f">@f</li> }</ul>
+                }
+                @if (App.Settings.excludePaths.Length > 0)
+                {
+                    <p class="muted">There @(App.Settings.excludePaths.Length == 1 ? "is" : "are") @Fmt.Plural(App.Settings.excludePaths.Length, "active path filtering rule", "active path filtering rules").</p>
+                }
+                <p style="margin-top:12px"><button @onclick='() => Nav.NavigateTo("settings#folders")'>Change folders and rules</button></p>
+            </section>
+            <section class="panel">
+                <h2>Last scan</h2>
+                @if (last == null)
+                {
+                    <p class="muted">These folders have not been scanned yet. The first scan reads every video and takes the longest.</p>
+                }
+                else
+                {
+                    <p>@Fmt.Ago(last.StartedUtc), @(last.Completed ? "finished" : "stopped") after @Fmt.Approx(TimeSpan.FromSeconds(last.TotalSeconds)).</p>
+                    <p class="muted" style="margin-top:6px">@last.FilesInScope.ToString("N0") videos, @last.NewFiles.ToString("N0") of them read for the first time.</p>
+                }
+            </section>
+        </aside>
+    </div>
+</div>
+
+@code {
+    private static readonly (ScanPhase, string)[] Steps =
+    {
+        (ScanPhase.FindingFiles, "Find videos"),
+        (ScanPhase.ReadingVideos, "Read new videos"),
+        (ScanPhase.Comparing, "Compare"),
+        (ScanPhase.Done, "Done")
+    };
+
+    private ScanProgress p = new();
+    private readonly List<int> recent = new();
+    private RunRecord last;
+    private bool stopping;
+
+    protected override void OnInitialized()
+    {
+        p = App.Scanner.Current;
+        last = App.LastRun();
+        App.Scanner.ProgressChanged += OnProgress;
+    }
+
+    private void OnProgress(ScanProgress progress)
+    {
+        p = progress;
+        if (progress.LastScreenshotId is int id && !recent.Contains(id))
+        {
+            recent.Insert(0, id);
+            if (recent.Count > 8) recent.RemoveAt(recent.Count - 1);
+        }
+        if (progress.Phase is ScanPhase.Done or ScanPhase.Cancelled or ScanPhase.Failed)
+        {
+            stopping = false;
+            last = App.LastRun();
+        }
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void Start()
+    {
+        recent.Clear();
+        App.StartScan();
+    }
+
+    private void Stop()
+    {
+        stopping = true;
+        App.Scanner.Cancel();
+    }
+
+    private string StepClass(ScanPhase step)
+    {
+        var current = p.Phase is ScanPhase.Preparing ? ScanPhase.FindingFiles : p.Phase;
+        if (current is ScanPhase.Idle or ScanPhase.Cancelled or ScanPhase.Failed) return "";
+        if (current == ScanPhase.Done || step < current) return "done";
+        return step == current ? "current" : "";
+    }
+
+    private string RemainingText()
+    {
+        if (p.Phase == ScanPhase.FindingFiles || p.Phase == ScanPhase.Preparing) return "Counting videos...";
+        if (p.Phase != ScanPhase.ReadingVideos) return "";
+        if (p.NewTotal == 0) return "No new videos to read";
+        if (p.Remaining is not TimeSpan r) return "Estimating time left...";
+        return Fmt.Approx(r) + " left" + (p.EstimateFromHistory ? " (from earlier scans)" : "");
+    }
+
+    public void Dispose() => App.Scanner.ProgressChanged -= OnProgress;
+}

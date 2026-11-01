@@ -1,0 +1,181 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="DuplicateVideoRemover.Desktop.App"
+             RequestedThemeVariant="Default">
+
+  <!-- Same palette as the web interface: a light table with contact sheets, red grease pencil for removal -->
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+          <SolidColorBrush x:Key="Table" Color="#E9EDF0"/>
+          <SolidColorBrush x:Key="Sheet" Color="#FFFFFF"/>
+          <SolidColorBrush x:Key="Ink" Color="#1C2630"/>
+          <SolidColorBrush x:Key="Muted" Color="#5B6875"/>
+          <SolidColorBrush x:Key="Rule" Color="#D3DAE0"/>
+          <SolidColorBrush x:Key="Accent" Color="#1F5C8A"/>
+          <SolidColorBrush x:Key="AccentHover" Color="#1A6FB0"/>
+          <SolidColorBrush x:Key="AccentPressed" Color="#174D75"/>
+          <SolidColorBrush x:Key="Keep" Color="#2F6B4F"/>
+          <SolidColorBrush x:Key="KeepWash" Color="#E3F0E8"/>
+          <SolidColorBrush x:Key="Grease" Color="#CF2F2F"/>
+          <SolidColorBrush x:Key="GreaseHover" Color="#E23A3A"/>
+          <SolidColorBrush x:Key="GreaseWash" Color="#FBECEB"/>
+          <SolidColorBrush x:Key="Frame" Color="#2A3036"/>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="Table" Color="#15191D"/>
+          <SolidColorBrush x:Key="Sheet" Color="#1E2429"/>
+          <SolidColorBrush x:Key="Ink" Color="#E5EAEE"/>
+          <SolidColorBrush x:Key="Muted" Color="#9AA7B2"/>
+          <SolidColorBrush x:Key="Rule" Color="#2E363D"/>
+          <SolidColorBrush x:Key="Accent" Color="#5B9FD6"/>
+          <SolidColorBrush x:Key="AccentHover" Color="#7DB8EA"/>
+          <SolidColorBrush x:Key="AccentPressed" Color="#4A88BC"/>
+          <SolidColorBrush x:Key="Keep" Color="#6CC196"/>
+          <SolidColorBrush x:Key="KeepWash" Color="#1B2D24"/>
+          <SolidColorBrush x:Key="Grease" Color="#FF6B5E"/>
+          <SolidColorBrush x:Key="GreaseHover" Color="#FF8478"/>
+          <SolidColorBrush x:Key="GreaseWash" Color="#351C1B"/>
+          <SolidColorBrush x:Key="Frame" Color="#0B0E10"/>
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+
+  <Application.Styles>
+    <FluentTheme />
+    <Style Selector="TextBlock.h1"><Setter Property="FontSize" Value="24"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+    <Style Selector="TextBlock.h2"><Setter Property="FontSize" Value="17"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+    <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource Muted}"/></Style>
+    <Style Selector="TextBlock.small"><Setter Property="FontSize" Value="12"/></Style>
+    <Style Selector="Border.panel">
+      <Setter Property="Background" Value="{DynamicResource Sheet}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Rule}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="Padding" Value="20"/>
+    </Style>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="{DynamicResource Accent}"/>
+      <Setter Property="Foreground" Value="White"/>
+    </Style>
+    <Style Selector="Button.danger">
+      <Setter Property="Background" Value="{DynamicResource Grease}"/>
+      <Setter Property="Foreground" Value="White"/>
+    </Style>
+    <!-- Fluent turns buttons grey on hover, which reads as "disabled": keep the colour, a little brighter -->
+    <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AccentHover}"/>
+      <Setter Property="Foreground" Value="White"/>
+    </Style>
+    <Style Selector="Button.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AccentPressed}"/>
+      <Setter Property="Foreground" Value="White"/>
+    </Style>
+    <Style Selector="Button.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource GreaseHover}"/>
+      <Setter Property="Foreground" Value="White"/>
+    </Style>
+    <Style Selector="Button.danger:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Grease}"/>
+      <Setter Property="Foreground" Value="White"/>
+    </Style>
+    <Style Selector="Button.link">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+      <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Button.link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource AccentHover}"/>
+    </Style>
+    <!-- Round icon button (play) -->
+    <Style Selector="Button.icon">
+      <Setter Property="Width" Value="34"/>
+      <Setter Property="Height" Value="34"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="CornerRadius" Value="17"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+    </Style>
+    <Style Selector="Button.icon:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Foreground" Value="{DynamicResource AccentHover}"/>
+    </Style>
+    <!-- Small buttons in list rows -->
+    <Style Selector="Button.small">
+      <Setter Property="Padding" Value="9,3"/>
+      <Setter Property="FontSize" Value="12"/>
+    </Style>
+    <Style Selector="Button.dangerOutline">
+      <Setter Property="Background" Value="{DynamicResource Sheet}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Grease}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Foreground" Value="{DynamicResource Grease}"/>
+    </Style>
+    <Style Selector="Button.dangerOutline:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource GreaseWash}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Grease}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Grease}"/>
+    </Style>
+
+    <!-- Scrollbars: always shown at full width (Fluent hides them to a hairline), a clear thumb that is easy to
+         grab, and the accent colour while hovered or dragged -->
+    <Style Selector="ScrollViewer">
+      <Setter Property="AllowAutoHide" Value="False"/>
+    </Style>
+    <Style Selector="ScrollBar">
+      <Setter Property="AllowAutoHide" Value="False"/>
+      <Setter Property="Background" Value="{DynamicResource Table}"/>
+    </Style>
+    <Style Selector="ScrollBar:vertical">
+      <Setter Property="Width" Value="16"/>
+      <Setter Property="MinWidth" Value="16"/>
+    </Style>
+    <Style Selector="ScrollBar:horizontal">
+      <Setter Property="Height" Value="16"/>
+      <Setter Property="MinHeight" Value="16"/>
+    </Style>
+    <!-- Fluent draws the scrollbar over the content: keep a gutter free for it in lists and pages -->
+    <Style Selector="ScrollViewer.gutter">
+      <Setter Property="Padding" Value="0,0,20,0"/>
+    </Style>
+    <Style Selector="ListBox.rows">
+      <Setter Property="Padding" Value="0,0,20,0"/>
+    </Style>
+    <Style Selector="ScrollBar /template/ Thumb">
+      <Setter Property="Background" Value="{DynamicResource Muted}"/>
+      <Setter Property="CornerRadius" Value="6"/>
+    </Style>
+    <Style Selector="ScrollBar:vertical /template/ Thumb">
+      <Setter Property="Width" Value="10"/>
+      <Setter Property="MinHeight" Value="40"/>
+    </Style>
+    <Style Selector="ScrollBar:horizontal /template/ Thumb">
+      <Setter Property="Height" Value="10"/>
+      <Setter Property="MinWidth" Value="40"/>
+    </Style>
+    <Style Selector="ScrollBar /template/ Thumb:pointerover /template/ Border">
+      <Setter Property="Background" Value="{DynamicResource Accent}"/>
+    </Style>
+    <Style Selector="ScrollBar /template/ Thumb:pressed /template/ Border">
+      <Setter Property="Background" Value="{DynamicResource AccentPressed}"/>
+    </Style>
+
+    <!-- A folder shown as a tag -->
+    <Style Selector="Border.tag">
+      <Setter Property="Background" Value="{DynamicResource Table}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Rule}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="14"/>
+      <Setter Property="Padding" Value="12,3"/>
+      <Setter Property="Margin" Value="0,0,6,6"/>
+    </Style>
+    <Style Selector="CheckBox.grease">
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+    </Style>
+  </Application.Styles>
+</Application>

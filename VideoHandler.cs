@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Xabe.FFmpeg;
 using Xabe.FFmpeg.Model;
@@ -36,6 +37,17 @@ namespace deepduplicates
         /// <param name="db">databasecontext</param>
         /// <returns>Colleciton of VideoInfo. All metadata from database. On the first run only video path and duration is present</returns>
         public async Task<List<VideoInfo>> saveVideoMetadataAndScreenshots(VideoInfoContext db)
+            => await saveVideoMetadataAndScreenshots(db, null, CancellationToken.None, null);
+
+        /// <summary>Files that needed reading in the last run, and the seconds spent on them (for time estimates).</summary>
+        public int LastNewFiles { get; private set; }
+        public double LastNewSeconds { get; private set; }
+
+        /// <param name="progress">Receives progress for the interfaces (optional)</param>
+        /// <param name="ct">Stops the scan; what was read so far is saved and reused next time</param>
+        /// <param name="historicalSecondsPerNewFile">Average from earlier runs, used for the first estimate</param>
+        public async Task<List<VideoInfo>> saveVideoMetadataAndScreenshots(VideoInfoContext db, IProgress<ScanProgress> progress,
+            CancellationToken ct, double? historicalSecondsPerNewFile)
         {
             Console.WriteLine("Reading db...");
             List<VideoInfo> fullTableScan = db.VideoInfos.ToList();
@@ -58,14 +70,52 @@ namespace deepduplicates
             stopWatch_total.Start();
             int fullProcessedItems = 0;
 
-            var query = from path in fileHandler.allFiles
+            var query = (from path in fileHandler.allFiles
                         join item in fullTableScan on path equals item.path into tmp
                         from subItem in tmp.DefaultIfEmpty()
-                        select new VideoInfoWrapper { path = path, item = subItem };
+                        select new VideoInfoWrapper { path = path, item = subItem }).ToList();
+
+            // Workload: files not in the database yet, or incomplete there. Cached files take almost no time.
+            int newTotal = query.Count(w => w.item == null ||
+                ((w.item.duration == -1 || w.item.image1Checksum == null || w.item.image1hash_blob == null) && w.item.formatNotSupported != true));
+            int newDone = 0, failed = 0;
+            double newSeconds = 0;
+            int? lastScreenshotId = null;
+            var lastReport = Stopwatch.StartNew();
+
+            void Report(string current, bool force)
+            {
+                if (progress == null || (!force && lastReport.ElapsedMilliseconds < 250)) return;
+                lastReport.Restart();
+                double? perFile = newDone >= 3 ? newSeconds / newDone : historicalSecondsPerNewFile;
+                progress.Report(new ScanProgress
+                {
+                    Phase = ScanPhase.ReadingVideos,
+                    Message = "Reading new videos",
+                    FilesFound = query.Count,
+                    Checked = index,
+                    NewTotal = newTotal,
+                    NewDone = newDone,
+                    Failed = failed,
+                    CurrentFile = current,
+                    LastScreenshotId = lastScreenshotId,
+                    Elapsed = stopWatch_total.Elapsed,
+                    SecondsPerNewFile = perFile,
+                    EstimateFromHistory = newDone < 3 && historicalSecondsPerNewFile.HasValue,
+                    Remaining = perFile.HasValue ? TimeSpan.FromSeconds(perFile.Value * (newTotal - newDone)) : null
+                });
+            }
 
             foreach (VideoInfoWrapper wrapper in query)
             {
+                if (ct.IsCancellationRequested)
+                {
+                    await db.SaveChangesAsync(); // keep what was read, the next run continues from here
+                    LastNewFiles = newDone; LastNewSeconds = newSeconds;
+                    ct.ThrowIfCancellationRequested();
+                }
                 index++;
+                Report(wrapper.path, false);
                 //stopWatch.Start();
                 if (index % fileHandler.settings.logInterval == 0) Console.WriteLine(index + "/" + fileHandler.allFilesCount + " checking: " + wrapper.path);
 
@@ -86,6 +136,9 @@ namespace deepduplicates
 
                 if ((newItem || wrapper.item.duration == -1 || wrapper.item.image1Checksum == null || wrapper.item.image1hash_blob == null) && wrapper.item.formatNotSupported != true)
                 {
+                    var itemTimer = Stopwatch.StartNew();
+                    try
+                    {
                     // Console.WriteLine("Reading size ...");
                     wrapper.item.fileSize = fileHandler.GetFileSize(wrapper.path);
                     if (wrapper.item.fileSize == -1)
@@ -141,6 +194,15 @@ namespace deepduplicates
                         ShowTimeStamp(stopWatch_total, "All full process items: " + fullProcessedItems + " took a total of: ");
                     }
                     Console.WriteLine(index + "/" + fileHandler.allFilesCount + " - Video metadata retrieved. Saved to db: " + wrapper.item);
+                    }
+                    finally
+                    {
+                        newDone++;
+                        newSeconds += itemTimer.Elapsed.TotalSeconds;
+                        if (wrapper.item.remove == true || wrapper.item.duration == -1) failed++;
+                        else if (wrapper.item.id != 0) lastScreenshotId = wrapper.item.id;
+                        Report(wrapper.path, true);
+                    }
                 }
 
                 if (wrapper.item.image1hash_blob != null) wrapper.item.image1hash = imageHandler.ByteArrayToImageHash(wrapper.item.image1hash_blob);
@@ -149,6 +211,8 @@ namespace deepduplicates
 
             }
             await db.SaveChangesAsync();
+            LastNewFiles = newDone; LastNewSeconds = newSeconds;
+            Report("", true);
             Console.WriteLine("Video mediaList length: " + mediaList.Count());
             ShowTimeStamp(stopWatch_total, "All full process items: " + fullProcessedItems + " took a total of: ");
             return (mediaList);

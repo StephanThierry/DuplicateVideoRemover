@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <title>Duplicate Video Remover</title>
+    <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48" />
+    <link rel="icon" type="image/png" href="appicon-192.png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="appicon-180.png" />
+    <ResourcePreloader />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <link rel="stylesheet" href="@Assets["encode.css"]" />
+    <link rel="stylesheet" href="@Assets["DuplicateVideoRemover.Web.styles.css"]" />
+    <ImportMap />
+    <HeadOutlet @rendermode="InteractiveServer" />
+</head>
+
+<body>
+    <Routes @rendermode="InteractiveServer" />
+    <ReconnectModal />
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script>
+        // Copy text: the clipboard API needs https or localhost; over plain http on the network use the old way
+        window.dvr = {
+            copy: async function (text) {
+                if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return; }
+                const area = document.createElement("textarea");
+                area.value = text; area.style.position = "fixed"; area.style.opacity = "0";
+                document.body.appendChild(area); area.select();
+                const ok = document.execCommand("copy");
+                area.remove();
+                if (!ok) throw new Error("the browser did not allow it");
+            }
+        };
+    </script>
+</body>
+
+</html>

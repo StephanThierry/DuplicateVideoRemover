@@ -1,0 +1,257 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DuplicateVideoRemover.Desktop.ViewModels"
+             xmlns:v="using:DuplicateVideoRemover.Desktop.Views"
+             x:Class="DuplicateVideoRemover.Desktop.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel"
+             x:Name="Root">
+  <UserControl.Styles>
+    <Style Selector="Border.mapcheck"><Setter Property="Background" Value="{DynamicResource Table}"/></Style>
+    <Style Selector="Border.mapcheck TextBlock"><Setter Property="Foreground" Value="{DynamicResource Muted}"/></Style>
+    <Style Selector="Border.mapcheck.ok"><Setter Property="Background" Value="{DynamicResource KeepWash}"/></Style>
+    <Style Selector="Border.mapcheck.ok TextBlock"><Setter Property="Foreground" Value="{DynamicResource Keep}"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+    <Style Selector="Border.mapcheck.warning"><Setter Property="Background" Value="#FFF3D6"/></Style>
+    <Style Selector="Border.mapcheck.warning TextBlock"><Setter Property="Foreground" Value="#8A4B00"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+    <Style Selector="Border.mapcheck.error"><Setter Property="Background" Value="{DynamicResource GreaseWash}"/></Style>
+    <Style Selector="Border.mapcheck.error TextBlock"><Setter Property="Foreground" Value="{DynamicResource Grease}"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+  </UserControl.Styles>
+  <Grid ColumnDefinitions="*,320" ColumnSpacing="20" Margin="12,16,12,12">
+    <ScrollViewer Grid.Column="0" Classes="gutter">
+      <StackPanel Spacing="16" Margin="0,0,8,0">
+        <StackPanel>
+          <TextBlock Classes="h1" Text="Settings"/>
+          <TextBlock Classes="muted" Text="Which folders to scan and how alike two videos must be to count as duplicates." Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <Border Classes="panel">
+          <StackPanel Spacing="16">
+            <TextBlock Classes="h2" Text="Folders"/>
+            <StackPanel Spacing="4">
+              <TextBlock Text="Folders to scan" FontWeight="SemiBold"/>
+              <TextBlock Classes="muted small" Text="Sub folders are included."/>
+              <v:PathListEditor DataContext="{Binding ContentFolders}" Tag="{Binding #Root.((vm:SettingsViewModel)DataContext).Placeholder}"/>
+            </StackPanel>
+            <StackPanel Spacing="4">
+              <TextBlock Text="Skip paths that contain" FontWeight="SemiBold"/>
+              <TextBlock Classes="muted small" Text="Any part of a path, for example a folder name."/>
+              <v:PathListEditor DataContext="{Binding ExcludePaths}" Tag="e.g. Samples"/>
+            </StackPanel>
+            <StackPanel Spacing="4">
+              <TextBlock Text="Prefer keeping copies in" FontWeight="SemiBold"/>
+              <TextBlock Classes="muted small" Text="When copies are found, the one in these folders is kept."/>
+              <v:PathListEditor DataContext="{Binding PriorityFolders}" Tag="Folder"/>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="panel">
+          <StackPanel Spacing="8">
+            <TextBlock Classes="h2" Text="Windows and Linux paths"/>
+            <TextBlock Classes="muted small" TextWrapping="Wrap"
+                       Text="Lets Windows and Linux share the database. Each row says where the same storage is found on each system. The Linux side must be a mounted folder, like /mnt/videos."/>
+            <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="6">
+              <TextBlock Classes="muted small" Text="On Windows"/>
+              <TextBlock Grid.Column="1" Classes="muted small" Text="On Linux"/>
+            </Grid>
+            <ItemsControl ItemsSource="{Binding Mappings}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:MappingItem">
+                  <StackPanel Margin="0,0,0,6" Spacing="4">
+                    <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="6">
+                      <TextBox Text="{Binding Windows}" PlaceholderText="L:\"/>
+                      <TextBox Grid.Column="1" Text="{Binding Linux}" PlaceholderText="/mnt/architecture"/>
+                      <Button Grid.Column="2" Content="Remove" Command="{Binding #Root.((vm:SettingsViewModel)DataContext).RemoveMappingCommand}" CommandParameter="{Binding}"/>
+                    </Grid>
+                    <!-- Background check of the pair against the database -->
+                    <Border IsVisible="{Binding HasCheck}" CornerRadius="4" Padding="10,6" Classes="mapcheck"
+                            Classes.ok="{Binding IsOk}" Classes.warning="{Binding IsWarning}" Classes.error="{Binding IsError}">
+                      <TextBlock Text="{Binding CheckText}" TextWrapping="Wrap" FontSize="12"/>
+                    </Border>
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Content="Add a path pair" Command="{Binding AddMappingCommand}"/>
+            <TextBlock Text="Try a path" FontWeight="SemiBold" Margin="0,8,0,0"/>
+            <TextBox Text="{Binding TestPath}" PlaceholderText="Paste a Windows or Linux path"/>
+            <TextBlock Text="{Binding TestResult}" TextWrapping="Wrap"/>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="panel">
+          <StackPanel Spacing="8">
+            <TextBlock Classes="h2" Text="Other names for the same place"/>
+            <TextBlock Classes="muted small" TextWrapping="Wrap"
+                       Text="For example a mapped drive letter and the network path it points to (L:\ and \\nas\video\). The main name is what the database uses - the network path is best, because it works on every computer. Each computer uses whichever of the names it can reach."/>
+            <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="6">
+              <TextBlock Classes="muted small" Text="Main name (network path)"/>
+              <TextBlock Grid.Column="1" Classes="muted small" Text="Also known as"/>
+            </Grid>
+            <ItemsControl ItemsSource="{Binding Synonyms}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:SynonymItem">
+                  <StackPanel Margin="0,0,0,6" Spacing="4">
+                    <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="6">
+                      <TextBox Text="{Binding Main}" PlaceholderText="\\nas\video\"/>
+                      <TextBox Grid.Column="1" Text="{Binding Alias}" PlaceholderText="L:\"/>
+                      <Button Grid.Column="2" Content="Remove" Command="{Binding #Root.((vm:SettingsViewModel)DataContext).RemoveSynonymCommand}" CommandParameter="{Binding}"/>
+                    </Grid>
+                    <Border IsVisible="{Binding HasCheck}" CornerRadius="4" Padding="10,6" Classes="mapcheck"
+                            Classes.ok="{Binding IsOk}" Classes.warning="{Binding IsWarning}" Classes.error="{Binding IsError}">
+                      <StackPanel Spacing="8">
+                        <TextBlock Text="{Binding CheckText}" TextWrapping="Wrap" FontSize="12"/>
+                        <Button Classes="primary" Content="Update paths" Command="{Binding UpdateCommand}" IsVisible="{Binding CanUpdate}" HorizontalAlignment="Left"/>
+                      </StackPanel>
+                    </Border>
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Content="Add a synonym" Command="{Binding AddSynonymCommand}"/>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="panel">
+          <StackPanel Spacing="14">
+            <TextBlock Classes="h2" Text="When are videos duplicates?"/>
+            <TextBlock Classes="muted" Text="Videos of the same length (within a second) are compared using 3 screenshots each." TextWrapping="Wrap"/>
+            <v:MatchEditor DataContext="{Binding Match}"/>
+            <CheckBox IsChecked="{Binding UseSameFolder}" Content="Use other rules for copies in folders with the same name" Margin="0,10,0,0"/>
+            <TextBlock Classes="muted small" Text="For example looser rules for re-encoded copies that sit next to each other."/>
+            <v:MatchEditor DataContext="{Binding SameFolder}" IsVisible="{Binding #Root.((vm:SettingsViewModel)DataContext).UseSameFolder}"/>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="panel">
+          <StackPanel Spacing="12">
+            <TextBlock Classes="h2" Text="False positives"/>
+            <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding FalsePositivesText}"/>
+            <Button Content="Review false positives" Command="{Binding OpenFalsePositivesCommand}"/>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="panel">
+          <StackPanel Spacing="12">
+            <TextBlock Classes="h2" Text="Re-encoding"/>
+            <TextBlock Classes="muted" TextWrapping="Wrap" Text="How the Re-encode screen makes smaller copies of large videos. The defaults are the recommended settings."/>
+            <v:EncodeSettingsEditor DataContext="{Binding Encoding}"/>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="panel">
+          <StackPanel Spacing="12">
+            <TextBlock Classes="h2" Text="Short, small and preferred versions"/>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="Remove videos this short or shorter" VerticalAlignment="Center" Width="260"/>
+              <NumericUpDown Value="{Binding MinLength}" Minimum="0" Increment="1" FormatString="0" Width="130"/>
+              <TextBlock Text="seconds" VerticalAlignment="Center"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="Remove videos smaller than" VerticalAlignment="Center" Width="260"/>
+              <NumericUpDown Value="{Binding MinSizeKb}" Minimum="0" Increment="100" FormatString="0" Width="130"/>
+              <TextBlock Text="KB (0 = off)" VerticalAlignment="Center"/>
+            </StackPanel>
+            <TextBlock Text="Prefer one version over another" FontWeight="SemiBold" Margin="0,8,0,0"/>
+            <TextBlock Classes="muted small" TextWrapping="Wrap"
+                       Text="If the path of one copy contains the first text and the other copy the second, keep the first when their sizes are close."/>
+            <ItemsControl ItemsSource="{Binding Switches}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:SwitchItem">
+                  <WrapPanel Margin="0,0,0,6">
+                    <TextBlock Text="Keep" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBox Text="{Binding Up}" Width="90"/>
+                    <TextBlock Text="over" VerticalAlignment="Center" Margin="6,0"/>
+                    <TextBox Text="{Binding Down}" Width="90"/>
+                    <TextBlock Text="when sizes differ by less than" VerticalAlignment="Center" Margin="6,0"/>
+                    <NumericUpDown Value="{Binding Percent}" Minimum="0" Maximum="100" FormatString="0" Width="110"/>
+                    <TextBlock Text="%" VerticalAlignment="Center" Margin="6,0"/>
+                    <Button Content="Remove" Command="{Binding #Root.((vm:SettingsViewModel)DataContext).RemoveSwitchCommand}" CommandParameter="{Binding}"/>
+                  </WrapPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Content="Add a rule" Command="{Binding AddSwitchCommand}"/>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+
+    <!-- Save -->
+    <Border Grid.Column="1" Classes="panel" VerticalAlignment="Top">
+      <StackPanel Spacing="10">
+        <Button Classes="primary" Content="Save settings" Command="{Binding SaveCommand}" IsEnabled="{Binding Dirty}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+        <Button Content="Save and compare again" Command="{Binding SaveAndCompareCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                ToolTip.Tip="Saves, then updates the review with the videos already read"/>
+        <TextBlock Text="{Binding SavedMessage}" Foreground="{DynamicResource Keep}" FontWeight="SemiBold"/>
+      </StackPanel>
+    </Border>
+
+    <!-- Sub page: the marked false positives -->
+    <DockPanel Grid.ColumnSpan="2" Margin="-12,-16,-12,-12" Background="{DynamicResource Table}" IsVisible="{Binding FalsePositivesVisible}">
+      <DockPanel DockPanel.Dock="Top" Margin="12,16,12,12">
+        <Button DockPanel.Dock="Right" Content="Back to settings" Command="{Binding CloseFalsePositivesCommand}" VerticalAlignment="Bottom"/>
+        <StackPanel>
+          <TextBlock Classes="h1" Text="False positives"/>
+          <TextBlock Classes="muted" TextWrapping="Wrap" Margin="0,4,0,0"
+                     Text="Videos marked as &quot;False positive&quot; in Review. They are recognised by their content, so a mark still applies after the files are moved or renamed."/>
+          <TextBlock Text="{Binding FalsePositivesStatus}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+        </StackPanel>
+      </DockPanel>
+      <ScrollViewer Margin="12,0,12,12" Classes="gutter">
+        <ItemsControl ItemsSource="{Binding FalsePositiveItems}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:FalsePositiveItem">
+              <Border Classes="panel" Padding="0" Margin="0,0,0,12">
+                <StackPanel>
+                  <DockPanel Margin="14,8">
+                    <Button DockPanel.Dock="Right" Content="Remove" Command="{Binding RemoveCommand}" ToolTip.Tip="These two can be found as duplicates again"/>
+                    <TextBlock Classes="muted small" Text="{Binding Heading}" VerticalAlignment="Center"/>
+                  </DockPanel>
+                  <ContentControl Content="{Binding A}"/>
+                  <ContentControl Content="{Binding B}"/>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+          <ItemsControl.DataTemplates>
+            <DataTemplate DataType="vm:FalsePositiveVideo">
+              <Border BorderBrush="{DynamicResource Rule}" BorderThickness="0,1,0,0" Padding="14,10">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                  <Border Background="{DynamicResource Frame}" CornerRadius="3" Padding="4" Width="376" Height="88">
+                    <Panel>
+                      <StackPanel Orientation="Horizontal" Spacing="3" IsVisible="{Binding InDatabase}">
+                        <Image Source="{Binding Shot1}" Width="120" Height="80" Stretch="UniformToFill"/>
+                        <Image Source="{Binding Shot2}" Width="120" Height="80" Stretch="UniformToFill"/>
+                        <Image Source="{Binding Shot3}" Width="120" Height="80" Stretch="UniformToFill"/>
+                      </StackPanel>
+                      <TextBlock Text="Not in the database" Foreground="#9AA7B2" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding !InDatabase}"/>
+                    </Panel>
+                  </Border>
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                    <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                    <TextBlock Classes="muted small" Text="{Binding Folder}" TextWrapping="Wrap"/>
+                    <TextBlock Classes="muted small" Text="{Binding Meta}"/>
+                  </StackPanel>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.DataTemplates>
+        </ItemsControl>
+      </ScrollViewer>
+    </DockPanel>
+
+    <!-- "Update paths" confirmation -->
+    <Grid Grid.ColumnSpan="2" Margin="-12,-16,-12,-12" Background="#80000000" IsVisible="{Binding ConfirmVisible}">
+      <Border Classes="panel" Width="560" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
+        <StackPanel Spacing="12">
+          <TextBlock Classes="h2" Text="{Binding ConfirmTitle}" TextWrapping="Wrap"/>
+          <TextBlock Classes="muted" Text="{Binding ConfirmText}" TextWrapping="Wrap"/>
+          <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="Cancel" Command="{Binding CancelUpdateCommand}"/>
+            <Button Classes="primary" Content="Update paths" Command="{Binding ConfirmUpdateCommand}" IsEnabled="{Binding !Updating}"/>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Command-line version: scans, then writes report.html and the delete script to ./output -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>duplicatevideoremover</AssemblyName>
+    <RootNamespace>deepduplicates</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../duplicatevideoremover.csproj" />
+    <!-- SkiaSharp's native library for Linux, without extra system dependencies (servers, NAS) -->
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.4" />
+  </ItemGroup>
+
+</Project>

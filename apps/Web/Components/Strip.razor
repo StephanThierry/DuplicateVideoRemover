@@ -1,0 +1,17 @@
+@* Three screenshots of a video as a film strip. Crossed out in red when picked for removal. *@
+<div class="strip" @onclick="OnClick" title="@Title">
+    @for (int i = 1; i <= 3; i++)
+    {
+        <img loading="lazy" src="shots/@(VideoId)_@(i).png" alt="" onerror="this.classList.add('missing')" />
+    }
+    <svg class="mark" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M4 10 Q 50 48 96 90" vector-effect="non-scaling-stroke" />
+        <path d="M95 8 Q 52 55 5 92" vector-effect="non-scaling-stroke" />
+    </svg>
+</div>
+
+@code {
+    [Parameter] public int VideoId { get; set; }
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public EventCallback OnClick { get; set; }
+}

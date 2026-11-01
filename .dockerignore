@@ -1,0 +1,14 @@
+**/bin/
+**/obj/
+.git/
+.vs/
+.vscode/
+apps/Desktop/
+tests/
+output/
+_screens/
+ffmpeg/
+deepdupes.db*
+settings.json
+pathmapping.json
+runhistory.json
