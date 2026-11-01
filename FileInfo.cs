@@ -10,7 +10,10 @@ namespace deepduplicates
     //dotnet build
     //dotnet ef migrations add [migration_name] - fx. "InitialCreate" 
     //dotnet ef database update
+    // Lower-case name kept on purpose: it has been part of the engine since the start
+#pragma warning disable CS8981
     public class rgb {
+#pragma warning restore CS8981
         public int r { get; set; }
         public int g { get; set; }
         public int b { get; set; }

@@ -15,7 +15,7 @@
       </ItemsControl.ItemTemplate>
     </ItemsControl>
     <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
-      <TextBox Text="{Binding NewValue}" Watermark="{Binding $parent[UserControl].Tag}"/>
+      <TextBox Text="{Binding NewValue}" PlaceholderText="{Binding $parent[UserControl].Tag}"/>
       <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseCommand}" IsVisible="{Binding CanBrowse}"/>
       <Button Grid.Column="2" Content="Add" Command="{Binding AddCommand}"/>
     </Grid>

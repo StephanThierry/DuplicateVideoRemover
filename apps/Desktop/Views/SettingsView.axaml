@@ -58,8 +58,8 @@
                 <DataTemplate x:DataType="vm:MappingItem">
                   <StackPanel Margin="0,0,0,6" Spacing="4">
                     <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="6">
-                      <TextBox Text="{Binding Windows}" Watermark="L:\"/>
-                      <TextBox Grid.Column="1" Text="{Binding Linux}" Watermark="/mnt/architecture"/>
+                      <TextBox Text="{Binding Windows}" PlaceholderText="L:\"/>
+                      <TextBox Grid.Column="1" Text="{Binding Linux}" PlaceholderText="/mnt/architecture"/>
                       <Button Grid.Column="2" Content="Remove" Command="{Binding #Root.((vm:SettingsViewModel)DataContext).RemoveMappingCommand}" CommandParameter="{Binding}"/>
                     </Grid>
                     <!-- Background check of the pair against the database -->
@@ -73,7 +73,7 @@
             </ItemsControl>
             <Button Content="Add a path pair" Command="{Binding AddMappingCommand}"/>
             <TextBlock Text="Try a path" FontWeight="SemiBold" Margin="0,8,0,0"/>
-            <TextBox Text="{Binding TestPath}" Watermark="Paste a Windows or Linux path"/>
+            <TextBox Text="{Binding TestPath}" PlaceholderText="Paste a Windows or Linux path"/>
             <TextBlock Text="{Binding TestResult}" TextWrapping="Wrap"/>
           </StackPanel>
         </Border>
@@ -92,8 +92,8 @@
                 <DataTemplate x:DataType="vm:SynonymItem">
                   <StackPanel Margin="0,0,0,6" Spacing="4">
                     <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="6">
-                      <TextBox Text="{Binding Main}" Watermark="\\nas\video\"/>
-                      <TextBox Grid.Column="1" Text="{Binding Alias}" Watermark="L:\"/>
+                      <TextBox Text="{Binding Main}" PlaceholderText="\\nas\video\"/>
+                      <TextBox Grid.Column="1" Text="{Binding Alias}" PlaceholderText="L:\"/>
                       <Button Grid.Column="2" Content="Remove" Command="{Binding #Root.((vm:SettingsViewModel)DataContext).RemoveSynonymCommand}" CommandParameter="{Binding}"/>
                     </Grid>
                     <Border IsVisible="{Binding HasCheck}" CornerRadius="4" Padding="10,6" Classes="mapcheck"

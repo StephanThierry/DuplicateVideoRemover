@@ -46,7 +46,7 @@
       <TextBlock Text="Only above" VerticalAlignment="Center" Margin="0,0,6,6"/>
       <NumericUpDown Value="{Binding MinKbps}" Minimum="0" Increment="500" FormatString="0" Width="140" Margin="0,0,6,6"/>
       <TextBlock Text="kbit/s" VerticalAlignment="Center" Margin="0,0,16,6"/>
-      <TextBox Text="{Binding Search}" Watermark="Filter by file or folder name" Width="280" Margin="0,0,0,6"/>
+      <TextBox Text="{Binding Search}" PlaceholderText="Filter by file or folder name" Width="280" Margin="0,0,0,6"/>
     </WrapPanel>
 
     <Border Grid.Row="4" Classes="panel" Padding="40" VerticalAlignment="Top" IsVisible="{Binding !HasVideos}">

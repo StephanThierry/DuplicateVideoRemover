@@ -68,7 +68,7 @@
       <TextBlock Text="Name of the new files" FontWeight="SemiBold"/>
       <TextBlock Classes="muted small" TextWrapping="Wrap" Text="The new file is saved next to the original, with this added to the name. The original is not changed."/>
       <StackPanel Orientation="Horizontal" Spacing="10">
-        <TextBox Text="{Binding FileSuffix}" Watermark="{Binding SuffixPlaceholder}" Width="220"/>
+        <TextBox Text="{Binding FileSuffix}" PlaceholderText="{Binding SuffixPlaceholder}" Width="220"/>
         <TextBlock Classes="muted" Text="{Binding ExampleName}" VerticalAlignment="Center"/>
       </StackPanel>
     </StackPanel>

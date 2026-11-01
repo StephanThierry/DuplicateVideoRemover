@@ -95,7 +95,7 @@
           <Button Content="Select all duplicates" Command="{Binding SelectAllDuplicatesCommand}" Margin="0,0,8,6"/>
           <Button Content="Select broken and short" Command="{Binding SelectBrokenCommand}" Margin="0,0,8,6"/>
           <Button Content="Select none" Command="{Binding SelectNoneCommand}" IsEnabled="{Binding HasSelection}" Margin="0,0,8,6"/>
-          <TextBox Text="{Binding Search}" Watermark="Filter by file or folder name" Width="280" Margin="0,0,0,6"/>
+          <TextBox Text="{Binding Search}" PlaceholderText="Filter by file or folder name" Width="280" Margin="0,0,0,6"/>
         </WrapPanel>
         <Border DockPanel.Dock="Top" Classes="panel" Padding="12,8" Margin="0,0,0,10" IsVisible="{Binding FolderFilterActive}">
           <WrapPanel>
