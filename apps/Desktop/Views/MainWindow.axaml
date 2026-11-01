@@ -5,18 +5,14 @@
         x:Class="DuplicateVideoRemover.Desktop.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="Duplicate Video Remover"
+        Icon="/Assets/appicon.ico"
         Width="1280" Height="860" MinWidth="900" MinHeight="600"
         Background="{DynamicResource Table}">
   <DockPanel>
     <Border DockPanel.Dock="Top" Background="{DynamicResource Sheet}" BorderBrush="{DynamicResource Rule}" BorderThickness="0,0,0,1" Padding="20,10">
       <DockPanel>
         <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-          <Viewbox Width="22" Height="22">
-            <Canvas Width="24" Height="24">
-              <Rectangle Canvas.Left="2" Canvas.Top="4" Width="20" Height="16" RadiusX="2" RadiusY="2" Stroke="{DynamicResource Grease}" StrokeThickness="2"/>
-              <Path Data="M7,9 L17,15 M17,9 L7,15" Stroke="{DynamicResource Grease}" StrokeThickness="2.4" StrokeLineCap="Round"/>
-            </Canvas>
-          </Viewbox>
+          <Image Source="/Assets/appicon-32.png" Width="24" Height="24"/>
           <TextBlock Text="Duplicate Video Remover" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center"/>
         </StackPanel>
         <TextBlock Text="{Binding DataFolder}" Classes="muted small" HorizontalAlignment="Right" VerticalAlignment="Center"

@@ -10,6 +10,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
     <AssemblyName>DuplicateVideoRemover.Web</AssemblyName>
+    <!-- Made from ressource/appicon.png with tools/make-icons.ps1 -->
+    <ApplicationIcon>appicon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
