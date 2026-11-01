@@ -10,8 +10,9 @@
     <div class="page-head">
         <div>
             <h1>All files</h1>
-            <p>Every video the last scan found. Search: all words must be in the path, <code>-word</code> leaves out paths with that word, <code>"two words"</code> searches a phrase. Not case sensitive.</p>
+            <p>@SourceText() Search: all words must be in the path, <code>-word</code> leaves out paths with that word, <code>"two words"</code> searches a phrase. Not case sensitive.</p>
         </div>
+        <button @onclick='() => Nav.NavigateTo("scan")' title="Find new and moved files">Scan again</button>
     </div>
 
     @if (index == null)
@@ -140,6 +141,11 @@
         matches = index.Search(query, f => !hidden.Contains(f.Folder) && !deleted.Contains(f.Id));
         shown = PageSize;
     }
+
+    // Where the list comes from: no scan is needed to open this page
+    private static string SourceText() => LastScan.FoundUtc is DateTime t
+        ? $"Every video the scan from {Fmt.When(t)} found (the saved file list - nothing is scanned)."
+        : "Every video found on disk.";
 
     private string ResultText()
     {

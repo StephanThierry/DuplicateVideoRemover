@@ -114,11 +114,18 @@ namespace deepduplicates
 
         /// <summary>
         /// Every video the last scan found (the All files screen), indexed for searching. Built once and kept
-        /// until the data changes; the database's dormant rows are left out (see CurrentMedia).
+        /// until the data changes; the database's dormant rows are left out (see CurrentMedia). Needs no scan:
+        /// the files come from the list the last scan saved, the details from the database.
         /// </summary>
         public FileIndex AllFiles()
         {
-            lock (cacheLock) return fileIndex ??= new FileIndex(CurrentMedia().Where(v => !string.IsNullOrEmpty(v.path)).Select(VideoEntry.From));
+            lock (cacheLock)
+            {
+                if (fileIndex != null) return fileIndex;
+                // With a saved list: only the columns the list shows - no scan, no fingerprints (about a second)
+                var listed = LastScan.FilterEntries(ScanEngine.LoadEntries());
+                return fileIndex = new FileIndex(listed ?? CurrentMedia().Where(v => !string.IsNullOrEmpty(v.path)).Select(VideoEntry.From).ToList());
+            }
         }
 
         /// <summary>A video in the current results or found by the last scan (for playing it), or null.</summary>

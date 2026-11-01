@@ -17,7 +17,14 @@
         }
         else
         {
-            <button class="primary big" @onclick="Start" disabled="@(App.Settings.contentFolders.Length == 0)">Start scan</button>
+            <div class="inline">
+                @if (LastScan.FoundUtc is DateTime listed)
+                {
+                    @* The saved file list: All files opens it straight away, nothing is scanned *@
+                    <button class="big" @onclick='() => Nav.NavigateTo("files")' title="Opens the files the last scan found - nothing is scanned">Show all files from @Fmt.When(listed)</button>
+                }
+                <button class="primary big" @onclick="Start" disabled="@(App.Settings.contentFolders.Length == 0)">Start scan</button>
+            </div>
         }
     </div>
 

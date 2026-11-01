@@ -43,5 +43,6 @@ public partial class MainViewModel : ObservableObject
     public void ShowReview() => SelectedTab = ReviewTab;
     public void ShowScan() => SelectedTab = ScanTab;
     public void ShowEncode() => SelectedTab = EncodeTab;
+    public void ShowFiles() => SelectedTab = FilesTab;
     public void ShowSettings() => SelectedTab = SettingsTab;
 }

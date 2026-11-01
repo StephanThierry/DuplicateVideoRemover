@@ -183,3 +183,13 @@ if (Environment.GetEnvironmentVariable("SHOT_FILES") == "1")
     Console.WriteLine($"after typing: {vm.Files.ResultText}");
     Shot("d_files_search");
 }
+// SHOT_LOADTIME=1: how long opening All files takes (database load + saved file list)
+if (Environment.GetEnvironmentVariable("SHOT_LOADTIME") == "1")
+{
+    var sw = System.Diagnostics.Stopwatch.StartNew();
+    var all = ScanEngine.LoadAllCached();
+    Console.WriteLine($"load database (with fingerprints): {sw.Elapsed.TotalSeconds:0.0} s, {all.Count:N0} rows");
+    sw.Restart();
+    var idx = controller.AllFiles();
+    Console.WriteLine($"All files index (first time): {sw.Elapsed.TotalSeconds:0.0} s, {idx.Count:N0} files");
+}

@@ -33,6 +33,7 @@ public partial class AllFilesViewModel : ObservableObject
     [ObservableProperty] private IReadOnlyList<FileRow> rows = Array.Empty<FileRow>();
     [ObservableProperty] private string search = "";
     [ObservableProperty] private string resultText = "";
+    [ObservableProperty] private string sourceText = "";
     [ObservableProperty] private bool loading;
     [ObservableProperty] private bool hasFiles = true;
     [ObservableProperty] private bool hasMatches = true;
@@ -58,6 +59,10 @@ public partial class AllFilesViewModel : ObservableObject
         stale = false;
         Loading = true;
         index = await Task.Run(app.AllFiles);
+        // Where the list comes from: no scan is needed to open this screen
+        SourceText = LastScan.FoundUtc is DateTime t
+            ? $"Every video the scan from {Fmt.When(t)} found (the saved file list - nothing is scanned)."
+            : "Every video found on disk.";
         rowsById.Clear();
         deleted.Clear();
         foreach (var e in index.All) rowsById[e.Id] = new FileRow(e, this);
@@ -158,6 +163,7 @@ public partial class AllFilesViewModel : ObservableObject
     }
 
     [RelayCommand] private void GoToScan() => main.ShowScan();
+    [RelayCommand] private void ScanAgain() => main.ShowScan();
 
     private void ShowToast(string text, int ms = 4000)
     {

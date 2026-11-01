@@ -39,10 +39,15 @@
   <ScrollViewer Classes="gutter">
     <Grid RowDefinitions="Auto,*" Margin="12,16,12,12">
       <DockPanel Grid.Row="0" Margin="0,0,0,16">
-        <Panel DockPanel.Dock="Right" VerticalAlignment="Bottom">
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+          <!-- The saved file list: All files opens it straight away, nothing is scanned -->
+          <Button Content="{Binding SavedListText}" Command="{Binding ShowFilesCommand}" IsVisible="{Binding HasSavedList}" FontSize="15" Padding="20,9"
+                  ToolTip.Tip="Opens the files the last scan found - nothing is scanned"/>
+          <Panel>
           <Button Classes="primary" Content="Start scan" Command="{Binding StartCommand}" IsVisible="{Binding !IsRunning}" FontSize="15" Padding="20,9"/>
           <Button Content="Stop scan" Command="{Binding StopCommand}" IsVisible="{Binding IsRunning}" IsEnabled="{Binding !Stopping}" FontSize="15" Padding="20,9"/>
-        </Panel>
+          </Panel>
+        </StackPanel>
         <StackPanel>
           <TextBlock Classes="h1" Text="Scan"/>
           <TextBlock Classes="muted" Text="Finds the videos in your folders, reads the new ones and compares them all." Margin="0,4,0,0"/>

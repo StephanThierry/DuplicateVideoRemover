@@ -26,6 +26,7 @@ namespace deepduplicates
         private static readonly object sync = new();
         private static HashSet<string> paths;
         private static string loadedFrom;
+        private static DateTime foundUtc;
 
         private static string FilePath => Path.Combine(FileHandler.AppFolder, "output", "lastscan.json");
 
@@ -41,6 +42,7 @@ namespace deepduplicates
                 var tmp = FilePath + ".tmp";
                 File.WriteAllText(tmp, JsonSerializer.Serialize(new FileData { FoundUtc = DateTime.UtcNow, Paths = list }));
                 File.Move(tmp, FilePath, overwrite: true);
+                foundUtc = DateTime.UtcNow;
                 paths = new HashSet<string>(list, Comparer);
                 loadedFrom = FilePath;
             }
@@ -50,6 +52,17 @@ namespace deepduplicates
         public static void Remove(string path)
         {
             lock (sync) { EnsureLoaded(); paths?.Remove(path); }
+        }
+
+        /// <summary>When the last scan listed the files (UTC), or null when there is no list.</summary>
+        public static DateTime? FoundUtc { get { lock (sync) { EnsureLoaded(); return paths == null ? null : foundUtc; } } }
+
+        /// <summary>The entries whose path is in the list (null when there is no list).</summary>
+        public static List<VideoEntry> FilterEntries(IEnumerable<VideoEntry> entries)
+        {
+            HashSet<string> set;
+            lock (sync) { EnsureLoaded(); set = paths; }
+            return set == null ? null : entries.Where(e => set.Contains(e.Path)).ToList();
         }
 
         /// <summary>True when a scan list exists on this installation.</summary>
@@ -93,7 +106,7 @@ namespace deepduplicates
             {
                 if (!File.Exists(FilePath)) return;
                 var data = JsonSerializer.Deserialize<FileData>(File.ReadAllText(FilePath));
-                if (data != null) paths = new HashSet<string>(data.Paths, Comparer);
+                if (data != null) { paths = new HashSet<string>(data.Paths, Comparer); foundUtc = data.FoundUtc; }
             }
             catch (Exception e) { Console.WriteLine("Could not read lastscan.json: " + e.Message); }
         }

@@ -18,9 +18,13 @@
 
   <Grid RowDefinitions="Auto,Auto,*" Margin="12,16,12,0">
     <StackPanel Grid.Row="0" Margin="0,0,0,12">
-      <TextBlock Classes="h1" Text="All files"/>
+      <DockPanel>
+        <Button DockPanel.Dock="Right" Content="Scan again" Command="{Binding ScanAgainCommand}" ToolTip.Tip="Find new and moved files" VerticalAlignment="Bottom"/>
+        <TextBlock Classes="h1" Text="All files"/>
+      </DockPanel>
+      <TextBlock Text="{Binding SourceText}" TextWrapping="Wrap" Margin="0,4,0,0"/>
       <TextBlock Classes="muted" TextWrapping="Wrap" Margin="0,4,0,0"
-                 Text="Every video the last scan found. Search: all words must be in the path, -word leaves out paths with that word, &quot;two words&quot; searches a phrase. Not case sensitive."/>
+                 Text="Search: all words must be in the path, -word leaves out paths with that word, &quot;two words&quot; searches a phrase. Not case sensitive."/>
     </StackPanel>
 
     <DockPanel Grid.Row="1" Margin="0,0,0,10" IsVisible="{Binding HasFiles}">

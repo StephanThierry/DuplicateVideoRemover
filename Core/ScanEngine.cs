@@ -225,6 +225,32 @@ namespace deepduplicates
         /// </summary>
         public static List<VideoInfo> LoadCached(Settings settings) => InScope(LoadAllCached(), settings);
 
+        /// <summary>
+        /// Every video in the database with only what lists show (id, path, size, length, bitrate) - much faster
+        /// than LoadAllCached, which also decodes the screenshot fingerprints used for comparing.
+        /// </summary>
+        public static List<VideoEntry> LoadEntries()
+        {
+            using var db = new VideoInfoContext();
+            db.Database.EnsureCreated();
+            var conn = db.Database.GetDbConnection();
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT id, path, fileSize, duration, bitrate FROM VideoInfos WHERE path IS NOT NULL";
+            var list = new List<VideoEntry>();
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+                list.Add(new VideoEntry
+                {
+                    Id = r.GetInt32(0),
+                    Path = PathMapper.ToLocal(r.GetString(1)),
+                    SizeBytes = r.IsDBNull(2) ? 0 : Math.Max(r.GetInt64(2), 0),
+                    DurationSeconds = r.IsDBNull(3) ? -1 : r.GetInt32(3),
+                    Bitrate = r.IsDBNull(4) ? 0 : r.GetDouble(4)
+                });
+            return list;
+        }
+
         /// <summary>Every video in the database, with screenshot hashes decoded.</summary>
         public static List<VideoInfo> LoadAllCached()
         {

@@ -36,6 +36,9 @@ public partial class ScanViewModel : ObservableObject
     [ObservableProperty] private bool isProblem;
     [ObservableProperty] private string scopeText = "";
     [ObservableProperty] private string filterRulesText = "";
+    // The saved file list of the last scan: All files opens it without scanning
+    [ObservableProperty] private bool hasSavedList;
+    [ObservableProperty] private string savedListText = "";
     /// <summary>The folders to scan, shown as tags.</summary>
     public ObservableCollection<string> ScopeFolders { get; } = new();
     [ObservableProperty] private string lastRunText = "";
@@ -59,6 +62,8 @@ public partial class ScanViewModel : ObservableObject
         ScopeText = s.contentFolders.Length == 0 ? "No folders yet. Add the folders with your videos in Settings." : "";
         int rules = s.excludePaths.Length;
         FilterRulesText = rules == 0 ? "" : $"There {(rules == 1 ? "is" : "are")} {Fmt.Plural(rules, "active path filtering rule", "active path filtering rules")}.";
+        HasSavedList = LastScan.FoundUtc != null;
+        SavedListText = LastScan.FoundUtc is DateTime listed ? "Show all files from " + Fmt.When(listed) : "";
         var last = app.LastRun();
         if (last == null)
         {
@@ -130,6 +135,7 @@ public partial class ScanViewModel : ObservableObject
     [RelayCommand] private void Review() => main.ShowReview();
     [RelayCommand] private void Encode() => main.ShowEncode();
     [RelayCommand] private void EditSettings() => main.ShowSettings();
+    [RelayCommand] private void ShowFiles() => main.ShowFiles();
 }
 
 /// <summary>One phase of a scan: its own bar, percentage and what it is doing.</summary>

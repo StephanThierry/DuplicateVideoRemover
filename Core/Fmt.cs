@@ -38,6 +38,16 @@ namespace deepduplicates
             return $"{(int)d.TotalDays} days ago";
         }
 
+        /// <summary>"today at 20:16", "yesterday at 20:16", "1 Nov at 20:16" (with the year when not this year).</summary>
+        public static string When(DateTime utc)
+        {
+            var t = utc.ToLocalTime();
+            var today = DateTime.Now.Date;
+            string day = t.Date == today ? "today" : t.Date == today.AddDays(-1) ? "yesterday"
+                : t.ToString(t.Year == today.Year ? "d MMM" : "d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
+            return $"{day} at {t.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture)}";
+        }
+
         public static string Plural(int n, string one, string many) => $"{n:N0} {(n == 1 ? one : many)}";
     }
 }
