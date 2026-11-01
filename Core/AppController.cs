@@ -230,7 +230,7 @@ namespace deepduplicates
         {
             try
             {
-                if (File.Exists(path)) File.Delete(path);
+                VideoFile.Delete(path);
             }
             catch (Exception e) { return e.Message; }
             ResultSession.RemoveFromDatabase(new List<VideoEntry> { new VideoEntry { Id = id, Path = path } }, CreateFileHandler());

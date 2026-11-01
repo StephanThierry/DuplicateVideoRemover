@@ -154,3 +154,12 @@ if (Environment.GetEnvironmentVariable("SHOT_COMPARE") == "1")
     Analyzer.Analyze(media, controller.Settings, f => steps.Add(f));
     Console.WriteLine($"analyze only: {t.Elapsed.TotalSeconds:0.0} s for {media.Count:N0} videos, {steps.Count} progress reports, last {(steps.Count > 0 ? steps[^1] : 0):P0}");
 }
+// SHOT_READONLY=1: a read-only file can be deleted (File.Delete alone says "Access to the path is denied")
+if (Environment.GetEnvironmentVariable("SHOT_READONLY") == "1")
+{
+    string ro = Path.Combine(output, "readonly-test.mp4");
+    File.WriteAllText(ro, "x");
+    File.SetAttributes(ro, FileAttributes.ReadOnly);
+    try { VideoFile.Delete(ro); Console.WriteLine("read-only delete: " + (File.Exists(ro) ? "still there" : "deleted")); }
+    catch (Exception e) { Console.WriteLine("read-only delete failed: " + e.Message); }
+}

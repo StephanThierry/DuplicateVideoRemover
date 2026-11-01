@@ -211,7 +211,7 @@ namespace deepduplicates
                 progress?.Report(new DeleteProgress(i, targets.Count, entry.FileName, report.Failed.Count));
                 try
                 {
-                    if (File.Exists(entry.Path)) File.Delete(entry.Path);
+                    VideoFile.Delete(entry.Path);
                     // A file that is already gone counts as removed, so it disappears from the list
                     report.Removed.Add(entry);
                 }
