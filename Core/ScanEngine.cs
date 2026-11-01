@@ -83,6 +83,8 @@ namespace deepduplicates
                     Elapsed = total.Elapsed
                 }), ct);
                 record.FilesInScope = fileHandler.allFilesCount;
+                // What is on disk now - the database also holds dormant rows of moved or missing files
+                try { LastScan.Save(fileHandler.allFiles); } catch (Exception e) { Console.WriteLine("Could not save lastscan.json: " + e.Message); }
 
                 using var db = new VideoInfoContext();
                 db.Database.EnsureCreated();

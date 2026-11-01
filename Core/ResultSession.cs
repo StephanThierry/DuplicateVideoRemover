@@ -244,7 +244,7 @@ namespace deepduplicates
             return report;
         }
 
-        private static void RemoveFromDatabase(List<VideoEntry> removed, FileHandler fileHandler)
+        internal static void RemoveFromDatabase(List<VideoEntry> removed, FileHandler fileHandler)
         {
             if (removed.Count == 0) return;
             try

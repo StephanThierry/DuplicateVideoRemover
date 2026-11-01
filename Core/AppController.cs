@@ -86,10 +86,13 @@ namespace deepduplicates
         /// <summary>Starts a scan with the saved settings.</summary>
         public bool StartScan() => Scanner.Start(Settings);
 
-        /// <summary>Compares again with the saved settings, using what is in the database (no rescan).</summary>
+        /// <summary>
+        /// Compares again with the saved settings and the videos already read (no rescan). Only the files the
+        /// last scan found on disk take part: the database also holds dormant rows of moved or missing files.
+        /// </summary>
         public void ReanalyzeFromDatabase()
         {
-            var media = ScanEngine.InScope(CachedMedia(), Settings);
+            var media = ScanEngine.InScope(CurrentMedia(), Settings);
             var (results, _) = Analyzer.Analyze(media, Settings);
             results.Save();
             ReplaceSession(results);
@@ -135,7 +138,8 @@ namespace deepduplicates
             if (all.Count == 0) return new();
             var wanted = all.SelectMany(p => new[] { p.A, p.B }).ToHashSet();
             var found = new Dictionary<string, VideoEntry>();
-            foreach (var v in CachedMedia())
+            // Files found by the last scan first, so a moved video shows where it is now, not a dormant row
+            foreach (var v in CurrentMedia().Concat(CachedMedia()))
             {
                 var print = FalsePositives.Fingerprint(v);
                 if (wanted.Contains(print) && !found.ContainsKey(print)) found[print] = VideoEntry.From(v);
@@ -150,13 +154,15 @@ namespace deepduplicates
 
         /// <summary>
         /// Videos in the scope that could be re-encoded (not duplicates or broken), highest average bitrate first.
-        /// Uses the videos already read - no files are read.
+        /// Only files the last scan found, and each one is checked to still exist.
         /// </summary>
         public List<EncodeCandidate> EncodeCandidates()
         {
-            var media = ScanEngine.InScope(CachedMedia(), Settings);
+            var media = ScanEngine.InScope(CurrentMedia(), Settings);
             var (_, analyzed) = Analyzer.Analyze(media, Settings);
-            return EncodePlanner.Candidates(analyzed, Settings.EncodeOrDefault());
+            var candidates = EncodePlanner.Candidates(analyzed, Settings.EncodeOrDefault());
+            var exists = LastScan.Exist(candidates.Select(c => c.Path).ToList());
+            return candidates.Where((c, i) => exists[i]).ToList();
         }
 
         /// <summary>Writes output/encode_selected.ps1 (Windows) or .sh (Linux) for these videos. Returns its path.</summary>
@@ -190,6 +196,29 @@ namespace deepduplicates
         private List<VideoInfo> CachedMedia()
         {
             lock (cacheLock) return cachedMedia ??= ScanEngine.LoadAllCached();
+        }
+
+        /// <summary>
+        /// The database rows of the files the last scan found on disk. The database itself keeps dormant rows
+        /// (moved, renamed or unreachable files) and must not be taken as the list of files that exist.
+        /// </summary>
+        private List<VideoInfo> CurrentMedia() => LastScan.Filter(CachedMedia());
+
+        /// <summary>
+        /// Deletes one video file (from Re-encode) and takes it out of the database and the scan list.
+        /// Returns null when it worked, otherwise the reason.
+        /// </summary>
+        public string DeleteVideoFile(int id, string path)
+        {
+            try
+            {
+                if (File.Exists(path)) File.Delete(path);
+            }
+            catch (Exception e) { return e.Message; }
+            ResultSession.RemoveFromDatabase(new List<VideoEntry> { new VideoEntry { Id = id, Path = path } }, CreateFileHandler());
+            LastScan.Remove(path);
+            InvalidateCache();
+            return null;
         }
 
         private void InvalidateCache()
