@@ -5,6 +5,7 @@ output/**
 ffmpeg/**
 deepdupes.db*
 settings.json*
+falsepositives.json*
 pathmapping.json
 runhistory.json
 .vs/
