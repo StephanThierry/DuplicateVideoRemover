@@ -18,6 +18,20 @@
     <Routes @rendermode="InteractiveServer" />
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script>
+        // Copy text: the clipboard API needs https or localhost; over plain http on the network use the old way
+        window.dvr = {
+            copy: async function (text) {
+                if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return; }
+                const area = document.createElement("textarea");
+                area.value = text; area.style.position = "fixed"; area.style.opacity = "0";
+                document.body.appendChild(area); area.select();
+                const ok = document.execCommand("copy");
+                area.remove();
+                if (!ok) throw new Error("the browser did not allow it");
+            }
+        };
+    </script>
 </body>
 
 </html>

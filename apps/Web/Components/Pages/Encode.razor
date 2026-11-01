@@ -35,7 +35,7 @@
 
     @if (candidates == null)
     {
-        <p class="muted">Loading videos...</p>
+        <p class="muted">Loading videos and checking that the files still exist...</p>
     }
     else if (candidates.Count == 0)
     {
@@ -51,6 +51,10 @@
             <button @onclick="SelectVisible">Select all</button>
             <button @onclick="() => SelectTop(20)">Select top 20</button>
             <button @onclick="() => picked.Clear()" disabled="@(picked.Count == 0)">Select none</button>
+            @if (hidden.Count > 0)
+            {
+                <button @onclick="() => { hidden.Clear(); ResetPaging(); }" title="@string.Join("\n", hidden)">Unhide folders (@hidden.Count)</button>
+            }
             <label class="inline">Only above <input type="number" min="0" step="500" @bind="minKbps" @bind:after="ResetPaging" aria-label="Minimum bitrate" /> kbit/s</label>
             <input type="search" placeholder="Filter by file or folder name" @bind="search" @bind:event="oninput" @bind:after="ResetPaging" aria-label="Filter by file or folder name" />
         </div>
@@ -69,7 +73,14 @@
                     <div class="enc-strip">
                         @for (int i = 1; i <= 3; i++) { <img loading="lazy" src="shots/@(c.Id)_@(i).png" alt="" onerror="this.style.visibility='hidden'" /> }
                     </div>
-                    <div class="info"><div class="name">@c.FileName</div><div class="muted" style="font-size:.85rem;word-break:break-all">@c.Folder</div><div class="muted" style="font-size:.85rem">@Fmt.Duration(c.DurationSeconds)</div></div>
+                    <div class="info">
+                        <div class="name">@c.FileName</div><div class="muted" style="font-size:.85rem;word-break:break-all">@c.Folder</div><div class="muted" style="font-size:.85rem">@Fmt.Duration(c.DurationSeconds)</div>
+                        <div class="enc-actions" @onclick:stopPropagation="true" @onkeydown:stopPropagation="true">
+                            <button class="small" @onclick="() => HideFolder(c.Folder)" title="Hide every video in @c.Folder">Exclude folder</button>
+                            <button class="small" @onclick="() => CopyPath(c)" title="Copy the full path">Copy path</button>
+                            <button class="small danger-outline" @onclick="() => deleting = c" title="Delete this file">Delete</button>
+                        </div>
+                    </div>
                     <span class="num">@c.AverageKbps.ToString("N0") kbit/s</span>
                     <span class="num">@Fmt.Size(c.SizeBytes)</span>
                     <span class="num">@Fmt.Size(est)<br /><small class="@(c.SizeBytes - est > c.SizeBytes / 10 ? "saving" : "muted")">@SavingText(c.SizeBytes, est)</small></span>
@@ -107,7 +118,31 @@
     </div>
 }
 
+@if (deleting != null)
+{
+    <div class="dialog-backdrop" @onclick="() => deleting = null">
+        <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="del-confirm" @onclick:stopPropagation="true">
+            <h2 id="del-confirm">Delete this video permanently?</h2>
+            <p><strong>@deleting.FileName</strong><br />@deleting.Folder<br />@Fmt.Size(deleting.SizeBytes) will be deleted. This can't be undone.</p>
+            <div class="buttons">
+                <button @onclick="() => deleting = null">Cancel</button>
+                <button class="danger" @onclick="DeleteFile">Delete permanently</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (toast != null)
+{
+    <div class="toast" role="status">@toast</div>
+}
+
 @code {
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+    private readonly HashSet<string> hidden = new(StringComparer.OrdinalIgnoreCase);   // folders hidden with "Exclude folder"
+    private EncodeCandidate deleting;
+    private string toast;
+    private CancellationTokenSource toastTimer;
     private EncodeSettings enc = EncodeSettings.CreateDefault();
     private List<EncodeCandidate> candidates;
     private readonly HashSet<int> picked = new();
@@ -138,7 +173,7 @@
     private void OnDataChanged() => InvokeAsync(async () => { await Load(); StateHasChanged(); });
 
     private IEnumerable<EncodeCandidate> Visible() => candidates.Where(c =>
-        c.AverageKbps >= minKbps &&
+        c.AverageKbps >= minKbps && !hidden.Contains(c.Folder) &&
         (string.IsNullOrWhiteSpace(search) || c.Path.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase)));
 
     private long PickedBytes => candidates?.Where(c => picked.Contains(c.Id)).Sum(c => c.SizeBytes) ?? 0;
@@ -181,14 +216,63 @@
 
     private void ResetPaging() => shown = 100;
 
+    // Hidden videos are unpicked too, so the script only holds what can be seen
+    private void HideFolder(string folder)
+    {
+        hidden.Add(folder);
+        foreach (var c in candidates.Where(c => string.Equals(c.Folder, folder, StringComparison.OrdinalIgnoreCase))) picked.Remove(c.Id);
+        ShowToast($"Hid the videos in {folder}.");
+    }
+
+    private async Task CopyPath(EncodeCandidate c)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("dvr.copy", c.Path);
+            ShowToast("Copied: " + c.Path);
+        }
+        catch (Exception e) { ShowToast("Could not copy: " + e.Message); }
+    }
+
+    private void DeleteFile()
+    {
+        var c = deleting;
+        deleting = null;
+        if (c == null) return;
+        var error = App.DeleteVideoFile(c.Id, c.Path);
+        if (error != null) { ShowToast($"Could not delete {c.FileName}: {error}", 10000); return; }
+        candidates.Remove(c);
+        picked.Remove(c.Id);
+        ShowToast($"Deleted {c.FileName} ({Fmt.Size(c.SizeBytes)}).");
+    }
+
+    private void ShowToast(string text, int ms = 4000)
+    {
+        toast = text;
+        toastTimer?.Cancel();
+        toastTimer = new CancellationTokenSource();
+        var token = toastTimer.Token;
+        _ = Task.Delay(ms, token).ContinueWith(t => { if (t.IsCanceled) return; toast = null; InvokeAsync(StateHasChanged); });
+    }
+
     private void Create()
     {
         confirming = false;
         // In list order: highest bitrate first
         var videos = candidates.Where(c => picked.Contains(c.Id)).ToList();
-        scriptPath = App.WriteEncodeScript(videos);
-        scriptCount = videos.Count;
+        var result = App.WriteEncodeScript(videos);
+        // Files that are gone since the scan are left out of the script and the list
+        foreach (var gone in result.Missing) { candidates.RemoveAll(c => c.Id == gone.Id); picked.Remove(gone.Id); }
+        if (result.Missing.Count > 0)
+            ShowToast($"{Fmt.Plural(result.Missing.Count, "file was", "files were")} not found any more and left out.", 10000);
+        if (result.Path == null) return;
+        scriptPath = result.Path;
+        scriptCount = result.Videos;
     }
 
-    public void Dispose() => App.DataChanged -= OnDataChanged;
+    public void Dispose()
+    {
+        App.DataChanged -= OnDataChanged;
+        toastTimer?.Cancel();
+    }
 }

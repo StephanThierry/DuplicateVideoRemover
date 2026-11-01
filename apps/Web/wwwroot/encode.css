@@ -27,3 +27,9 @@ select { cursor: pointer; }
 .mapcheck.warning { color: #8a4b00; background: #fff3d6; font-weight: 600; }
 .mapcheck.error { color: var(--grease); background: var(--grease-wash); font-weight: 600; }
 @media (prefers-color-scheme: dark) { .mapcheck.warning { color: #ffc46b; background: #33270f; } }
+
+/* Per-video actions: exclude the folder, copy the path, delete */
+.enc-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+button.small { padding: 3px 10px; font-size: .82rem; font-weight: 500; }
+button.danger-outline { color: var(--grease); border-color: var(--grease); background: var(--sheet); }
+button.danger-outline:hover:not(:disabled) { background: var(--grease-wash); border-color: var(--grease); }
