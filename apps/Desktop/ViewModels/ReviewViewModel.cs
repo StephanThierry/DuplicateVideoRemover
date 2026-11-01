@@ -95,7 +95,13 @@ public partial class ReviewViewModel : ObservableObject
             foreach (var g in groups.Take(shownGroups))
             {
                 Rows.Add(new GroupHeaderRow($"{g.Members.Count} copies, {Fmt.Duration(g.Members[0].DurationSeconds)} long"));
-                foreach (var m in g.Members) Rows.Add(new VideoRow(m, this, inGroup: true));
+                for (int i = 0; i < g.Members.Count; i++)
+                {
+                    var row = new VideoRow(g.Members[i], this, inGroup: true);
+                    // Each copy was matched with the first video: the divider takes the copy below out of the group
+                    if (i > 0) Rows.Add(new MatchDividerRow(row));
+                    Rows.Add(row);
+                }
             }
             if (groups.Count > shownGroups)
                 Rows.Add(new MoreRow($"Show {Math.Min(PageSize, groups.Count - shownGroups)} more groups", () => { shownGroups += PageSize; Rebuild(); }));
@@ -222,7 +228,6 @@ public partial class ReviewViewModel : ObservableObject
         if (message != null) { ShowToast(message); row.Refresh(); }
     }
 
-    internal void KeepInstead(VideoRow row) => session.KeepInstead(row.Entry.Id);
 
     internal void MarkFalsePositive(VideoRow row)
     {
@@ -258,6 +263,20 @@ public partial class ReviewViewModel : ObservableObject
 
 public sealed record SectionRow(string Title, string Subtitle);
 public sealed record GroupHeaderRow(string Text);
+
+/// <summary>The line between two matched copies, with "False positive" for the copy below it.</summary>
+public sealed class MatchDividerRow
+{
+    public VideoRow Below { get; }
+    public string Tip { get; }
+    public IRelayCommand Command { get; }
+    public MatchDividerRow(VideoRow below)
+    {
+        Below = below;
+        Tip = $"These videos only look alike: take {below.FileName} out of the group and never match it with these copies again";
+        Command = new RelayCommand(() => below.MarkFalsePositive());
+    }
+}
 
 public sealed class MoreRow
 {
@@ -319,7 +338,6 @@ public partial class VideoRow : ObservableObject
     [ObservableProperty] private bool isSelected;
     [ObservableProperty] private bool isKept;
 
-    public bool CanKeep => InGroup && !IsKept;
     public bool ShowReason => HasReason && !IsKept;
 
     // Screenshots load when the row is first shown (the list is virtualized)
@@ -360,13 +378,11 @@ public partial class VideoRow : ObservableObject
 
     partial void OnIsKeptChanged(bool value)
     {
-        OnPropertyChanged(nameof(CanKeep));
         OnPropertyChanged(nameof(ShowReason));
     }
 
     [RelayCommand] private void Toggle() => IsSelected = !IsSelected;
-    [RelayCommand] private void KeepThis() => owner.KeepInstead(this);
     [RelayCommand] private void Play() => owner.Play(this);
-    [RelayCommand] private void NotDuplicate() => owner.MarkFalsePositive(this);
+    internal void MarkFalsePositive() => owner.MarkFalsePositive(this);
     [RelayCommand] private void ShowFolder() => owner.ShowFolderCommand.Execute(Folder);
 }

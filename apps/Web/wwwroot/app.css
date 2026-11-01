@@ -137,7 +137,7 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
 }
 .group-head { padding: 8px 14px; color: var(--muted); font-size: .85rem; border-bottom: 1px solid var(--rule); }
 .row {
-  display: grid; grid-template-columns: 28px auto 1fr auto; gap: 14px; align-items: center;
+  display: grid; grid-template-columns: 28px auto 34px 1fr; gap: 14px; align-items: center;
   padding: 10px 14px;
 }
 .row + .row { border-top: 1px solid var(--rule); }
@@ -251,7 +251,7 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
   .folders, .preview { position: static; max-height: none; }
   .row { grid-template-columns: 28px 1fr; }
   .row .strip { grid-column: 2; }
-  .row .info, .row .row-actions { grid-column: 2; }
+  .row .info, .row .row-actions, .row button.icon { grid-column: 2; }
   .strip img { width: calc((100vw - 140px) / 3); height: auto; aspect-ratio: 3 / 2; }
   .datafolder { display: none; }
   .steps { grid-template-columns: repeat(2, 1fr); }
@@ -305,3 +305,9 @@ button.icon:hover:not(:disabled) { border-color: var(--accent); background: var(
 .row.fp-row { grid-template-columns: auto 1fr; }
 .strip-missing { width: 372px; height: 90px; display: grid; place-items: center; background: var(--table); color: var(--muted); border-radius: 3px; font-size: .85rem; }
 @media (max-width: 960px) { .strip-missing { width: 100%; } }
+
+/* Between two matched copies: "False positive" takes the copy below out of the group */
+.match-divider { display: flex; align-items: center; gap: 10px; padding: 2px 14px; }
+.match-divider::before, .match-divider::after { content: ""; flex: 1; border-top: 1px solid var(--rule); }
+.match-divider button { border-radius: 12px; color: var(--muted); }
+.match-divider button:hover:not(:disabled) { color: var(--grease); border-color: var(--grease); }

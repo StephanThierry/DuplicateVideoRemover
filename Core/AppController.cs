@@ -129,7 +129,7 @@ namespace deepduplicates
             var others = group.Members.Where(m => m.Id != id && videos.ContainsKey(m.Id)).Select(m => videos[m.Id]).ToList();
             FalsePositives.Add(video, others);
             Session.RemoveFromGroup(id);
-            return $"Marked {System.IO.Path.GetFileName(video.path)} as not a duplicate. It won't be matched with these copies again.";
+            return $"Marked {System.IO.Path.GetFileName(video.path)} as a false positive. It won't be matched with these copies again.";
         }
 
         /// <summary>

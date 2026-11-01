@@ -193,7 +193,7 @@
         <StackPanel>
           <TextBlock Classes="h1" Text="False positives"/>
           <TextBlock Classes="muted" TextWrapping="Wrap" Margin="0,4,0,0"
-                     Text="Videos marked as &quot;Not a duplicate&quot; in Review. They are recognised by their content, so a mark still applies after the files are moved or renamed."/>
+                     Text="Videos marked as &quot;False positive&quot; in Review. They are recognised by their content, so a mark still applies after the files are moved or renamed."/>
           <TextBlock Text="{Binding FalsePositivesStatus}" TextWrapping="Wrap" Margin="0,8,0,0"/>
         </StackPanel>
       </DockPanel>

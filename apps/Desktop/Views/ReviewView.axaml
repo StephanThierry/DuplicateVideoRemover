@@ -121,9 +121,17 @@
             <DataTemplate DataType="vm:MoreRow">
               <Button Content="{Binding Text}" Command="{Binding Command}" HorizontalAlignment="Center" Margin="0,12"/>
             </DataTemplate>
+            <!-- Between two matched copies: "False positive" takes the copy below out of the group -->
+            <DataTemplate DataType="vm:MatchDividerRow">
+              <Grid ColumnDefinitions="*,Auto,*" ColumnSpacing="10" Margin="0,-2,0,4">
+                <Border Height="1" Background="{DynamicResource Rule}" VerticalAlignment="Center"/>
+                <Button Grid.Column="1" Classes="small" Content="False positive" Command="{Binding Command}" ToolTip.Tip="{Binding Tip}" CornerRadius="12"/>
+                <Border Grid.Column="2" Height="1" Background="{DynamicResource Rule}" VerticalAlignment="Center"/>
+              </Grid>
+            </DataTemplate>
             <DataTemplate DataType="vm:VideoRow">
               <Border Classes="video" Classes.selected="{Binding IsSelected}">
-                <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="14">
+                <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="14">
                   <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Center"/>
                   <!-- Film strip, crossed out with grease pencil when picked for removal -->
                   <Button Grid.Column="1" Padding="0" Background="Transparent" BorderThickness="0" Command="{Binding ToggleCommand}"
@@ -143,7 +151,11 @@
                       </Viewbox>
                     </Grid>
                   </Button>
-                  <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="2">
+                  <!-- Play: always in the same place, right of the thumbnails -->
+                  <Button Grid.Column="2" Classes="icon" Command="{Binding PlayCommand}" ToolTip.Tip="Play (opens the default player)" VerticalAlignment="Center">
+                    <Path Data="M3,1.5 L3,12.5 L12,7 Z" Fill="{Binding $parent[Button].Foreground}" Width="14" Height="14"/>
+                  </Button>
+                  <StackPanel Grid.Column="3" VerticalAlignment="Center" Spacing="2">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextWrapping="Wrap"/>
                       <Border IsVisible="{Binding IsKept}" Background="{DynamicResource KeepWash}" CornerRadius="9" Padding="8,1" VerticalAlignment="Center">
@@ -153,14 +165,6 @@
                     <Button Classes="link" Content="{Binding Folder}" Command="{Binding ShowFolderCommand}" ToolTip.Tip="Show only this folder"/>
                     <TextBlock Classes="muted small" Text="{Binding Meta}"/>
                     <TextBlock Classes="muted small" Text="{Binding Reason}" IsVisible="{Binding ShowReason}" TextWrapping="Wrap"/>
-                  </StackPanel>
-                  <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <Button Classes="icon" Command="{Binding PlayCommand}" ToolTip.Tip="Play (opens the default player)">
-                      <Path Data="M3,1.5 L3,12.5 L12,7 Z" Fill="{Binding $parent[Button].Foreground}" Width="14" Height="14"/>
-                    </Button>
-                    <Button Content="Keep this one" Command="{Binding KeepThisCommand}" IsVisible="{Binding CanKeep}"/>
-                    <Button Content="Not a duplicate" Command="{Binding NotDuplicateCommand}" IsVisible="{Binding InGroup}"
-                            ToolTip.Tip="These videos only look alike: take this one out of the group and don't match them again"/>
                   </StackPanel>
                 </Grid>
               </Border>

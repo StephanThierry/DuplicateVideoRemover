@@ -77,7 +77,7 @@ public partial class SettingsViewModel : ObservableObject
     private void UpdateFalsePositivesText()
     {
         int n = FalsePositives.Count;
-        FalsePositivesText = "Videos you marked as \"Not a duplicate\" in Review are never matched with each other again, even after they are moved or renamed. "
+        FalsePositivesText = "Videos you marked as \"False positive\" in Review are never matched with each other again, even after they are moved or renamed. "
                            + (n == 0 ? "None are marked yet." : $"{Fmt.Plural(n, "pair is", "pairs are")} marked.");
     }
 
@@ -90,7 +90,7 @@ public partial class SettingsViewModel : ObservableObject
         var details = await Task.Run(app.FalsePositiveDetails);
         foreach (var d in details) FalsePositiveItems.Add(new FalsePositiveItem(d, RemoveFalsePositive));
         FalsePositivesStatus = details.Count == 0
-            ? "No false positives. When two videos only look alike, use \"Not a duplicate\" on the Review screen."
+            ? "No false positives. When two videos only look alike, use \"False positive\" on the Review screen."
             : "After removing a pair, use \"Compare again\" on the Review screen to find it again.";
     }
 

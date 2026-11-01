@@ -112,7 +112,7 @@
             <section class="panel" id="false-positives">
                 <h2>False positives</h2>
                 <p class="muted" style="margin-bottom:12px">
-                    Videos you marked as "Not a duplicate" in Review are never matched with each other again, even after they are moved or renamed.
+                    Videos you marked as "False positive" in Review are never matched with each other again, even after they are moved or renamed.
                     @(falsePositiveCount == 0 ? "None are marked yet." : $"{Fmt.Plural(falsePositiveCount, "pair is", "pairs are")} marked.")
                 </p>
                 <a class="button" href="settings/false-positives">Review false positives</a>

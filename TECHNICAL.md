@@ -56,6 +56,6 @@ use it. Database ids are not stable either: a moved file gets a new row and a ne
 | `output/lastscan.json` | data folder | the files the last scan found on disk |
 | `deepdupes.db`, `_screens/` | database folder | the read cache and screenshots (named by row id) |
 | `runhistory.json` | database folder | scan timings for estimates |
-| `falsepositives.json` | database folder | pairs marked "Not a duplicate", by fingerprint |
+| `falsepositives.json` | database folder | pairs marked "False positive", by fingerprint |
 
 The data and database folders are the same unless `--db` / `DVR_DB` is given (see DataLocation.cs).

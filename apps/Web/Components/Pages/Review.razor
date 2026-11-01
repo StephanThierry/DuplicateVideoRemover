@@ -92,22 +92,26 @@
                         int keepId = Session.KeepId(g);
                         <article class="group" @key="g.Id">
                             <div class="group-head">@g.Members.Count copies, @Fmt.Duration(g.Members[0].DurationSeconds) long</div>
-                            @foreach (var m in g.Members)
+                            @for (int i = 0; i < g.Members.Count; i++)
                             {
+                                var m = g.Members[i];
                                 bool sel = Session.IsSelected(m.Id);
+                                @if (i > 0)
+                                {
+                                    @* Each copy was matched with the first video: the button takes the copy below out of the group *@
+                                    <div class="match-divider" @key="-m.Id">
+                                        <button class="small" @onclick="() => MarkFalsePositive(m.Id)" title="These videos only look alike: take @m.FileName out of the group and never match it with these copies again">False positive</button>
+                                    </div>
+                                }
                                 <div class="row @(sel ? "is-selected" : "") @(m.Id == keepId ? "is-kept" : "")" @key="m.Id">
                                     <input type="checkbox" checked="@sel" @onchange="() => Toggle(m.Id)" aria-label="Select @m.FileName for removal" />
                                     <Strip VideoId="m.Id" Title="Click to select or unselect" OnClick="() => Toggle(m.Id)" />
+                                    <button class="icon" @onclick="() => playing = m" title="Play" aria-label="Play @m.FileName">@PlayIcon</button>
                                     <div class="info">
                                         <div class="name">@m.FileName</div>
                                         <button class="link folderlink" @onclick="() => FilterFolder(m.Folder)" title="Show only this folder">@m.Folder</button>
                                         <div class="meta"><span>@Fmt.Size(m.SizeBytes)</span><span>@Fmt.Duration(m.DurationSeconds)</span><span>@Fmt.Bitrate(m.Bitrate)</span></div>
                                         @if (m.Id != keepId && !string.IsNullOrEmpty(m.Reason)) { <div class="reason">@CleanReason(m.Reason)</div> }
-                                    </div>
-                                    <div class="row-actions">
-                                        <button class="icon" @onclick="() => playing = m" title="Play" aria-label="Play @m.FileName">@PlayIcon</button>
-                                        @if (m.Id != keepId) { <button @onclick="() => Session.KeepInstead(m.Id)">Keep this one</button> }
-                                        <button @onclick="() => MarkFalsePositive(m.Id)" title="These videos only look alike: take this one out of the group and don't match them again">Not a duplicate</button>
                                     </div>
                                 </div>
                             }
@@ -129,14 +133,12 @@
                             <div class="row @(sel ? "is-selected" : "")" @key="b.Id">
                                 <input type="checkbox" checked="@sel" @onchange="() => Toggle(b.Id)" aria-label="Select @b.FileName for removal" />
                                 <Strip VideoId="b.Id" Title="Click to select or unselect" OnClick="() => Toggle(b.Id)" />
+                                <button class="icon" @onclick="() => playing = b" title="Play" aria-label="Play @b.FileName">@PlayIcon</button>
                                 <div class="info">
                                     <div class="name">@b.FileName</div>
                                     <button class="link folderlink" @onclick="() => FilterFolder(b.Folder)" title="Show only this folder">@b.Folder</button>
                                     <div class="meta"><span>@Fmt.Size(b.SizeBytes)</span><span>@Fmt.Duration(b.DurationSeconds)</span></div>
                                     <div class="reason">@CleanReason(b.Reason)</div>
-                                </div>
-                                <div class="row-actions">
-                                    <button class="icon" @onclick="() => playing = b" title="Play" aria-label="Play @b.FileName">@PlayIcon</button>
                                 </div>
                             </div>
                         }
