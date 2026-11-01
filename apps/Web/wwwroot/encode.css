@@ -5,7 +5,7 @@ select { cursor: pointer; }
 
 /* ---------- Re-encode ---------- */
 .enc-list { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius-sheet); overflow: hidden; }
-.enc-row { display: grid; grid-template-columns: 22px auto 1fr 110px 90px 150px; gap: 14px; align-items: center; padding: 8px 14px; cursor: pointer; user-select: none; }
+.enc-row { display: grid; grid-template-columns: 22px auto 34px 1fr 110px 90px 150px; gap: 14px; align-items: center; padding: 8px 14px; cursor: pointer; user-select: none; }
 .enc-row:not(.head):hover { background: var(--table); }
 .enc-row:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
 .enc-row input[type=checkbox] { pointer-events: none; }

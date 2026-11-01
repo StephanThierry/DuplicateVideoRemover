@@ -106,7 +106,7 @@
                                 <div class="row @(sel ? "is-selected" : "") @(m.Id == keepId ? "is-kept" : "")" @key="m.Id">
                                     <input type="checkbox" checked="@sel" @onchange="() => Toggle(m.Id)" aria-label="Select @m.FileName for removal" />
                                     <Strip VideoId="m.Id" Title="Click to select or unselect" OnClick="() => Toggle(m.Id)" />
-                                    <button class="icon" @onclick="() => playing = m" title="Play" aria-label="Play @m.FileName">@PlayIcon</button>
+                                    <button class="icon" @onclick="() => playing = m" title="Play" aria-label="Play @m.FileName">@VideoPlayer.Icon</button>
                                     <div class="info">
                                         <div class="name">@m.FileName</div>
                                         <button class="link folderlink" @onclick="() => FilterFolder(m.Folder)" title="Show only this folder">@m.Folder</button>
@@ -133,7 +133,7 @@
                             <div class="row @(sel ? "is-selected" : "")" @key="b.Id">
                                 <input type="checkbox" checked="@sel" @onchange="() => Toggle(b.Id)" aria-label="Select @b.FileName for removal" />
                                 <Strip VideoId="b.Id" Title="Click to select or unselect" OnClick="() => Toggle(b.Id)" />
-                                <button class="icon" @onclick="() => playing = b" title="Play" aria-label="Play @b.FileName">@PlayIcon</button>
+                                <button class="icon" @onclick="() => playing = b" title="Play" aria-label="Play @b.FileName">@VideoPlayer.Icon</button>
                                 <div class="info">
                                     <div class="name">@b.FileName</div>
                                     <button class="link folderlink" @onclick="() => FilterFolder(b.Folder)" title="Show only this folder">@b.Folder</button>
@@ -229,23 +229,7 @@
     </div>
 }
 
-@if (playing != null)
-{
-    var ext = System.IO.Path.GetExtension(playing.Path).ToLowerInvariant();
-    <div class="dialog-backdrop" @onclick="() => playing = null">
-        <div class="dialog player" role="dialog" aria-modal="true" aria-labelledby="player-title" @onclick:stopPropagation="true">
-            <div class="player-head">
-                <h2 id="player-title">@playing.FileName</h2>
-                <button @onclick="() => playing = null">Close</button>
-            </div>
-            <video src="video/@playing.Id" controls autoplay preload="metadata" @key="playing.Id"></video>
-            <p class="muted">
-                @Fmt.Size(playing.SizeBytes), @Fmt.Duration(playing.DurationSeconds)
-                @if (ext is not (".mp4" or ".m4v" or ".webm" or ".mov" or ".ogv")) { <text> - browsers often can't play @ext files; if nothing shows, </text><a href="video/@playing.Id" target="_blank" rel="noopener">open it in a new tab</a><text> to download it.</text> }
-            </p>
-        </div>
-    </div>
-}
+<VideoPlayer Video="playing" OnClose="() => playing = null" />
 
 @if (toast != null)
 {
@@ -271,8 +255,6 @@
     private VideoEntry playing;
     private DateTime lastProgressRender;
 
-    private static readonly RenderFragment PlayIcon =
-        @<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 1.5v11l9-5.5z" fill="currentColor" /></svg>;
     private string toast;
     private CancellationTokenSource toastTimer;
 

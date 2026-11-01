@@ -111,8 +111,15 @@ namespace deepduplicates
             return report;
         }
 
-        /// <summary>A video in the current results (for playing it), or null.</summary>
-        public VideoEntry FindEntry(int id) => Session.Results.AllEntries().FirstOrDefault(e => e.Id == id);
+        /// <summary>A video in the current results or found by the last scan (for playing it), or null.</summary>
+        public VideoEntry FindEntry(int id)
+        {
+            var entry = Session.Results.AllEntries().FirstOrDefault(e => e.Id == id);
+            if (entry != null) return entry;
+            // Re-encode lists the other videos the last scan found
+            var video = CurrentMedia().FirstOrDefault(v => v.id == id);
+            return video == null ? null : VideoEntry.From(video);
+        }
 
         /// <summary>
         /// Marks a copy as not a duplicate of the other copies in its group: the pairs are saved in

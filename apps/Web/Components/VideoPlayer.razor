@@ -1,0 +1,29 @@
+@* A video in a popup player (Review and Re-encode). Streams /video/{id}; browsers play mp4, webm and mov, not every format. *@
+@if (Video != null)
+{
+    var ext = System.IO.Path.GetExtension(Video.Path).ToLowerInvariant();
+    <div class="dialog-backdrop" @onclick="Close">
+        <div class="dialog player" role="dialog" aria-modal="true" aria-labelledby="player-title" @onclick:stopPropagation="true">
+            <div class="player-head">
+                <h2 id="player-title">@Video.FileName</h2>
+                <button @onclick="Close">Close</button>
+            </div>
+            <video src="video/@Video.Id" controls autoplay preload="metadata" @key="Video.Id"></video>
+            <p class="muted">
+                @Fmt.Size(Video.SizeBytes), @Fmt.Duration(Video.DurationSeconds)
+                @if (ext is not (".mp4" or ".m4v" or ".webm" or ".mov" or ".ogv")) { <text> - browsers often can't play @ext files; if nothing shows, </text><a href="video/@Video.Id" target="_blank" rel="noopener">open it in a new tab</a><text> to download it.</text> }
+            </p>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public VideoEntry? Video { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    /// <summary>The round play icon used on the buttons that open the player.</summary>
+    public static readonly RenderFragment Icon =
+        @<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 1.5v11l9-5.5z" fill="currentColor" /></svg>;
+
+    private Task Close() => OnClose.InvokeAsync();
+}

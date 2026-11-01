@@ -62,7 +62,7 @@
         var visible = Visible().ToList();
         <p class="muted" style="font-size:.85rem;margin:0 0 8px">Estimated sizes are rough: the real result depends on each video's resolution and content.</p>
         <div class="enc-list">
-            <div class="enc-row head"><span></span><span></span><span>Video</span><span class="num">Bitrate</span><span class="num">Size now</span><span class="num">Estimated after</span></div>
+            <div class="enc-row head"><span></span><span></span><span></span><span>Video</span><span class="num">Bitrate</span><span class="num">Size now</span><span class="num">Estimated after</span></div>
             @foreach (var c in visible.Take(shown))
             {
                 bool on = picked.Contains(c.Id);
@@ -73,6 +73,7 @@
                     <div class="enc-strip">
                         @for (int i = 1; i <= 3; i++) { <img loading="lazy" src="shots/@(c.Id)_@(i).png" alt="" onerror="this.style.visibility='hidden'" /> }
                     </div>
+                    <button class="icon" @onclick="() => playing = ToEntry(c)" @onclick:stopPropagation="true" @onkeydown:stopPropagation="true" title="Play" aria-label="Play @c.FileName">@VideoPlayer.Icon</button>
                     <div class="info">
                         <div class="name">@c.FileName</div><div class="muted" style="font-size:.85rem;word-break:break-all">@c.Folder</div><div class="muted" style="font-size:.85rem">@Fmt.Duration(c.DurationSeconds)</div>
                         <div class="enc-actions" @onclick:stopPropagation="true" @onkeydown:stopPropagation="true">
@@ -132,6 +133,8 @@
     </div>
 }
 
+<VideoPlayer Video="playing" OnClose="() => playing = null" />
+
 @if (toast != null)
 {
     <div class="toast" role="status">@toast</div>
@@ -141,6 +144,10 @@
     [Inject] private IJSRuntime JS { get; set; } = default!;
     private readonly HashSet<string> hidden = new(StringComparer.OrdinalIgnoreCase);   // folders hidden with "Exclude folder"
     private EncodeCandidate deleting;
+    private VideoEntry playing;
+
+    private static VideoEntry ToEntry(EncodeCandidate c) =>
+        new() { Id = c.Id, Path = c.Path, SizeBytes = c.SizeBytes, DurationSeconds = c.DurationSeconds };
     private string toast;
     private CancellationTokenSource toastTimer;
     private EncodeSettings enc = EncodeSettings.CreateDefault();

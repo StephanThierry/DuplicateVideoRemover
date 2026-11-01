@@ -175,6 +175,17 @@ public partial class EncodeViewModel : ObservableObject
         UnhideText = $"Unhide folders ({hidden.Count})";
     }
 
+    /// <summary>Opens the video in the program the system uses for it.</summary>
+    internal void Play(EncodeRow row)
+    {
+        try
+        {
+            if (!System.IO.File.Exists(row.Candidate.Path)) { ShowToast("The file is not there any more: " + row.Candidate.Path); return; }
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(row.Candidate.Path) { UseShellExecute = true });
+        }
+        catch (Exception e) { ShowToast("Could not open the video: " + e.Message); }
+    }
+
     internal async Task CopyPath(EncodeRow row)
     {
         try
@@ -305,4 +316,5 @@ public partial class EncodeRow : ObservableObject
     [RelayCommand] private void ExcludeFolder() => owner.HideFolder(this);
     [RelayCommand] private Task CopyPath() => owner.CopyPath(this);
     [RelayCommand] private void Delete() => owner.AskDelete(this);
+    [RelayCommand] private void Play() => owner.Play(this);
 }

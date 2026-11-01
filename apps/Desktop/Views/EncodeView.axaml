@@ -60,11 +60,11 @@
     <Border Grid.Row="4" BorderBrush="{DynamicResource Rule}" BorderThickness="1" CornerRadius="6" ClipToBounds="True" IsVisible="{Binding HasVideos}">
       <DockPanel>
         <Border DockPanel.Dock="Top" Background="{DynamicResource Table}" Padding="12,6,32,6">
-          <Grid ColumnDefinitions="32,316,*,120,90,160">
-            <TextBlock Grid.Column="2" Text="Video" Classes="muted small" FontWeight="SemiBold"/>
-            <TextBlock Grid.Column="3" Text="Bitrate" Classes="muted small" FontWeight="SemiBold" HorizontalAlignment="Right"/>
-            <TextBlock Grid.Column="4" Text="Size now" Classes="muted small" FontWeight="SemiBold" HorizontalAlignment="Right"/>
-            <TextBlock Grid.Column="5" Text="Estimated after" Classes="muted small" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+          <Grid ColumnDefinitions="32,316,48,*,120,90,160">
+            <TextBlock Grid.Column="3" Text="Video" Classes="muted small" FontWeight="SemiBold"/>
+            <TextBlock Grid.Column="4" Text="Bitrate" Classes="muted small" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+            <TextBlock Grid.Column="5" Text="Size now" Classes="muted small" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+            <TextBlock Grid.Column="6" Text="Estimated after" Classes="muted small" FontWeight="SemiBold" HorizontalAlignment="Right"/>
           </Grid>
         </Border>
         <ListBox Classes="rows" ItemsSource="{Binding Rows}" Background="Transparent">
@@ -72,7 +72,7 @@
             <DataTemplate x:DataType="vm:EncodeRow">
               <!-- The whole row is clickable; Shift-click picks a range (see EncodeView.axaml.cs) -->
               <Border Classes="encrow" Classes.picked="{Binding IsPicked}" PointerPressed="Row_PointerPressed" Cursor="Hand">
-                <Grid ColumnDefinitions="32,316,*,120,90,160">
+                <Grid ColumnDefinitions="32,316,48,*,120,90,160">
                   <CheckBox IsChecked="{Binding IsPicked}" IsHitTestVisible="False" VerticalAlignment="Center"/>
                   <Border Grid.Column="1" Background="{DynamicResource Frame}" CornerRadius="3" Padding="4" HorizontalAlignment="Left">
                     <StackPanel Orientation="Horizontal" Spacing="3">
@@ -81,7 +81,11 @@
                       <Image Source="{Binding Shot3}" Width="96" Height="64" Stretch="UniformToFill"/>
                     </StackPanel>
                   </Border>
-                  <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="2" Margin="8,0,0,0">
+                  <!-- Play: opens the default player; the button takes the click, so the row isn't picked -->
+                  <Button Grid.Column="2" Classes="icon" Command="{Binding PlayCommand}" ToolTip.Tip="Play (opens the default player)" VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <Path Data="M3,1.5 L3,12.5 L12,7 Z" Fill="{Binding $parent[Button].Foreground}" Width="14" Height="14"/>
+                  </Button>
+                  <StackPanel Grid.Column="3" VerticalAlignment="Center" Spacing="2" Margin="8,0,0,0">
                     <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                     <TextBlock Text="{Binding Folder}" Classes="muted small" TextTrimming="CharacterEllipsis"/>
                     <TextBlock Text="{Binding Length}" Classes="muted small"/>
@@ -92,9 +96,9 @@
                       <Button Classes="small dangerOutline" Content="Delete" Command="{Binding DeleteCommand}" ToolTip.Tip="Delete this file"/>
                     </StackPanel>
                   </StackPanel>
-                  <TextBlock Grid.Column="3" Text="{Binding Bitrate}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
-                  <TextBlock Grid.Column="4" Text="{Binding Size}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
-                  <StackPanel Grid.Column="5" HorizontalAlignment="Right" VerticalAlignment="Center">
+                  <TextBlock Grid.Column="4" Text="{Binding Bitrate}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="5" Text="{Binding Size}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                  <StackPanel Grid.Column="6" HorizontalAlignment="Right" VerticalAlignment="Center">
                     <TextBlock Text="{Binding Estimate}" HorizontalAlignment="Right"/>
                     <TextBlock Text="{Binding Saving}" FontSize="12" HorizontalAlignment="Right" Classes="muted" Classes.saving="{Binding GoodSaving}"/>
                   </StackPanel>
