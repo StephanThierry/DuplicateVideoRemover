@@ -65,13 +65,22 @@ if (args.Length > 2 && args[^1] == "execute")
 else vm.Review.CancelExecuteCommand.Execute(null);
 if (Environment.GetEnvironmentVariable("SHOT_ENCODE") == "1")
 {
-    vm.SelectedTab = 2; Pump(2500);
+    vm.SelectedTab = 2; Pump(500);
+    var loadStart = DateTime.UtcNow;
+    while (vm.Encode.Loading && DateTime.UtcNow - loadStart < TimeSpan.FromMinutes(5)) Pump(200);
+    Console.WriteLine($"encode list: {vm.Encode.Rows.Count} rows after {(DateTime.UtcNow - loadStart).TotalSeconds:0} s");
     vm.Encode.RowClicked(vm.Encode.Rows[0], false);
     vm.Encode.RowClicked(vm.Encode.Rows[4], true); Pump(300);
     Console.WriteLine("shift range picked: " + vm.Encode.Rows.Count(r => r.IsPicked));
     vm.Encode.RowClicked(vm.Encode.Rows[2], false); Pump(200);
     Console.WriteLine("after one click: " + vm.Encode.Rows.Count(r => r.IsPicked) + " | " + vm.Encode.PickedSize);
     vm.Encode.RowClicked(vm.Encode.Rows[2], false); Shot("d_encode");
+    int shownBefore = vm.Encode.Rows.Count;
+    vm.Encode.Rows[0].ExcludeFolderCommand.Execute(null); Pump(300);
+    Console.WriteLine($"hide folder: {shownBefore} -> {vm.Encode.Rows.Count} rows, {vm.Encode.UnhideText}"); Shot("d_encode_hidden");
+    vm.Encode.UnhideFoldersCommand.Execute(null); Pump(300);
+    Console.WriteLine($"unhide: {vm.Encode.Rows.Count} rows");
+    vm.Encode.Rows[1].DeleteCommand.Execute(null); Shot("d_encode_delete_confirm"); vm.Encode.CancelDeleteCommand.Execute(null);
     vm.Encode.AskCreateCommand.Execute(null); Shot("d_encode_confirm");
     vm.Encode.CreateCommand.Execute(null); Pump(300);
     Console.WriteLine("encode: " + vm.Encode.ResultText);
