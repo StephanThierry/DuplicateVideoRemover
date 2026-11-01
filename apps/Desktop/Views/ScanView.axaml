@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:DuplicateVideoRemover.Desktop.ViewModels"
              xmlns:img="using:Avalonia.Media.Imaging"
+             xmlns:sys="using:System"
              x:Class="DuplicateVideoRemover.Desktop.Views.ScanView"
              x:DataType="vm:ScanViewModel">
   <ScrollViewer>
@@ -90,8 +91,20 @@
           <Border Classes="panel">
             <StackPanel Spacing="8">
               <TextBlock Classes="h2" Text="What is scanned"/>
-              <TextBlock Text="{Binding ScopeText}" TextWrapping="Wrap"/>
-              <Button Classes="link" Content="Change folders and rules" Command="{Binding EditSettingsCommand}"/>
+              <TextBlock Text="{Binding ScopeText}" TextWrapping="Wrap" IsVisible="{Binding ScopeText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+              <ItemsControl ItemsSource="{Binding ScopeFolders}">
+                <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="sys:String">
+                    <Border Classes="tag" ToolTip.Tip="{Binding}">
+                      <TextBlock Text="{Binding}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxWidth="270"/>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Classes="muted" Text="{Binding FilterRulesText}" TextWrapping="Wrap"
+                         IsVisible="{Binding FilterRulesText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+              <Button Content="Change folders and rules" Command="{Binding EditSettingsCommand}" Margin="0,4,0,0"/>
             </StackPanel>
           </Border>
           <Border Classes="panel">

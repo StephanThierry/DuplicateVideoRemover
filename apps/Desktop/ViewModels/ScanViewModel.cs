@@ -41,6 +41,9 @@ public partial class ScanViewModel : ObservableObject
     [ObservableProperty] private bool isDone;
     [ObservableProperty] private bool isProblem;
     [ObservableProperty] private string scopeText = "";
+    [ObservableProperty] private string filterRulesText = "";
+    /// <summary>The folders to scan, shown as tags.</summary>
+    public ObservableCollection<string> ScopeFolders { get; } = new();
     [ObservableProperty] private string lastRunText = "";
     [ObservableProperty] private string lastRunDetail = "";
 
@@ -57,10 +60,11 @@ public partial class ScanViewModel : ObservableObject
     public void RefreshInfo()
     {
         var s = app.Settings;
-        ScopeText = s.contentFolders.Length == 0
-            ? "No folders yet. Add the folders with your videos in Settings."
-            : string.Join(Environment.NewLine, s.contentFolders) +
-              (s.excludePaths.Length > 0 ? Environment.NewLine + "Skipping paths that contain: " + string.Join(", ", s.excludePaths) : "");
+        ScopeFolders.Clear();
+        foreach (var f in s.contentFolders) ScopeFolders.Add(f);
+        ScopeText = s.contentFolders.Length == 0 ? "No folders yet. Add the folders with your videos in Settings." : "";
+        int rules = s.excludePaths.Length;
+        FilterRulesText = rules == 0 ? "" : $"There {(rules == 1 ? "is" : "are")} {Fmt.Plural(rules, "active path filtering rule", "active path filtering rules")}.";
         var last = app.LastRun();
         if (last == null)
         {

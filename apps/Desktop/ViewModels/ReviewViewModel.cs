@@ -40,6 +40,12 @@ public partial class ReviewViewModel : ObservableObject
     [ObservableProperty] private string? toast;
     [ObservableProperty] private bool failuresVisible;
     [ObservableProperty] private bool hasFailures;
+    [ObservableProperty] private string failuresTitle = "";
+    [ObservableProperty] private string failuresSummary = "";
+    // Progress while deleting
+    [ObservableProperty] private double deletePercent;
+    [ObservableProperty] private string deleteText = "";
+    [ObservableProperty] private string deleteFailedText = "";
 
     public string ExecuteLabel => "Delete " + Fmt.Plural(session.SelectedCount, "file", "files");
     public bool FolderFilterActive => FolderFilter != null;
@@ -115,12 +121,13 @@ public partial class ReviewViewModel : ObservableObject
         foreach (var row in Rows.OfType<VideoRow>()) row.Refresh();
 
         var folders = session.Folders();
+        int n = session.SelectedCount;
         Folders.Clear();
+        Folders.Add(FolderItem.All(folders.Sum(f => f.Count), n, FolderFilter == null));
         foreach (var f in folders) Folders.Add(new FolderItem(f, f.Folder == FolderFilter));
 
-        int n = session.SelectedCount;
         HasSelection = n > 0;
-        SelectionCount = Fmt.Plural(n, "file", "files") + " selected";
+        SelectionCount = n == 0 ? "nothing selected for deleting" : $"selected for deleting in {Fmt.Plural(n, "file", "files")}";
         SelectionSize = Fmt.Size(session.SelectedBytes);
         OnPropertyChanged(nameof(ExecuteLabel));
     }
@@ -131,7 +138,7 @@ public partial class ReviewViewModel : ObservableObject
     [RelayCommand] private void SelectBroken() => session.SelectAllBroken();
     [RelayCommand] private void SelectNone() => session.SelectNone();
     [RelayCommand] private void ShowAllFolders() => FolderFilter = null;
-    [RelayCommand] private void ShowFolder(string folder) => FolderFilter = folder;
+    [RelayCommand] private void ShowFolder(string? folder) => FolderFilter = folder;
     [RelayCommand] private void UnselectFolder() { if (FolderFilter != null) session.UnselectFolder(FolderFilter); }
     [RelayCommand] private void GoToScan() => main.ShowScan();
     [RelayCommand] private void GoToEncode() => main.ShowEncode();
@@ -167,17 +174,39 @@ public partial class ReviewViewModel : ObservableObject
     [RelayCommand]
     private async Task Execute()
     {
-        Busy = true;
-        var report = await Task.Run(app.Execute);
-        Busy = false;
         ConfirmVisible = false;
+        DeletePercent = 0;
+        DeleteText = "Starting...";
+        DeleteFailedText = "";
+        Busy = true;
+        var lastShown = DateTime.MinValue;
+        // Reported from the worker thread; shown at most ~8 times a second, and always for the last step
+        var progress = new SyncProgress<DeleteProgress>(p =>
+        {
+            if (!p.UpdatingDatabase && DateTime.UtcNow - lastShown < TimeSpan.FromMilliseconds(120)) return;
+            lastShown = DateTime.UtcNow;
+            Dispatcher.UIThread.Post(() =>
+            {
+                DeletePercent = p.Fraction * 100;
+                DeleteText = p.UpdatingDatabase ? "Updating the database..." : $"{p.Done + 1:N0} of {p.Total:N0}: {p.CurrentFile}";
+                DeleteFailedText = p.Failed > 0 ? $"{Fmt.Plural(p.Failed, "file", "files")} could not be deleted so far" : "";
+            });
+        });
+        ExecuteReport report;
+        try { report = await Task.Run(() => app.Execute(progress)); }
+        finally { Busy = false; }
 
         Failures.Clear();
         foreach (var f in report.Failed) Failures.Add(f);
         HasFailures = report.Failed.Count > 0;
+        FailuresSummary = $"{(report.Removed.Count > 0 ? $"Deleted {Fmt.Plural(report.Removed.Count, "file", "files")} ({Fmt.Size(report.BytesFreed)}). " : "")}"
+                        + "The files below are still selected. Close any program using them, check that you may change the folder, and try again.";
+        FailuresTitle = $"{Fmt.Plural(report.Failed.Count, "file was", "files were")} not deleted";
+        // Failures are shown straight away, with the reason for each file
+        FailuresVisible = HasFailures;
 
         var text = $"Deleted {Fmt.Plural(report.Removed.Count, "file", "files")}, {Fmt.Size(report.BytesFreed)}.";
-        if (HasFailures) text += $" {Fmt.Plural(report.Failed.Count, "file", "files")} could not be removed.";
+        if (HasFailures) text += $" {Fmt.Plural(report.Failed.Count, "file", "files")} could not be deleted.";
         // The folder may be empty now - then show everything again
         if (FolderFilter != null && !session.Folders().Any(f => f.Folder == FolderFilter)) FolderFilter = null;
         else Rebuild();
@@ -194,6 +223,23 @@ public partial class ReviewViewModel : ObservableObject
     }
 
     internal void KeepInstead(VideoRow row) => session.KeepInstead(row.Entry.Id);
+
+    internal void MarkFalsePositive(VideoRow row)
+    {
+        ShowToast(app.MarkFalsePositive(row.Entry.Id), 6000);
+        Rebuild();
+    }
+
+    /// <summary>Opens the video in the program the system uses for it.</summary>
+    internal void Play(VideoRow row)
+    {
+        try
+        {
+            if (!System.IO.File.Exists(row.Entry.Path)) { ShowToast("The file is not there any more: " + row.Entry.Path); return; }
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(row.Entry.Path) { UseShellExecute = true });
+        }
+        catch (Exception e) { ShowToast("Could not open the video: " + e.Message); }
+    }
     internal bool IsSelected(int id) => session.IsSelected(id);
     internal bool IsKept(VideoEntry e) => session.IsKept(e);
 
@@ -222,12 +268,25 @@ public sealed class MoreRow
 
 public sealed class FolderItem
 {
-    public string Folder { get; }
+    public string? Folder { get; }
     public string ShortName { get; }
     public string Count { get; }
     public string SelectedText { get; }
     public bool HasSelected { get; }
     public bool IsActive { get; }
+
+    private FolderItem(string? folder, string shortName, int count, int selected, bool active)
+    {
+        Folder = folder;
+        ShortName = shortName;
+        Count = count.ToString("N0");
+        HasSelected = selected > 0;
+        SelectedText = $"{selected} selected";
+        IsActive = active;
+    }
+
+    /// <summary>The first item: every folder.</summary>
+    public static FolderItem All(int count, int selected, bool active) => new(null, "All folders", count, selected, active);
 
     public FolderItem(FolderSummary f, bool active)
     {
@@ -307,5 +366,7 @@ public partial class VideoRow : ObservableObject
 
     [RelayCommand] private void Toggle() => IsSelected = !IsSelected;
     [RelayCommand] private void KeepThis() => owner.KeepInstead(this);
+    [RelayCommand] private void Play() => owner.Play(this);
+    [RelayCommand] private void NotDuplicate() => owner.MarkFalsePositive(this);
     [RelayCommand] private void ShowFolder() => owner.ShowFolderCommand.Execute(Folder);
 }

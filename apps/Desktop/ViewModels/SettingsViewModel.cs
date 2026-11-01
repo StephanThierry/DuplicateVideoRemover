@@ -14,7 +14,6 @@ namespace DuplicateVideoRemover.Desktop.ViewModels;
 public partial class SettingsViewModel : ObservableObject
 {
     private readonly AppController app;
-    private CancellationTokenSource? debounce;
     private bool loading;
 
     /// <summary>Set by the view: opens the system folder picker.</summary>
@@ -45,11 +44,11 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool dirty;
     [ObservableProperty] private string savedMessage = "";
 
-    [ObservableProperty] private string previewDuplicates = "";
-    [ObservableProperty] private string previewGroups = "";
-    [ObservableProperty] private string previewBroken = "";
-    [ObservableProperty] private string previewSize = "";
-    [ObservableProperty] private string previewNote = "Working out the result...";
+    // False positives: a line in the settings and a sub page with the marked pairs
+    [ObservableProperty] private string falsePositivesText = "";
+    [ObservableProperty] private bool falsePositivesVisible;
+    [ObservableProperty] private string falsePositivesStatus = "";
+    public ObservableCollection<FalsePositiveItem> FalsePositiveItems { get; } = new();
 
     public string Placeholder => OperatingSystem.IsWindows() ? @"D:\Videos or \\nas\videos" : "/mnt/videos";
 
@@ -71,8 +70,37 @@ public partial class SettingsViewModel : ObservableObject
         MinLength = s.minVideoLength;
         MinSizeKb = s.minVideoSizeKb;
         loading = false;
-        SchedulePreview(0);
-        app.DataChanged += () => SchedulePreview(0);
+        UpdateFalsePositivesText();
+        FalsePositives.Changed += () => Dispatcher.UIThread.Post(UpdateFalsePositivesText);
+    }
+
+    private void UpdateFalsePositivesText()
+    {
+        int n = FalsePositives.Count;
+        FalsePositivesText = "Videos you marked as \"Not a duplicate\" in Review are never matched with each other again, even after they are moved or renamed. "
+                           + (n == 0 ? "None are marked yet." : $"{Fmt.Plural(n, "pair is", "pairs are")} marked.");
+    }
+
+    [RelayCommand]
+    private async Task OpenFalsePositives()
+    {
+        FalsePositiveItems.Clear();
+        FalsePositivesStatus = "Loading...";
+        FalsePositivesVisible = true;
+        var details = await Task.Run(app.FalsePositiveDetails);
+        foreach (var d in details) FalsePositiveItems.Add(new FalsePositiveItem(d, RemoveFalsePositive));
+        FalsePositivesStatus = details.Count == 0
+            ? "No false positives. When two videos only look alike, use \"Not a duplicate\" on the Review screen."
+            : "After removing a pair, use \"Compare again\" on the Review screen to find it again.";
+    }
+
+    [RelayCommand] private void CloseFalsePositives() => FalsePositivesVisible = false;
+
+    private void RemoveFalsePositive(FalsePositiveItem item)
+    {
+        if (!app.RemoveFalsePositive(item.Key)) return;
+        FalsePositiveItems.Remove(item);
+        FalsePositivesStatus = "Removed. Use \"Compare again\" on the Review screen to find these two as duplicates again.";
     }
 
     partial void OnUseSameFolderChanged(bool value) => Edited();
@@ -86,7 +114,6 @@ public partial class SettingsViewModel : ObservableObject
         Dirty = true;
         SavedMessage = "";
         UpdateTest();
-        SchedulePreview(400);
     }
 
     private deepduplicates.Settings Current()
@@ -146,34 +173,6 @@ public partial class SettingsViewModel : ObservableObject
         var local = PathMapper.PreviewLocal(TestPath.Trim(), CurrentMappings());
         bool exists = Directory.Exists(local) || File.Exists(local);
         TestResult = $"On this computer: {local} ({(exists ? "found" : "not found")})";
-    }
-
-    // Re-runs the comparison on videos already read, a moment after the last change
-    private void SchedulePreview(int delayMs)
-    {
-        debounce?.Cancel();
-        debounce = new CancellationTokenSource();
-        var token = debounce.Token;
-        var snapshot = Current();
-        Task.Run(async () =>
-        {
-            try
-            {
-                await Task.Delay(delayMs, token);
-                var r = app.Preview(snapshot);
-                if (token.IsCancellationRequested) return;
-                Dispatcher.UIThread.Post(() =>
-                {
-                    PreviewDuplicates = r.Duplicates.ToString("N0");
-                    PreviewGroups = r.Groups.ToString("N0");
-                    PreviewBroken = r.Broken.ToString("N0");
-                    PreviewSize = Fmt.Size(r.DuplicateBytes);
-                    PreviewNote = $"Based on the {r.VideosInScope:N0} videos already read in these folders. New videos count after the next scan.";
-                });
-            }
-            catch (OperationCanceledException) { }
-            catch (Exception e) { Dispatcher.UIThread.Post(() => PreviewNote = "Could not work out the result: " + e.Message); }
-        });
     }
 
     [RelayCommand]
@@ -391,6 +390,47 @@ public partial class SynonymItem : ObservableObject
             catch (OperationCanceledException) { }
             catch (Exception e) { Show(new MappingCheck(MappingCheckLevel.Warning, "Could not check this synonym: " + e.Message)); }
         });
+    }
+}
+
+/// <summary>One marked false positive on the sub page: the two videos as they are now.</summary>
+public partial class FalsePositiveItem
+{
+    private readonly Action<FalsePositiveItem> remove;
+    public string Key { get; }
+    public string Heading { get; }
+    public FalsePositiveVideo A { get; }
+    public FalsePositiveVideo B { get; }
+
+    public FalsePositiveItem(FalsePositiveDetail d, Action<FalsePositiveItem> remove)
+    {
+        this.remove = remove;
+        Key = d.Pair.Key;
+        Heading = $"Marked {Fmt.Ago(d.Pair.MarkedUtc)}, {Fmt.Duration(d.Pair.DurationSeconds)} long";
+        A = new FalsePositiveVideo(d.NowA, d.PathA, d.Pair.SizeA);
+        B = new FalsePositiveVideo(d.NowB, d.PathB, d.Pair.SizeB);
+    }
+
+    [RelayCommand] private void Remove() => remove(this);
+}
+
+public sealed class FalsePositiveVideo
+{
+    private readonly int? id;
+    public string FileName { get; }
+    public string Folder { get; }
+    public string Meta { get; }
+    public bool InDatabase => id != null;
+    public Avalonia.Media.Imaging.Bitmap? Shot1 => id is int i ? Shots.Get(i, 1) : null;
+    public Avalonia.Media.Imaging.Bitmap? Shot2 => id is int i ? Shots.Get(i, 2) : null;
+    public Avalonia.Media.Imaging.Bitmap? Shot3 => id is int i ? Shots.Get(i, 3) : null;
+
+    public FalsePositiveVideo(VideoEntry? now, string path, long size)
+    {
+        id = now?.Id;
+        FileName = Path.GetFileName(path);
+        Folder = Path.GetDirectoryName(path) ?? "";
+        Meta = Fmt.Size(now?.SizeBytes ?? size) + (now == null ? "     not in the database any more" : "");
     }
 }
 

@@ -124,6 +124,14 @@
 
         <Border Classes="panel">
           <StackPanel Spacing="12">
+            <TextBlock Classes="h2" Text="False positives"/>
+            <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding FalsePositivesText}"/>
+            <Button Content="Review false positives" Command="{Binding OpenFalsePositivesCommand}"/>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="panel">
+          <StackPanel Spacing="12">
             <TextBlock Classes="h2" Text="Re-encoding"/>
             <TextBlock Classes="muted" TextWrapping="Wrap" Text="How the Re-encode screen makes smaller copies of large videos. The defaults are the recommended settings."/>
             <v:EncodeSettingsEditor DataContext="{Binding Encoding}"/>
@@ -168,24 +176,69 @@
       </StackPanel>
     </ScrollViewer>
 
-    <!-- Live preview -->
+    <!-- Save -->
     <Border Grid.Column="1" Classes="panel" VerticalAlignment="Top">
       <StackPanel Spacing="10">
-        <TextBlock Classes="h2" Text="With these settings"/>
-        <TextBlock Text="{Binding PreviewDuplicates}" FontSize="38" FontWeight="SemiBold"/>
-        <TextBlock Classes="muted" Text="duplicates would be found" Margin="0,-8,0,0"/>
-        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="6">
-          <TextBlock Classes="muted" Text="Groups of copies"/><TextBlock Grid.Column="1" Text="{Binding PreviewGroups}" FontWeight="SemiBold"/>
-          <TextBlock Grid.Row="1" Classes="muted" Text="Broken or short"/><TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding PreviewBroken}" FontWeight="SemiBold"/>
-          <TextBlock Grid.Row="2" Classes="muted" Text="Space in duplicates"/><TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding PreviewSize}" FontWeight="SemiBold"/>
-        </Grid>
-        <TextBlock Classes="muted small" Text="{Binding PreviewNote}" TextWrapping="Wrap"/>
         <Button Classes="primary" Content="Save settings" Command="{Binding SaveCommand}" IsEnabled="{Binding Dirty}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
         <Button Content="Save and compare again" Command="{Binding SaveAndCompareCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                 ToolTip.Tip="Saves, then updates the review with the videos already read"/>
         <TextBlock Text="{Binding SavedMessage}" Foreground="{DynamicResource Keep}" FontWeight="SemiBold"/>
       </StackPanel>
     </Border>
+
+    <!-- Sub page: the marked false positives -->
+    <DockPanel Grid.ColumnSpan="2" Margin="-12,-16,-12,-12" Background="{DynamicResource Table}" IsVisible="{Binding FalsePositivesVisible}">
+      <DockPanel DockPanel.Dock="Top" Margin="12,16,12,12">
+        <Button DockPanel.Dock="Right" Content="Back to settings" Command="{Binding CloseFalsePositivesCommand}" VerticalAlignment="Bottom"/>
+        <StackPanel>
+          <TextBlock Classes="h1" Text="False positives"/>
+          <TextBlock Classes="muted" TextWrapping="Wrap" Margin="0,4,0,0"
+                     Text="Videos marked as &quot;Not a duplicate&quot; in Review. They are recognised by their content, so a mark still applies after the files are moved or renamed."/>
+          <TextBlock Text="{Binding FalsePositivesStatus}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+        </StackPanel>
+      </DockPanel>
+      <ScrollViewer Margin="12,0,12,12">
+        <ItemsControl ItemsSource="{Binding FalsePositiveItems}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:FalsePositiveItem">
+              <Border Classes="panel" Padding="0" Margin="0,0,0,12">
+                <StackPanel>
+                  <DockPanel Margin="14,8">
+                    <Button DockPanel.Dock="Right" Content="Remove" Command="{Binding RemoveCommand}" ToolTip.Tip="These two can be found as duplicates again"/>
+                    <TextBlock Classes="muted small" Text="{Binding Heading}" VerticalAlignment="Center"/>
+                  </DockPanel>
+                  <ContentControl Content="{Binding A}"/>
+                  <ContentControl Content="{Binding B}"/>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+          <ItemsControl.DataTemplates>
+            <DataTemplate DataType="vm:FalsePositiveVideo">
+              <Border BorderBrush="{DynamicResource Rule}" BorderThickness="0,1,0,0" Padding="14,10">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+                  <Border Background="{DynamicResource Frame}" CornerRadius="3" Padding="4" Width="376" Height="88">
+                    <Panel>
+                      <StackPanel Orientation="Horizontal" Spacing="3" IsVisible="{Binding InDatabase}">
+                        <Image Source="{Binding Shot1}" Width="120" Height="80" Stretch="UniformToFill"/>
+                        <Image Source="{Binding Shot2}" Width="120" Height="80" Stretch="UniformToFill"/>
+                        <Image Source="{Binding Shot3}" Width="120" Height="80" Stretch="UniformToFill"/>
+                      </StackPanel>
+                      <TextBlock Text="Not in the database" Foreground="#9AA7B2" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding !InDatabase}"/>
+                    </Panel>
+                  </Border>
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                    <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                    <TextBlock Classes="muted small" Text="{Binding Folder}" TextWrapping="Wrap"/>
+                    <TextBlock Classes="muted small" Text="{Binding Meta}"/>
+                  </StackPanel>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.DataTemplates>
+        </ItemsControl>
+      </ScrollViewer>
+    </DockPanel>
 
     <!-- "Update paths" confirmation -->
     <Grid Grid.ColumnSpan="2" Margin="-12,-16,-12,-12" Background="#80000000" IsVisible="{Binding ConfirmVisible}">

@@ -14,9 +14,12 @@
           <SolidColorBrush x:Key="Muted" Color="#5B6875"/>
           <SolidColorBrush x:Key="Rule" Color="#D3DAE0"/>
           <SolidColorBrush x:Key="Accent" Color="#1F5C8A"/>
+          <SolidColorBrush x:Key="AccentHover" Color="#1A6FB0"/>
+          <SolidColorBrush x:Key="AccentPressed" Color="#174D75"/>
           <SolidColorBrush x:Key="Keep" Color="#2F6B4F"/>
           <SolidColorBrush x:Key="KeepWash" Color="#E3F0E8"/>
           <SolidColorBrush x:Key="Grease" Color="#CF2F2F"/>
+          <SolidColorBrush x:Key="GreaseHover" Color="#E23A3A"/>
           <SolidColorBrush x:Key="GreaseWash" Color="#FBECEB"/>
           <SolidColorBrush x:Key="Frame" Color="#2A3036"/>
         </ResourceDictionary>
@@ -27,9 +30,12 @@
           <SolidColorBrush x:Key="Muted" Color="#9AA7B2"/>
           <SolidColorBrush x:Key="Rule" Color="#2E363D"/>
           <SolidColorBrush x:Key="Accent" Color="#5B9FD6"/>
+          <SolidColorBrush x:Key="AccentHover" Color="#7DB8EA"/>
+          <SolidColorBrush x:Key="AccentPressed" Color="#4A88BC"/>
           <SolidColorBrush x:Key="Keep" Color="#6CC196"/>
           <SolidColorBrush x:Key="KeepWash" Color="#1B2D24"/>
           <SolidColorBrush x:Key="Grease" Color="#FF6B5E"/>
+          <SolidColorBrush x:Key="GreaseHover" Color="#FF8478"/>
           <SolidColorBrush x:Key="GreaseWash" Color="#351C1B"/>
           <SolidColorBrush x:Key="Frame" Color="#0B0E10"/>
         </ResourceDictionary>
@@ -58,12 +64,55 @@
       <Setter Property="Background" Value="{DynamicResource Grease}"/>
       <Setter Property="Foreground" Value="White"/>
     </Style>
+    <!-- Fluent turns buttons grey on hover, which reads as "disabled": keep the colour, a little brighter -->
+    <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AccentHover}"/>
+      <Setter Property="Foreground" Value="White"/>
+    </Style>
+    <Style Selector="Button.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AccentPressed}"/>
+      <Setter Property="Foreground" Value="White"/>
+    </Style>
+    <Style Selector="Button.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource GreaseHover}"/>
+      <Setter Property="Foreground" Value="White"/>
+    </Style>
+    <Style Selector="Button.danger:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Grease}"/>
+      <Setter Property="Foreground" Value="White"/>
+    </Style>
     <Style Selector="Button.link">
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="BorderThickness" Value="0"/>
       <Setter Property="Padding" Value="0"/>
       <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
       <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Button.link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource AccentHover}"/>
+    </Style>
+    <!-- Round icon button (play) -->
+    <Style Selector="Button.icon">
+      <Setter Property="Width" Value="34"/>
+      <Setter Property="Height" Value="34"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="CornerRadius" Value="17"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+    </Style>
+    <Style Selector="Button.icon:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Foreground" Value="{DynamicResource AccentHover}"/>
+    </Style>
+    <!-- A folder shown as a tag -->
+    <Style Selector="Border.tag">
+      <Setter Property="Background" Value="{DynamicResource Table}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Rule}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="14"/>
+      <Setter Property="Padding" Value="12,3"/>
+      <Setter Property="Margin" Value="0,0,6,6"/>
     </Style>
     <Style Selector="CheckBox.grease">
       <Setter Property="Foreground" Value="{DynamicResource Ink}"/>

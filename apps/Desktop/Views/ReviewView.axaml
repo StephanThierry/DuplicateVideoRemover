@@ -154,7 +154,14 @@
                     <TextBlock Classes="muted small" Text="{Binding Meta}"/>
                     <TextBlock Classes="muted small" Text="{Binding Reason}" IsVisible="{Binding ShowReason}" TextWrapping="Wrap"/>
                   </StackPanel>
-                  <Button Grid.Column="3" Content="Keep this one" Command="{Binding KeepThisCommand}" IsVisible="{Binding CanKeep}" VerticalAlignment="Center"/>
+                  <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Button Classes="icon" Command="{Binding PlayCommand}" ToolTip.Tip="Play (opens the default player)">
+                      <Path Data="M3,1.5 L3,12.5 L12,7 Z" Fill="{Binding $parent[Button].Foreground}" Width="14" Height="14"/>
+                    </Button>
+                    <Button Content="Keep this one" Command="{Binding KeepThisCommand}" IsVisible="{Binding CanKeep}"/>
+                    <Button Content="Not a duplicate" Command="{Binding NotDuplicateCommand}" IsVisible="{Binding InGroup}"
+                            ToolTip.Tip="These videos only look alike: take this one out of the group and don't match them again"/>
+                  </StackPanel>
                 </Grid>
               </Border>
             </DataTemplate>
@@ -169,8 +176,11 @@
         <Button DockPanel.Dock="Right" Classes="danger" Content="{Binding ExecuteLabel}"
                 Command="{Binding AskExecuteCommand}" IsEnabled="{Binding HasSelection}" FontSize="15" Padding="18,8"/>
         <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-          <TextBlock Text="{Binding SelectionCount}" FontSize="16" FontWeight="SemiBold"/>
-          <TextBlock Text="{Binding SelectionSize}" Classes="muted" VerticalAlignment="Bottom"/>
+          <Panel>
+            <TextBlock Text="{Binding SelectionSize}" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource Muted}" IsVisible="{Binding !HasSelection}"/>
+            <TextBlock Text="{Binding SelectionSize}" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource Grease}" IsVisible="{Binding HasSelection}"/>
+          </Panel>
+          <TextBlock Text="{Binding SelectionCount}" Classes="muted" VerticalAlignment="Bottom" Margin="0,0,0,4"/>
         </StackPanel>
       </DockPanel>
     </Border>
@@ -199,22 +209,43 @@
       </Border>
     </Grid>
 
-    <!-- Files that could not be removed -->
+    <!-- Progress while deleting -->
+    <Grid Grid.RowSpan="3" Background="#80000000" IsVisible="{Binding Busy}">
+      <Border Classes="panel" Width="520" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
+        <StackPanel Spacing="12">
+          <TextBlock Classes="h2" Text="Deleting files"/>
+          <ProgressBar Value="{Binding DeletePercent}" Maximum="100" Height="14" CornerRadius="7"/>
+          <TextBlock Text="{Binding DeleteText}" Classes="muted" TextWrapping="Wrap"/>
+          <TextBlock Text="{Binding DeleteFailedText}" Foreground="{DynamicResource Grease}" FontWeight="SemiBold" TextWrapping="Wrap"
+                     IsVisible="{Binding DeleteFailedText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+        </StackPanel>
+      </Border>
+    </Grid>
+
+    <!-- Files that could not be deleted: file and reason -->
     <Grid Grid.RowSpan="3" Background="#80000000" IsVisible="{Binding FailuresVisible}">
-      <Border Classes="panel" Width="720" MaxHeight="520" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
+      <Border Classes="panel" Width="760" MaxHeight="560" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
         <DockPanel>
-          <TextBlock DockPanel.Dock="Top" Classes="h2" Text="These files were not removed"/>
-          <TextBlock DockPanel.Dock="Top" Classes="muted" TextWrapping="Wrap" Margin="0,8,0,12"
-                     Text="They are still selected. Close any program using them, check that you may change the folder, and try again."/>
+          <TextBlock DockPanel.Dock="Top" Classes="h2" Text="{Binding FailuresTitle}"/>
+          <TextBlock DockPanel.Dock="Top" Classes="muted" TextWrapping="Wrap" Margin="0,8,0,12" Text="{Binding FailuresSummary}"/>
+          <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*" ColumnSpacing="16" Margin="0,0,0,6">
+            <TextBlock Classes="muted small" Text="File" FontWeight="SemiBold"/>
+            <TextBlock Grid.Column="1" Classes="muted small" Text="Reason" FontWeight="SemiBold"/>
+          </Grid>
           <Button DockPanel.Dock="Bottom" Classes="primary" Content="Close" Command="{Binding CloseFailuresCommand}" HorizontalAlignment="Right" Margin="0,12,0,0"/>
           <ScrollViewer>
             <ItemsControl ItemsSource="{Binding Failures}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="core:ExecuteFailure">
-                  <StackPanel Margin="0,0,0,8">
-                    <TextBlock Text="{Binding Entry.Path}" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                    <TextBlock Text="{Binding Error}" Classes="muted small" TextWrapping="Wrap"/>
-                  </StackPanel>
+                  <Border BorderBrush="{DynamicResource Rule}" BorderThickness="0,1,0,0" Padding="0,6">
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                      <StackPanel>
+                        <TextBlock Text="{Binding Entry.FileName}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding Entry.Folder}" Classes="muted small" TextWrapping="Wrap"/>
+                      </StackPanel>
+                      <TextBlock Grid.Column="1" Text="{Binding Error}" TextWrapping="Wrap"/>
+                    </Grid>
+                  </Border>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
