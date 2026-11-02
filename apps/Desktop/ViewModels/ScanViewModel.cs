@@ -49,6 +49,7 @@ public partial class ScanViewModel : ObservableObject
         this.app = app;
         this.main = main;
         app.Scanner.ProgressChanged += p => Dispatcher.UIThread.Post(() => Apply(p));
+        app.ExcludeAdded += _ => Dispatcher.UIThread.Post(RefreshInfo);
         RefreshInfo();
         Apply(app.Scanner.Current);
     }

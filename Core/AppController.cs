@@ -39,6 +39,9 @@ namespace deepduplicates
         /// <summary>Raised when videos in the database changed (scan finished, files removed) - previews are outdated.</summary>
         public event Action DataChanged;
 
+        /// <summary>Raised when Review added a path to skip to the saved settings (screens holding a copy add it too).</summary>
+        public event Action<string> ExcludeAdded;
+
         private AppController(string dataFolder)
         {
             DataFolder = dataFolder;
@@ -175,6 +178,29 @@ namespace deepduplicates
             return all.Select(p => new FalsePositiveDetail(p,
                 found.TryGetValue(p.A, out var a) ? a : null,
                 found.TryGetValue(p.B, out var b) ? b : null)).ToList();
+        }
+
+        /// <summary>
+        /// "Exclude folder" in Review: adds the folder (with its sub folders) to the paths to skip in the
+        /// settings, so later scans leave it out, and takes its files out of the current results.
+        /// Returns a message for the user.
+        /// </summary>
+        public string ExcludeFolder(string folder)
+        {
+            if (string.IsNullOrWhiteSpace(folder)) return "No folder chosen.";
+            // With the separator, "D:\Videos\a" does not also skip "D:\Videos\ab"
+            string rule = folder.TrimEnd('/', '\\') + Path.DirectorySeparatorChar;
+            var settings = Settings.Clone();
+            if (!settings.excludePaths.Contains(rule, StringComparer.OrdinalIgnoreCase))
+            {
+                settings.excludePaths = settings.excludePaths.Append(rule).ToArray();
+                settings.Normalize();
+                FileHandler.SaveSettings(settings);
+                Settings = settings;
+                ExcludeAdded?.Invoke(rule);
+            }
+            int n = Session.RemoveUnder(folder);
+            return $"Excluded {folder} - {Fmt.Plural(n, "file", "files")} taken out of the matches. Undo it under Settings, paths to skip.";
         }
 
         /// <summary>Forgets a false positive; "Compare again" can then find the pair again.</summary>

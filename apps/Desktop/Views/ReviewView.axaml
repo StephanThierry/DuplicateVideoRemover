@@ -103,6 +103,8 @@
             <TextBlock Text="{Binding FolderFilter}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0" TextWrapping="Wrap"/>
             <Button Classes="danger" Content="Select all duplicates in this folder" Command="{Binding SelectFolderCommand}" Margin="0,0,8,0"/>
             <Button Content="Unselect folder" Command="{Binding UnselectFolderCommand}" Margin="0,0,8,0"/>
+            <Button Content="Exclude folder" Command="{Binding ExcludeFolderCommand}" Margin="0,0,8,0"
+                    ToolTip.Tip="Exclude this folder from all matches"/>
             <Button Classes="link" Content="Show all folders" Command="{Binding ShowAllFoldersCommand}" VerticalAlignment="Center"/>
           </WrapPanel>
         </Border>

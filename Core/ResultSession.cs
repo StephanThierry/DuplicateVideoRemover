@@ -193,6 +193,46 @@ namespace deepduplicates
             try { Results.Save(); } catch (Exception e) { Console.WriteLine("Could not save results: " + e.Message); }
         }
 
+        /// <summary>
+        /// Takes every file under this folder (and its sub folders) out of the results, after the folder was
+        /// excluded. A group with one file left is gone. Saves the results. Returns how many files were taken out.
+        /// </summary>
+        public int RemoveUnder(string folder)
+        {
+            var cmp = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            string prefix = folder.TrimEnd('/', '\\') + Path.DirectorySeparatorChar;
+            int count = 0;
+            Change(() =>
+            {
+                var gone = Results.AllEntries().Where(e => e.Path.StartsWith(prefix, cmp)).Select(e => e.Id).ToHashSet();
+                count = gone.Count;
+                if (count == 0) return;
+                foreach (var id in gone) { selected.Remove(id); groupOf.Remove(id); }
+                Results.Broken.RemoveAll(b => gone.Contains(b.Id));
+                foreach (var g in Results.Groups.ToList())
+                {
+                    if (g.Members.RemoveAll(m => gone.Contains(m.Id)) == 0) continue;
+                    if (g.Members.Count < 2)
+                    {
+                        Results.Groups.Remove(g);
+                        keep.Remove(g.Id);
+                        foreach (var m in g.Members) { groupOf.Remove(m.Id); selected.Remove(m.Id); }
+                        continue;
+                    }
+                    if (gone.Contains(keep[g.Id]))
+                    {
+                        var next = g.Members.FirstOrDefault(m => !selected.Contains(m.Id)) ?? g.Members[0];
+                        keep[g.Id] = next.Id;
+                        selected.Remove(next.Id);
+                    }
+                    g.SuggestedKeepId = keep[g.Id];
+                }
+            });
+            if (count > 0)
+                try { Results.Save(); } catch (Exception e) { Console.WriteLine("Could not save results: " + e.Message); }
+            return count;
+        }
+
         // --- Removing ---
 
         /// <summary>

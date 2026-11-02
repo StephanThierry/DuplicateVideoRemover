@@ -157,6 +157,16 @@ public partial class ReviewViewModel : ObservableObject
         ShowToast(n == 0 ? "Nothing more to select in this folder." : $"Selected {Fmt.Plural(n, "file", "files")} in this folder.");
     }
 
+    // Skips the folder in later scans and takes its files out of the matches now
+    [RelayCommand]
+    private void ExcludeFolder()
+    {
+        if (FolderFilter == null) return;
+        var message = app.ExcludeFolder(FolderFilter);
+        FolderFilter = null;
+        ShowToast(message, 8000);
+    }
+
     [RelayCommand]
     private void Reanalyze()
     {

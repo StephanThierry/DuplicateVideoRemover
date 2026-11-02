@@ -72,6 +72,15 @@ public partial class SettingsViewModel : ObservableObject
         loading = false;
         UpdateFalsePositivesText();
         FalsePositives.Changed += () => Dispatcher.UIThread.Post(UpdateFalsePositivesText);
+        // "Exclude folder" in Review saved a new path to skip: show it here, so saving these settings keeps it
+        app.ExcludeAdded += rule => Dispatcher.UIThread.Post(() =>
+        {
+            if (ExcludePaths.Values().Contains(rule, StringComparer.OrdinalIgnoreCase)) return;
+            bool wasLoading = loading;
+            loading = true;
+            ExcludePaths.Items.Add(new PathItem(rule, ExcludePaths));
+            loading = wasLoading;
+        });
     }
 
     private void UpdateFalsePositivesText()

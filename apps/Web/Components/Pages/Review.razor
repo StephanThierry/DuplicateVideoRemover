@@ -75,6 +75,7 @@
                         <span>Showing <span class="path">@folderFilter</span></span>
                         <button class="danger" @onclick="SelectFolder">Select all duplicates in this folder</button>
                         @if (summary?.SelectedCount > 0) { <button @onclick="() => Session.UnselectFolder(folderFilter)">Unselect folder</button> }
+                        <button @onclick="ExcludeFolder" title="Exclude this folder from all matches">Exclude folder</button>
                         <button class="link" @onclick="() => FilterFolder(null)">Show all folders</button>
                     </div>
                 }
@@ -315,6 +316,15 @@
     {
         int n = Session.SelectFolder(folderFilter);
         ShowToast(n == 0 ? "Nothing more to select in this folder." : $"Selected {Fmt.Plural(n, "file", "files")} in this folder.");
+    }
+
+    // Skips the folder in later scans and takes its files out of the matches now
+    private void ExcludeFolder()
+    {
+        if (folderFilter == null) return;
+        var message = App.ExcludeFolder(folderFilter);
+        FilterFolder(null);
+        ShowToast(message);
     }
 
     private async Task Execute()
