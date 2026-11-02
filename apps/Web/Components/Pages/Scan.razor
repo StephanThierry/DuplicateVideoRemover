@@ -11,7 +11,8 @@
             <h1>Scan</h1>
             <p>Finds the videos in your folders, reads the new ones and compares them all.</p>
         </div>
-        @if (App.Scanner.IsRunning)
+        @* The final report arrives just before the engine clears IsRunning: a finished scan is not running *@
+        @if (App.Scanner.IsRunning && p.Phase is not (ScanPhase.Done or ScanPhase.Cancelled or ScanPhase.Failed))
         {
             <button class="big" @onclick="Stop" disabled="@stopping">@(stopping ? "Stopping..." : "Stop scan")</button>
         }
@@ -23,7 +24,18 @@
                     @* The saved file list: All files opens it straight away, nothing is scanned *@
                     <button class="big" @onclick='() => Nav.NavigateTo("files")' title="Opens the files the last scan found - nothing is scanned">Show all files from @Fmt.When(listed)</button>
                 }
-                <button class="primary big" @onclick="Start" disabled="@(App.Settings.contentFolders.Length == 0)">Start scan</button>
+                @if (p.Phase == ScanPhase.Idle)
+                {
+                    <button class="primary big" @onclick="Start" disabled="@(App.Settings.contentFolders.Length == 0)">Start scan</button>
+                }
+                else
+                {
+                    @* After a scan (finished, stopped or failed): run it again *@
+                    <button class="primary big" @onclick="Start" disabled="@(App.Settings.contentFolders.Length == 0)">
+                        Run new scan
+                        <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style="vertical-align:-3px;margin-left:6px"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" fill="currentColor" /></svg>
+                    </button>
+                }
             </div>
         }
     </div>

@@ -79,7 +79,8 @@ public partial class ScanViewModel : ObservableObject
 
     private void Apply(ScanProgress p)
     {
-        IsRunning = app.Scanner.IsRunning;
+        // The final report arrives just before the engine clears IsRunning: a finished scan is not running
+        IsRunning = app.Scanner.IsRunning && p.Phase is not (ScanPhase.Done or ScanPhase.Cancelled or ScanPhase.Failed);
         IsIdle = p.Phase == ScanPhase.Idle;
         FindPhase.Update(ScanText.FindState(p), p.FindFraction, ScanText.FindUnknownTotal(p), ScanText.FindDetail(p), ScanText.FindLeft(p));
         ProcessPhase.Update(ScanText.ProcessState(p), p.ProcessFraction, false, ScanText.ProcessDetail(p), ScanText.ProcessLeft(p));
