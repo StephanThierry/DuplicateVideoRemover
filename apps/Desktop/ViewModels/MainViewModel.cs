@@ -12,9 +12,9 @@ public partial class MainViewModel : ObservableObject
     public EncodeViewModel Encode { get; }
     public AllFilesViewModel Files { get; }
 
-    public const int ReviewTab = 0, ScanTab = 1, EncodeTab = 2, FilesTab = 3, SettingsTab = 4;
+    public const int ScanTab = 0, ReviewTab = 1, EncodeTab = 2, FilesTab = 3, SettingsTab = 4;
 
-    /// <summary>0 = Review, 1 = Scan, 2 = Re-encode, 3 = All files, 4 = Settings.</summary>
+    /// <summary>0 = Scan, 1 = Review, 2 = Re-encode, 3 = All files, 4 = Settings.</summary>
     [ObservableProperty] private int selectedTab;
 
     public string DataFolder => App.DatabaseFolder == App.DataFolder
