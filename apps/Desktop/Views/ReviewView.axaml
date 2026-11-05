@@ -164,7 +164,11 @@
                         <TextBlock Text="Keep" Foreground="{DynamicResource Keep}" FontSize="11" FontWeight="SemiBold"/>
                       </Border>
                     </StackPanel>
-                    <Button Classes="link" Content="{Binding Folder}" Command="{Binding ShowFolderCommand}" ToolTip.Tip="Show only this folder"/>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                      <Button Classes="link" Content="{Binding Folder}" Command="{Binding ShowFolderCommand}" ToolTip.Tip="Show only this folder"/>
+                      <Button Classes="small" Content="Exclude this folder" Command="{Binding ExcludeFolderCommand}"
+                              ToolTip.Tip="Skip this folder in later scans (added to the paths to skip) and take its files out of the matches"/>
+                    </StackPanel>
                     <TextBlock Classes="muted small" Text="{Binding Meta}"/>
                     <TextBlock Classes="muted small" Text="{Binding Reason}" IsVisible="{Binding ShowReason}" TextWrapping="Wrap"/>
                   </StackPanel>

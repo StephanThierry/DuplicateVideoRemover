@@ -162,7 +162,13 @@ public partial class ReviewViewModel : ObservableObject
     private void ExcludeFolder()
     {
         if (FolderFilter == null) return;
-        var message = app.ExcludeFolder(FolderFilter);
+        ExcludeFolderOf(FolderFilter);
+    }
+
+    // Also used by the button on each row
+    internal void ExcludeFolderOf(string folder)
+    {
+        var message = app.ExcludeFolder(folder);
         FolderFilter = null;
         ShowToast(message, 8000);
     }
@@ -395,4 +401,5 @@ public partial class VideoRow : ObservableObject
     [RelayCommand] private void Play() => owner.Play(this);
     internal void MarkFalsePositive() => owner.MarkFalsePositive(this);
     [RelayCommand] private void ShowFolder() => owner.ShowFolderCommand.Execute(Folder);
+    [RelayCommand] private void ExcludeFolder() => owner.ExcludeFolderOf(Folder);
 }

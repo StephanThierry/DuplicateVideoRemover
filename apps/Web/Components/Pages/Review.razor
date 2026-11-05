@@ -110,7 +110,10 @@
                                     <button class="icon" @onclick="() => playing = m" title="Play" aria-label="Play @m.FileName">@VideoPlayer.Icon</button>
                                     <div class="info">
                                         <div class="name">@m.FileName</div>
-                                        <button class="link folderlink" @onclick="() => FilterFolder(m.Folder)" title="Show only this folder">@m.Folder</button>
+                                        <div class="folderline">
+                                            <button class="link folderlink" @onclick="() => FilterFolder(m.Folder)" title="Show only this folder">@m.Folder</button>
+                                            <button class="small" @onclick="() => ExcludeFolder(m.Folder)" title="Skip this folder in later scans (added to the paths to skip) and take its files out of the matches">Exclude this folder</button>
+                                        </div>
                                         <div class="meta"><span>@Fmt.Size(m.SizeBytes)</span><span>@Fmt.Duration(m.DurationSeconds)</span><span>@Fmt.Bitrate(m.Bitrate)</span></div>
                                         @if (m.Id != keepId && !string.IsNullOrEmpty(m.Reason)) { <div class="reason">@CleanReason(m.Reason)</div> }
                                     </div>
@@ -137,7 +140,10 @@
                                 <button class="icon" @onclick="() => playing = b" title="Play" aria-label="Play @b.FileName">@VideoPlayer.Icon</button>
                                 <div class="info">
                                     <div class="name">@b.FileName</div>
-                                    <button class="link folderlink" @onclick="() => FilterFolder(b.Folder)" title="Show only this folder">@b.Folder</button>
+                                    <div class="folderline">
+                                        <button class="link folderlink" @onclick="() => FilterFolder(b.Folder)" title="Show only this folder">@b.Folder</button>
+                                        <button class="small" @onclick="() => ExcludeFolder(b.Folder)" title="Skip this folder in later scans (added to the paths to skip) and take its files out of the matches">Exclude this folder</button>
+                                    </div>
                                     <div class="meta"><span>@Fmt.Size(b.SizeBytes)</span><span>@Fmt.Duration(b.DurationSeconds)</span></div>
                                     <div class="reason">@CleanReason(b.Reason)</div>
                                 </div>
@@ -244,20 +250,20 @@
     private const int PageSize = 40;
     private ResultSession Session => App.Session;
     private ResultSet Results => App.Session.Results;
-    private ResultSession watched;
+    private ResultSession? watched;
 
     private List<FolderSummary> folders = new();
-    private string folderFilter;
+    private string? folderFilter;
     private string search = "";
     private int shown = PageSize, shownBroken = PageSize * 2;
     private bool confirming, busy, showFailures;
-    private ExecuteReport report;
-    private DeleteProgress deleteProgress;
-    private VideoEntry playing;
+    private ExecuteReport? report;
+    private DeleteProgress? deleteProgress;
+    private VideoEntry? playing;
     private DateTime lastProgressRender;
 
-    private string toast;
-    private CancellationTokenSource toastTimer;
+    private string? toast;
+    private CancellationTokenSource? toastTimer;
 
     protected override void OnInitialized()
     {
@@ -296,7 +302,7 @@
         (folderFilter == null || e.Folder == folderFilter) &&
         (string.IsNullOrWhiteSpace(search) || e.Path.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase));
 
-    private void FilterFolder(string folder)
+    private void FilterFolder(string? folder)
     {
         folderFilter = folder;
         ResetPaging();
@@ -319,12 +325,14 @@
     }
 
     // Skips the folder in later scans and takes its files out of the matches now
-    private void ExcludeFolder()
+    private void ExcludeFolder() => ExcludeFolder(folderFilter);
+
+    private void ExcludeFolder(string? folder)
     {
-        if (folderFilter == null) return;
-        var message = App.ExcludeFolder(folderFilter);
+        if (folder == null) return;
+        var message = App.ExcludeFolder(folder);
         FilterFolder(null);
-        ShowToast(message);
+        ShowToast(message, 8000);
     }
 
     private async Task Execute()
