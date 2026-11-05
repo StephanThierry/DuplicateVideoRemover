@@ -32,6 +32,14 @@
         <div class="toolbar">
             <input type="search" class="files-search" placeholder='e.g. vacation lisbon 2026 -ocean' value="@search" @oninput="OnSearch"
                    aria-label="Search in the file paths" autofocus />
+            <label class="sortpick">Sort by
+                <select @bind="sort" @bind:after="Resort" aria-label="Sort the files by">
+                    @foreach (var (label, value) in FileSorting.Choices)
+                    {
+                        <option value="@value">@label</option>
+                    }
+                </select>
+            </label>
             @if (hidden.Count > 0)
             {
                 <button @onclick="Unhide" title="@string.Join("\n", hidden)">Unhide folders (@hidden.Count)</button>
@@ -95,16 +103,20 @@
 
 @code {
     private const int PageSize = 50;
-    private FileIndex index;
+    private FileIndex? index;
     private List<VideoEntry> matches = new();
     private SearchQuery query = SearchQuery.Parse("");
     private string search = "";
     private int shown = PageSize;
+    private FileSort sort = FileSort.Path;
+
+    // A new order starts the list from the top again
+    private void Resort() => Filter();
     private readonly HashSet<string> hidden = new(StringComparer.OrdinalIgnoreCase);   // "Exclude folder"
     private readonly HashSet<int> deleted = new();
-    private VideoEntry playing, deleting;
-    private string toast;
-    private CancellationTokenSource debounce, toastTimer;
+    private VideoEntry? playing, deleting;
+    private string? toast;
+    private CancellationTokenSource? debounce, toastTimer;
 
     protected override async Task OnInitializedAsync()
     {
@@ -112,7 +124,7 @@
         await Load();
     }
 
-    private DotNetObjectReference<Files> self;
+    private DotNetObjectReference<Files>? self;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -155,7 +167,7 @@
     {
         if (index == null) return;
         query = SearchQuery.Parse(search);
-        matches = index.Search(query, f => !hidden.Contains(f.Folder) && !deleted.Contains(f.Id));
+        matches = FileSorting.Apply(index.Search(query, f => !hidden.Contains(f.Folder) && !deleted.Contains(f.Id)), sort);
         shown = PageSize;
     }
 
@@ -166,7 +178,8 @@
 
     private string ResultText()
     {
-        string n = query.IsEmpty && hidden.Count == 0 ? $"{index.Count - deleted.Count:N0} files" : $"{matches.Count:N0} of {index.Count - deleted.Count:N0} files";
+        int total = (index?.Count ?? 0) - deleted.Count;
+        string n = query.IsEmpty && hidden.Count == 0 ? $"{total:N0} files" : $"{matches.Count:N0} of {total:N0} files";
         return n;
     }
 

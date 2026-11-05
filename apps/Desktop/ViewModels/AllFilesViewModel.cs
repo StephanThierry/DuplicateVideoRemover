@@ -32,6 +32,9 @@ public partial class AllFilesViewModel : ObservableObject
     /// <summary>The rows that match the search (a new list each time - the list control is virtualized).</summary>
     [ObservableProperty] private IReadOnlyList<FileRow> rows = Array.Empty<FileRow>();
     [ObservableProperty] private string search = "";
+    /// <summary>The sort drop-down: the labels, and which one is chosen (index into FileSorting.Choices).</summary>
+    public string[] SortLabels { get; } = FileSorting.Choices.Select(c => c.Label).ToArray();
+    [ObservableProperty] private int sortIndex;
     [ObservableProperty] private string resultText = "";
     [ObservableProperty] private string sourceText = "";
     [ObservableProperty] private bool loading;
@@ -71,6 +74,9 @@ public partial class AllFilesViewModel : ObservableObject
         await Filter();
     }
 
+    // A new order starts the list from the top again
+    partial void OnSortIndexChanged(int value) => _ = Filter();
+
     // Searches a moment after the last key press
     partial void OnSearchChanged(string value)
     {
@@ -85,7 +91,8 @@ public partial class AllFilesViewModel : ObservableObject
         var query = SearchQuery.Parse(Search);
         var hiddenNow = hidden.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var deletedNow = deleted.ToHashSet();
-        var found = await Task.Run(() => index.Search(query, f => !hiddenNow.Contains(f.Folder) && !deletedNow.Contains(f.Id)));
+        var sort = FileSorting.Choices[Math.Clamp(SortIndex, 0, FileSorting.Choices.Length - 1)].Sort;
+        var found = await Task.Run(() => FileSorting.Apply(index.Search(query, f => !hiddenNow.Contains(f.Folder) && !deletedNow.Contains(f.Id)), sort));
         if (!SameQuery(query, SearchQuery.Parse(Search))) return;   // typed on meanwhile: that search shows instead
         Rows = found.Select(f => rowsById[f.Id]).ToList();
         HasMatches = Rows.Count > 0 || index.Count == 0;

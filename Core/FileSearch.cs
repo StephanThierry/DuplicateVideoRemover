@@ -47,6 +47,38 @@ namespace deepduplicates
         }
     }
 
+    /// <summary>How the All files list is ordered.</summary>
+    public enum FileSort { Path, NameUp, NameDown, FolderUp, FolderDown, SizeUp, SizeDown }
+
+    public static class FileSorting
+    {
+        /// <summary>(label, value) for a sort drop-down, in display order.</summary>
+        public static readonly (string Label, FileSort Sort)[] Choices =
+        {
+            ("Path (default)", FileSort.Path),
+            ("Filename, A to Z", FileSort.NameUp), ("Filename, Z to A", FileSort.NameDown),
+            ("Folder name, A to Z", FileSort.FolderUp), ("Folder name, Z to A", FileSort.FolderDown),
+            ("Size, smallest first", FileSort.SizeUp), ("Size, largest first", FileSort.SizeDown),
+        };
+
+        /// <summary>The list in the chosen order (ties by path, so the order is the same every time). The list is kept as it is for Path.</summary>
+        public static List<VideoEntry> Apply(List<VideoEntry> list, FileSort sort)
+        {
+            var cmp = StringComparer.OrdinalIgnoreCase;
+            IOrderedEnumerable<VideoEntry> ordered = sort switch
+            {
+                FileSort.NameUp => list.OrderBy(e => e.FileName, cmp).ThenBy(e => e.Folder, cmp),
+                FileSort.NameDown => list.OrderByDescending(e => e.FileName, cmp).ThenBy(e => e.Folder, cmp),
+                FileSort.FolderUp => list.OrderBy(e => e.Folder, cmp).ThenBy(e => e.FileName, cmp),
+                FileSort.FolderDown => list.OrderByDescending(e => e.Folder, cmp).ThenBy(e => e.FileName, cmp),
+                FileSort.SizeUp => list.OrderBy(e => e.SizeBytes).ThenBy(e => e.Path, cmp),
+                FileSort.SizeDown => list.OrderByDescending(e => e.SizeBytes).ThenBy(e => e.Path, cmp),
+                _ => null
+            };
+            return ordered == null ? list : ordered.ToList();
+        }
+    }
+
     /// <summary>
     /// All videos the last scan found, ready for searching: the paths are lower-cased once, so a search over
     /// 60,000+ files is only substring checks (a few milliseconds).
