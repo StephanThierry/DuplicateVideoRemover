@@ -8,7 +8,25 @@
                 <h2 id="player-title">@Video.FileName</h2>
                 <button @onclick="Close">Close</button>
             </div>
-            <video src="video/@Video.Id" controls autoplay preload="metadata" @key="Video.Id"></video>
+            <div class="player-box" @ref="box" data-duration="@Video.DurationSeconds" @key="Video.Id">
+                <video src="video/@Video.Id" autoplay preload="metadata"></video>
+                <div class="pc">
+                    @* A tall seek bar in its own row: the browser's own bar is too thin to hit with the mouse *@
+                    <div class="pc-seek" role="slider" tabindex="0" aria-label="Position in the video" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                        <div class="pc-track"><div class="pc-buf"></div><div class="pc-fill"></div></div>
+                        <div class="pc-thumb"></div>
+                        <span class="pc-tip" aria-hidden="true"></span>
+                    </div>
+                    <div class="pc-row">
+                        <button type="button" class="pc-play" aria-label="Play or pause"></button>
+                        <span class="pc-time num">0:00 / 0:00</span>
+                        <span class="pc-hint muted">Left/right arrow: 10 sec - Ctrl: 1 min - Space: play/pause</span>
+                        <button type="button" class="pc-mute" aria-label="Mute"></button>
+                        <input type="range" class="pc-vol" min="0" max="1" step="0.05" value="1" aria-label="Volume" />
+                        <button type="button" class="pc-fs" aria-label="Full screen">Full screen</button>
+                    </div>
+                </div>
+            </div>
             <p class="muted">
                 @Fmt.Size(Video.SizeBytes), @Fmt.Duration(Video.DurationSeconds)
                 @if (ext is not (".mp4" or ".m4v" or ".webm" or ".mov" or ".ogv")) { <text> - browsers often can't play @ext files; if nothing shows, </text><a href="video/@Video.Id" target="_blank" rel="noopener">open it in a new tab</a><text> to download it.</text> }
@@ -17,9 +35,24 @@
     </div>
 }
 
+@inject IJSRuntime JS
+
 @code {
     [Parameter] public VideoEntry? Video { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
+
+    private ElementReference box;
+    private int? wiredId;
+
+    // The controls are wired up in the browser (dvr.initPlayer in App.razor) once the video is on the page
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Video == null) { wiredId = null; return; }
+        if (wiredId == Video.Id) return;
+        wiredId = Video.Id;
+        try { await JS.InvokeVoidAsync("dvr.initPlayer", box); }
+        catch (JSDisconnectedException) { }
+    }
 
     /// <summary>The round play icon used on the buttons that open the player.</summary>
     public static readonly RenderFragment Icon =

@@ -15,6 +15,12 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.MainWindow = new MainWindow { DataContext = new MainViewModel(Program.Controller) };
+            // Closing the app stops a running scan and frees scan.lock, so other programs can scan right away
+            desktop.Exit += (_, _) =>
+            {
+                Program.Controller.Scanner.Cancel();
+                deepduplicates.ScanLock.ReleaseAll();
+            };
         }
         base.OnFrameworkInitializationCompleted();
     }

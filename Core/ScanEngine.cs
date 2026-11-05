@@ -164,7 +164,11 @@ namespace deepduplicates
                     };
                 }
                 Report(Comparing(0));
-                var (results, analyzed) = Analyzer.Analyze(media, settings, done => Report(Comparing(done)));
+                var (results, analyzed) = Analyzer.Analyze(media, settings, done =>
+                {
+                    ct.ThrowIfCancellationRequested();   // Stop scan also works while comparing, so the lock is freed at once
+                    Report(Comparing(done));
+                });
                 record.CompareSeconds = compare.Elapsed.TotalSeconds;
                 results.Save();
 

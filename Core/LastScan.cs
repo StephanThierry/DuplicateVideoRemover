@@ -25,6 +25,7 @@ namespace deepduplicates
 
         private static readonly object sync = new();
         private static HashSet<string> paths;
+        private static HashSet<string> exact;   // the same paths, with exactly the spelling the scan found
         private static string loadedFrom;
         private static DateTime foundUtc;
 
@@ -43,7 +44,7 @@ namespace deepduplicates
                 File.WriteAllText(tmp, JsonSerializer.Serialize(new FileData { FoundUtc = DateTime.UtcNow, Paths = list }));
                 File.Move(tmp, FilePath, overwrite: true);
                 foundUtc = DateTime.UtcNow;
-                paths = new HashSet<string>(list, Comparer);
+                paths = new HashSet<string>(list, Comparer); exact = new HashSet<string>(list, StringComparer.Ordinal);
                 loadedFrom = FilePath;
             }
         }
@@ -51,7 +52,22 @@ namespace deepduplicates
         /// <summary>Forgets a file (deleted by the app).</summary>
         public static void Remove(string path)
         {
-            lock (sync) { EnsureLoaded(); paths?.Remove(path); }
+            lock (sync) { EnsureLoaded(); paths?.Remove(path); exact?.Remove(path); }
+        }
+
+        /// <summary>Renames paths in the list (a synonym update changed the names the database uses) and saves it.</summary>
+        public static void Rename(Func<string, string> rename)
+        {
+            lock (sync)
+            {
+                EnsureLoaded();
+                if (paths == null) return;
+                var list = paths.Select(rename).ToList();
+                var tmp = FilePath + ".tmp";
+                File.WriteAllText(tmp, JsonSerializer.Serialize(new FileData { FoundUtc = foundUtc, Paths = list }));
+                File.Move(tmp, FilePath, overwrite: true);
+                paths = new HashSet<string>(list, Comparer); exact = new HashSet<string>(list, StringComparer.Ordinal);
+            }
         }
 
         /// <summary>When the last scan listed the files (UTC), or null when there is no list.</summary>
@@ -62,8 +78,34 @@ namespace deepduplicates
         {
             HashSet<string> set;
             lock (sync) { EnsureLoaded(); set = paths; }
-            return set == null ? null : entries.Where(e => set.Contains(e.Path)).ToList();
+            return set == null ? null : OnePerFile(entries.Where(e => set.Contains(e.Path)), e => e.Path, e => e.Id, e => false);
         }
+
+        /// <summary>
+        /// One row per file. On Windows "A\Video.mp4" and "a\video.mp4" are the same file, but the database keeps a
+        /// row for each spelling (the scan matches paths exactly): when a folder changes case on disk, the old row stays
+        /// as a dormant copy that the list - which ignores case - would let through, and it matches its own twin 100 %.
+        /// The row with the spelling the scan found is kept (else the one with screenshots, else the oldest).
+        /// </summary>
+        private static List<T> OnePerFile<T>(IEnumerable<T> rows, Func<T, string> path, Func<T, int> id, Func<T, bool> hasShots)
+        {
+            var list = rows.ToList();
+            if (Comparer == StringComparer.Ordinal) return list;   // paths that differ in case are different files
+            var byPath = new Dictionary<string, List<T>>(Comparer);
+            foreach (var r in list)
+            {
+                if (!byPath.TryGetValue(path(r), out var same)) byPath[path(r)] = same = new List<T>();
+                same.Add(r);
+            }
+            if (byPath.Count == list.Count) return list;
+            var keep = new HashSet<T>(byPath.Values.Select(same => same.Count == 1 ? same[0]
+                : same.OrderByDescending(r => ExactSpelling(path(r)))
+                      .ThenByDescending(hasShots).ThenBy(id).First()));
+            return list.Where(keep.Contains).ToList();
+        }
+
+        // Whether the list has this exact spelling (the list itself ignores case on Windows)
+        private static bool ExactSpelling(string path) => exact != null && exact.Contains(path);
 
         /// <summary>True when a scan list exists on this installation.</summary>
         public static bool Exists { get { lock (sync) { EnsureLoaded(); return paths != null; } } }
@@ -76,16 +118,18 @@ namespace deepduplicates
         {
             HashSet<string> set;
             lock (sync) { EnsureLoaded(); set = paths; }
-            if (set != null) return media.Where(v => v.path != null && set.Contains(v.path)).ToList();
+            if (set != null) return OnePerFile(media.Where(v => v.path != null && set.Contains(v.path)), v => v.path, v => v.id, HasShots);
             return OnlyExisting(media);
         }
+
+        private static bool HasShots(VideoInfo v) => v.image1hash_blob != null && (v.duration ?? -1) > 0;
 
         /// <summary>The videos whose file exists right now.</summary>
         public static List<VideoInfo> OnlyExisting(IEnumerable<VideoInfo> media)
         {
             var list = media.Where(v => v.path != null).ToList();
             var exists = Exist(list.Select(v => v.path).ToList());
-            return list.Where((v, i) => exists[i]).ToList();
+            return OnePerFile(list.Where((v, i) => exists[i]), v => v.path, v => v.id, HasShots);
         }
 
         /// <summary>Whether each file exists right now (checked in parallel - shares can be slow).</summary>
@@ -101,12 +145,12 @@ namespace deepduplicates
         {
             if (loadedFrom == FilePath) return;
             loadedFrom = FilePath;
-            paths = null;
+            paths = null; exact = null;
             try
             {
                 if (!File.Exists(FilePath)) return;
                 var data = JsonSerializer.Deserialize<FileData>(File.ReadAllText(FilePath));
-                if (data != null) { paths = new HashSet<string>(data.Paths, Comparer); foundUtc = data.FoundUtc; }
+                if (data != null) { paths = new HashSet<string>(data.Paths, Comparer); exact = new HashSet<string>(data.Paths, StringComparer.Ordinal); foundUtc = data.FoundUtc; }
             }
             catch (Exception e) { Console.WriteLine("Could not read lastscan.json: " + e.Message); }
         }

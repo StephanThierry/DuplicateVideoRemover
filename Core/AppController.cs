@@ -47,6 +47,9 @@ namespace deepduplicates
             DataFolder = dataFolder;
             Settings = FileHandler.LoadSettings(out bool created);
             IsFirstRun = created;
+            // Rules written with a synonym's alias (T:\) follow the main name, so none are left behind
+            try { if (UseMainNames(Settings)) FileHandler.SaveSettings(Settings); }
+            catch (Exception e) { Console.WriteLine("Could not update the rules to the main names: " + e.Message); }
             Session = new ResultSession(ResultSet.LoadSaved());
             Scanner.Completed += results =>
             {
@@ -87,8 +90,20 @@ namespace deepduplicates
         {
             settings.Normalize();
             PathMapper.Save(DataFolder, mappings, synonyms);
+            UseMainNames(settings);
             FileHandler.SaveSettings(settings);
             Settings = settings.Clone();
+        }
+
+        /// <summary>
+        /// Folders to scan, paths to skip and preferred folders that start with a synonym's alias are changed to its
+        /// main name (what the database uses). Returns true when something changed.
+        /// </summary>
+        private static bool UseMainNames(Settings settings)
+        {
+            int changed = 0;
+            foreach (var s in PathMapper.Synonyms) changed += SynonymTools.UpdateSettings(settings, s);
+            return changed > 0;
         }
 
         /// <summary>Starts a scan with the saved settings.</summary>
@@ -98,10 +113,16 @@ namespace deepduplicates
         /// Compares again with the saved settings and the videos already read (no rescan). Only the files the
         /// last scan found on disk take part: the database also holds dormant rows of moved or missing files.
         /// </summary>
-        public void ReanalyzeFromDatabase()
+        public void ReanalyzeFromDatabase() => ReanalyzeFromDatabase(null);
+
+        /// <summary>As above, reporting the steps (loading the videos, comparing with its share done, saving).</summary>
+        public void ReanalyzeFromDatabase(IProgress<SynonymProgress> progress)
         {
+            progress?.Report(new SynonymProgress("Loading the videos", null));
             var media = ScanEngine.InScope(CurrentMedia(), Settings);
-            var (results, _) = Analyzer.Analyze(media, Settings);
+            progress?.Report(new SynonymProgress("Comparing the videos", 0));
+            var (results, _) = Analyzer.Analyze(media, Settings, progress == null ? null : done => progress.Report(new SynonymProgress($"Comparing the videos ({done:P0})", done)));
+            progress?.Report(new SynonymProgress("Saving the results", null));
             results.Save();
             ReplaceSession(results);
         }
@@ -239,16 +260,28 @@ namespace deepduplicates
         /// Rewrites the stored paths under the synonym's alias to its main name (see SynonymTools.Update).
         /// Not while a scan is running. Compares again afterwards, so the review uses the new paths.
         /// </summary>
-        public SynonymUpdateReport UpdateSynonymPaths(PathSynonym synonym)
+        public SynonymUpdateReport UpdateSynonymPaths(PathSynonym synonym, IProgress<SynonymProgress> progress = null)
         {
             ScanLock scanLock;
             try { scanLock = ScanLock.Acquire("updating paths"); }
             catch (ScanAlreadyRunningException e) { return new SynonymUpdateReport(0, 0, e.Message); }
             using (scanLock)
             {
-                var report = SynonymTools.Update(synonym);
+                var report = SynonymTools.Update(synonym, progress);
+                // The saved rules and the last scan's file list use the new name too
+                progress?.Report(new SynonymProgress("Updating the settings and the file list", null));
+                var settings = Settings.Clone();
+                int rules = SynonymTools.UpdateSettings(settings, synonym);
+                if (rules > 0)
+                {
+                    settings.Normalize();
+                    FileHandler.SaveSettings(settings);
+                    Settings = settings;
+                    report = report with { Message = report.Message + $" {Fmt.Plural(rules, "rule", "rules")} in the settings (folders to scan, paths to skip, preferred folders) updated too." };
+                }
+                LastScan.Rename(p => SynonymTools.RenameRoot(p, synonym));
                 InvalidateCache();
-                ReanalyzeFromDatabase();
+                ReanalyzeFromDatabase(progress);
                 DataChanged?.Invoke();
                 return report;
             }

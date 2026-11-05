@@ -30,6 +30,9 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string confirmTitle = "";
     [ObservableProperty] private string confirmText = "";
     [ObservableProperty] private bool updating;
+    [ObservableProperty] private string updateStep = "";
+    [ObservableProperty] private double updatePercent;
+    [ObservableProperty] private bool updateIndeterminate = true;
     public bool ConfirmVisible => ConfirmSynonym != null;
     public ObservableCollection<SwitchItem> Switches { get; } = new();
     public MatchViewModel Match { get; }
@@ -157,7 +160,7 @@ public partial class SettingsViewModel : ObservableObject
                     + "Videos stored under both names become one. Your settings are saved too, so new scans use the main name. This can't be undone.";
     }
 
-    [RelayCommand] private void CancelUpdate() => ConfirmSynonym = null;
+    [RelayCommand] private void CancelUpdate() { if (!Updating) ConfirmSynonym = null; }
 
     // Saves the settings (so new scans use the main name) and rewrites the stored paths once
     [RelayCommand]
@@ -165,12 +168,37 @@ public partial class SettingsViewModel : ObservableObject
     {
         var item = ConfirmSynonym;
         if (item == null) return;
+        UpdateStep = "Saving the settings";
+        UpdateIndeterminate = true;
         Updating = true;
         Save();
-        var report = await Task.Run(() => app.UpdateSynonymPaths(new PathSynonym { Main = item.Main, Alias = item.Alias }));
+        // Shows each step as it starts: the update can take a while with many videos
+        var progress = new SyncProgress<SynonymProgress>(p => Dispatcher.UIThread.Post(() =>
+        {
+            UpdateStep = p.Step;
+            UpdateIndeterminate = p.Fraction == null;
+            UpdatePercent = (p.Fraction ?? 0) * 100;
+        }));
+        var report = await Task.Run(() => app.UpdateSynonymPaths(new PathSynonym { Main = item.Main, Alias = item.Alias }, progress));
         Updating = false;
         ConfirmSynonym = null;
+        ReloadRules();
         item.ShowResult(report);
+    }
+
+    // Rules written with a synonym's alias were changed to the main name when saving: show them
+    private void ReloadRules()
+    {
+        var saved = app.Settings;
+        bool wasLoading = loading;
+        loading = true;
+        foreach (var (list, values) in new[] { (ContentFolders, saved.contentFolders), (ExcludePaths, saved.excludePaths), (PriorityFolders, saved.priorityFolders) })
+        {
+            if (list.Values().SequenceEqual(values)) continue;
+            list.Items.Clear();
+            foreach (var v in values) list.Items.Add(new PathItem(v, list));
+        }
+        loading = wasLoading;
     }
 
     [RelayCommand] private void AddSynonym() { Synonyms.Add(new SynonymItem("", "", Edited, AskUpdate)); }
@@ -188,6 +216,7 @@ public partial class SettingsViewModel : ObservableObject
     private void Save()
     {
         app.SaveSettings(Current(), CurrentMappings(), CurrentSynonyms());
+        ReloadRules();
         Dirty = false;
         SavedMessage = "Saved";
     }

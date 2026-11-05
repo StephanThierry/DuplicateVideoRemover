@@ -246,8 +246,12 @@
         <StackPanel Spacing="12">
           <TextBlock Classes="h2" Text="{Binding ConfirmTitle}" TextWrapping="Wrap"/>
           <TextBlock Classes="muted" Text="{Binding ConfirmText}" TextWrapping="Wrap"/>
+          <StackPanel Spacing="6" IsVisible="{Binding Updating}">
+            <TextBlock Text="{Binding UpdateStep}"/>
+            <ProgressBar Minimum="0" Maximum="100" Value="{Binding UpdatePercent}" IsIndeterminate="{Binding UpdateIndeterminate}"/>
+          </StackPanel>
           <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0">
-            <Button Content="Cancel" Command="{Binding CancelUpdateCommand}"/>
+            <Button Content="Cancel" Command="{Binding CancelUpdateCommand}" IsEnabled="{Binding !Updating}"/>
             <Button Classes="primary" Content="Update paths" Command="{Binding ConfirmUpdateCommand}" IsEnabled="{Binding !Updating}"/>
           </StackPanel>
         </StackPanel>

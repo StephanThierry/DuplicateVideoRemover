@@ -165,12 +165,22 @@
 @if (confirmSynonym != null)
 {
     var pending = synChecks.TryGetValue(confirmSynonym, out var pc) ? pc : null;
-    <div class="dialog-backdrop" @onclick="() => confirmSynonym = null">
+    <div class="dialog-backdrop" @onclick="() => { if (!updating) confirmSynonym = null; }">
         <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="syn-confirm" @onclick:stopPropagation="true">
             <h2 id="syn-confirm">Update @Fmt.Plural(pending?.InDatabase ?? 0, "path", "paths") in the database?</h2>
             <p>Paths starting with @PathMapper.NormalizeRoot(confirmSynonym.Alias) are changed to start with @PathMapper.NormalizeRoot(confirmSynonym.Main). Videos stored under both names become one. Your settings are saved too, so new scans use the main name. This can't be undone.</p>
+            @if (updating)
+            {
+                <div role="status" style="margin-top:12px">
+                    <div>@updateStep</div>
+                    <div class="bar @(updateFraction == null ? "unknown" : "")" role="progressbar" style="margin-top:8px"
+                         aria-valuemin="0" aria-valuemax="100" aria-valuenow="@(updateFraction == null ? (int?)null : (int)(updateFraction * 100))">
+                        <div style="width:@(((updateFraction ?? 1) * 100).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))%"></div>
+                    </div>
+                </div>
+            }
             <div class="buttons">
-                <button @onclick="() => confirmSynonym = null">Cancel</button>
+                <button @onclick="() => confirmSynonym = null" disabled="@updating">Cancel</button>
                 <button class="primary" @onclick="UpdateSynonymPaths" disabled="@updating">@(updating ? "Updating..." : "Update paths")</button>
             </div>
         </div>
@@ -192,6 +202,8 @@
     private readonly System.Collections.Concurrent.ConcurrentDictionary<PathSynonym, CancellationTokenSource> synRuns = new();
     private PathSynonym confirmSynonym;
     private bool updating;
+    private string updateStep = "";
+    private double? updateFraction;
     // Background checks of the path pairs against the database, one per row
     private readonly System.Collections.Concurrent.ConcurrentDictionary<PathMapping, MappingCheck> checks = new();
     private readonly System.Collections.Concurrent.ConcurrentDictionary<PathMapping, CancellationTokenSource> checkRuns = new();
@@ -255,10 +267,16 @@
         var s = confirmSynonym;
         if (s == null) return;
         updating = true;
+        updateStep = "Saving the settings";
+        updateFraction = null;
         Save();
-        var report = await Task.Run(() => App.UpdateSynonymPaths(s));
+        // Shows each step as it starts: the update can take a while with many videos
+        var progress = new SyncProgress<SynonymProgress>(p => { updateStep = p.Step; updateFraction = p.Fraction; InvokeAsync(StateHasChanged); });
+        var report = await Task.Run(() => App.UpdateSynonymPaths(s, progress));
         updating = false;
         confirmSynonym = null;
+        ReloadRules();
+        dirty = false;
         synChecks[s] = new MappingCheck(report.Updated + report.Merged > 0 ? MappingCheckLevel.Ok : MappingCheckLevel.Warning, report.Message);
         foreach (var m in mappings) StartCheck(m, 0);
     }
@@ -330,9 +348,20 @@
         Edited();
     }
 
+    // Rules written with a synonym's alias were changed to the main name when saving: show them
+    private void ReloadRules()
+    {
+        settings = App.Settings.Clone();
+        settings.encodeSettings ??= EncodeSettings.CreateDefault();
+        contentFolders = settings.contentFolders.ToList();
+        excludePaths = settings.excludePaths.ToList();
+        priorityFolders = settings.priorityFolders.ToList();
+    }
+
     private void Save()
     {
         App.SaveSettings(Current().Clone(), mappings, synonyms);
+        ReloadRules();
         dirty = false;
         savedMessage = "Saved";
     }

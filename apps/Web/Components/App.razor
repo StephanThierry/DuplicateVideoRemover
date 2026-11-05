@@ -24,6 +24,138 @@
     <script>
         // Copy text: the clipboard API needs https or localhost; over plain http on the network use the old way
         window.dvr = {
+            // The popup player's controls: a tall seek bar, play/pause, volume, full screen,
+            // and the keys: left/right arrow = 10 sec, with Ctrl = 1 min, Space = play/pause.
+            initPlayer: function (root) {
+                const video = root.querySelector("video");
+                const seek = root.querySelector(".pc-seek");
+                const fill = root.querySelector(".pc-fill");
+                const buf = root.querySelector(".pc-buf");
+                const thumb = root.querySelector(".pc-thumb");
+                const tip = root.querySelector(".pc-tip");
+                const time = root.querySelector(".pc-time");
+                const play = root.querySelector(".pc-play");
+                const mute = root.querySelector(".pc-mute");
+                const vol = root.querySelector(".pc-vol");
+                const fs = root.querySelector(".pc-fs");
+                const known = parseFloat(root.dataset.duration) || 0;   // from the database, for files the browser can't measure
+                const ICON_PLAY = '<svg width="18" height="18" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 1.5v11l9-5.5z" fill="currentColor"/></svg>';
+                const ICON_PAUSE = '<svg width="18" height="18" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 1.5h3v11H3zM8 1.5h3v11H8z" fill="currentColor"/></svg>';
+                const ICON_SOUND = '<svg width="18" height="18" viewBox="0 0 14 14" aria-hidden="true"><path d="M1 5h3l4-3v10L4 9H1z" fill="currentColor"/><path d="M10 4.5a3.5 3.5 0 0 1 0 5" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>';
+                const ICON_MUTED = '<svg width="18" height="18" viewBox="0 0 14 14" aria-hidden="true"><path d="M1 5h3l4-3v10L4 9H1z" fill="currentColor"/><path d="M10 5l3 4M13 5l-3 4" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>';
+
+                const duration = () => (isFinite(video.duration) && video.duration > 0 ? video.duration : known);
+                const fmt = s => {
+                    s = Math.max(0, Math.floor(s || 0));
+                    const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
+                    return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(sec).padStart(2, "0");
+                };
+                let dragging = false, dragFrac = 0;
+
+                function paint() {
+                    const d = duration();
+                    const frac = dragging ? dragFrac : (d ? video.currentTime / d : 0);
+                    const pct = Math.min(Math.max(frac, 0), 1) * 100;
+                    fill.style.width = pct + "%";
+                    thumb.style.left = pct + "%";
+                    seek.setAttribute("aria-valuenow", Math.round(pct));
+                    time.textContent = fmt(dragging ? dragFrac * d : video.currentTime) + " / " + fmt(d);
+                    play.innerHTML = video.paused ? ICON_PLAY : ICON_PAUSE;
+                    mute.innerHTML = video.muted || video.volume === 0 ? ICON_MUTED : ICON_SOUND;
+                    if (video.buffered.length) buf.style.width = Math.min(video.buffered.end(video.buffered.length - 1) / (d || 1), 1) * 100 + "%";
+                }
+                function fracAt(clientX) {
+                    const r = seek.getBoundingClientRect();
+                    return Math.min(Math.max((clientX - r.left) / r.width, 0), 1);
+                }
+                function toggle() { if (video.paused) video.play().catch(() => { }); else video.pause(); }
+                function skip(seconds) {
+                    const d = duration();
+                    video.currentTime = Math.min(Math.max(video.currentTime + seconds, 0), d || video.currentTime + seconds);
+                    paint();
+                }
+
+                // While dragging the picture follows the pointer. One seek at a time: the next starts when the
+                // last one is done ("seeked"), with the newest position, so seeks never pile up on a big file.
+                let seeking = false, pending = null, seekTimer = null, wasPlaying = false;
+                function flushSeek() {
+                    if (pending == null) return;
+                    const t = pending; pending = null;
+                    seeking = true;
+                    clearTimeout(seekTimer);
+                    seekTimer = setTimeout(() => { seeking = false; flushSeek(); }, 700);   // in case "seeked" never comes
+                    if (dragging && video.fastSeek) video.fastSeek(t); else video.currentTime = t;
+                }
+                function liveSeek(t) { pending = t; if (!seeking) flushSeek(); }
+                video.addEventListener("seeked", () => { seeking = false; clearTimeout(seekTimer); flushSeek(); });
+
+                // Seek bar: click or drag anywhere in the tall bar; the time shows while pointing at it
+                seek.addEventListener("pointerdown", e => {
+                    dragging = true; dragFrac = fracAt(e.clientX);
+                    wasPlaying = !video.paused; video.pause();   // no sound stutter while scrubbing
+                    seek.setPointerCapture(e.pointerId); seek.classList.add("dragging");
+                    if (duration()) liveSeek(dragFrac * duration());
+                    paint();
+                });
+                seek.addEventListener("pointermove", e => {
+                    const f = fracAt(e.clientX);
+                    tip.textContent = fmt(f * duration());
+                    tip.style.left = f * 100 + "%";
+                    if (dragging) { dragFrac = f; if (duration()) liveSeek(f * duration()); paint(); }
+                });
+                const endDrag = e => {
+                    if (!dragging) return;
+                    dragging = false; seek.classList.remove("dragging");
+                    const d = duration();
+                    pending = null;
+                    if (d) video.currentTime = dragFrac * d;   // the exact position (fastSeek only goes to the nearest key frame)
+                    if (wasPlaying) video.play().catch(() => { });
+                    paint();
+                };
+                seek.addEventListener("pointerup", endDrag);
+                seek.addEventListener("pointercancel", endDrag);
+
+                play.addEventListener("click", toggle);
+                video.addEventListener("click", toggle);
+                mute.addEventListener("click", () => { video.muted = !video.muted; paint(); });
+                vol.addEventListener("input", () => { video.volume = parseFloat(vol.value); video.muted = false; paint(); });
+                fs.addEventListener("click", () => {
+                    if (document.fullscreenElement) document.exitFullscreen();
+                    else root.requestFullscreen && root.requestFullscreen().catch(() => { });
+                });
+                ["timeupdate", "durationchange", "loadedmetadata", "progress", "play", "pause", "volumechange", "seeked"]
+                    .forEach(n => video.addEventListener(n, paint));
+
+                // Keys work while the player is open, wherever the focus is (not in the volume slider)
+                const onKey = e => {
+                    if (!root.isConnected) { document.removeEventListener("keydown", onKey, true); return; }
+                    if (e.altKey || e.metaKey || e.shiftKey) return;
+                    if (e.target === vol) return;
+                    if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+                        e.preventDefault();
+                        skip((e.key === "ArrowRight" ? 1 : -1) * (e.ctrlKey ? 60 : 10));
+                    } else if (e.key === " " && !e.ctrlKey && !(e.target instanceof HTMLButtonElement)) {
+                        e.preventDefault();
+                        toggle();
+                    }
+                };
+                document.addEventListener("keydown", onKey, true);
+                paint();
+            },
+            // Calls ref.LoadMore() when the element with this id comes within 800px of the viewport.
+            // Called after every render: a new sentinel element fires again, so short lists keep filling up.
+            observeEnd: function (id, ref) {
+                if (window.dvr._obs) { window.dvr._obs.disconnect(); window.dvr._obs = null; }
+                const el = document.getElementById(id);
+                if (!el) return;
+                window.dvr._obs = new IntersectionObserver(entries => {
+                    if (entries.some(e => e.isIntersecting)) {
+                        window.dvr._obs.disconnect(); window.dvr._obs = null;
+                        ref.invokeMethodAsync("LoadMore");
+                    }
+                }, { rootMargin: "0px 0px 800px 0px" });
+                window.dvr._obs.observe(el);
+            },
             copy: async function (text) {
                 if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return; }
                 const area = document.createElement("textarea");

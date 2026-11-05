@@ -23,10 +23,27 @@ namespace deepduplicates
         private readonly string owner;
         private readonly Timer heartbeat;
 
+        // Locks held by this process: released when the program exits, so closing the app mid-scan doesn't leave scan.lock behind
+        private static readonly System.Collections.Generic.List<ScanLock> held = new();
+
+        static ScanLock()
+        {
+            AppDomain.CurrentDomain.ProcessExit += (_, _) => ReleaseAll();
+        }
+
+        /// <summary>Releases every lock this process holds (called when the program closes).</summary>
+        public static void ReleaseAll()
+        {
+            ScanLock[] locks;
+            lock (held) { locks = held.ToArray(); }
+            foreach (var l in locks) l.Dispose();
+        }
+
         private ScanLock(string path, string owner)
         {
             this.path = path;
             this.owner = owner;
+            lock (held) held.Add(this);
             heartbeat = new Timer(_ => Touch(), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
         }
 
@@ -52,6 +69,7 @@ namespace deepduplicates
 
         public void Dispose()
         {
+            lock (held) held.Remove(this);
             heartbeat.Dispose();
             try
             {

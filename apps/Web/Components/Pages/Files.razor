@@ -66,7 +66,7 @@
             </div>
             @if (matches.Count > shown)
             {
-                <div class="more"><button @onclick="() => shown += PageSize">Show @Math.Min(PageSize, matches.Count - shown) more</button></div>
+                <div class="more" id="files-end" @key="shown"><span class="muted">Loading more...</span></div>
             }
         }
     }
@@ -111,6 +111,23 @@
         App.DataChanged += OnDataChanged;
         await Load();
     }
+
+    private DotNetObjectReference<Files> self;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (index == null) return;
+        self ??= DotNetObjectReference.Create(this);
+        try { await JS.InvokeVoidAsync("dvr.observeEnd", "files-end", self); }
+        catch (JSDisconnectedException) { }
+    }
+
+    // Called from the browser when the bottom of the list is near: shows the next page
+    [JSInvokable]
+    public Task LoadMore() => InvokeAsync(() =>
+    {
+        if (shown < matches.Count) { shown += PageSize; StateHasChanged(); }
+    });
 
     private async Task Load()
     {
@@ -199,5 +216,6 @@
         App.DataChanged -= OnDataChanged;
         debounce?.Cancel();
         toastTimer?.Cancel();
+        self?.Dispose();
     }
 }

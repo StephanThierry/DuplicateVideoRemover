@@ -11,6 +11,9 @@ namespace deepduplicates
     /// <summary>What "Update paths" did.</summary>
     public sealed record SynonymUpdateReport(int Updated, int Merged, string Message);
 
+    /// <summary>Where "Update paths" is: what it is doing and how far (null fraction = no way to tell).</summary>
+    public sealed record SynonymProgress(string Step, double? Fraction);
+
     /// <summary>
     /// Synonyms: checking how many videos in the database use an alias (e.g. "L:\"), whether they are found
     /// under the main name (e.g. "\\nas\video\"), and rewriting them to the main name once.
@@ -40,6 +43,35 @@ namespace deepduplicates
             char sep = PathMapper.IsWindowsForm(s.Main) ? '\\' : '/';
             char other = sep == '\\' ? '/' : '\\';
             return s.Main + path.Substring(Math.Min(s.Alias.Length, path.Length)).TrimStart('\\', '/').Replace(other, sep);
+        }
+
+        /// <summary>The path with the alias at the start replaced by the main name; other paths unchanged.</summary>
+        public static string RenameRoot(string path, PathSynonym synonym)
+        {
+            if (string.IsNullOrEmpty(path)) return path;
+            var s = new PathSynonym { Main = PathMapper.NormalizeRoot(synonym.Main), Alias = PathMapper.NormalizeRoot(synonym.Alias) };
+            return Under(path.Trim(), s.Alias) ? Rename(path.Trim(), s) : path;
+        }
+
+        /// <summary>
+        /// Rewrites the folders to scan, the paths to skip and the preferred folders in the settings that
+        /// start with the alias, so no rule is left pointing at a name the database no longer uses.
+        /// Returns the number of rules changed (0 when the settings are unchanged).
+        /// </summary>
+        public static int UpdateSettings(Settings settings, PathSynonym synonym)
+        {
+            int changed = 0;
+            string[] Map(string[] list)
+            {
+                if (list == null) return list;
+                var result = list.Select(x => { var y = RenameRoot(x, synonym); if (y != x) changed++; return y; })
+                    .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+                return result;
+            }
+            settings.contentFolders = Map(settings.contentFolders);
+            settings.excludePaths = Map(settings.excludePaths);
+            settings.priorityFolders = Map(settings.priorityFolders);
+            return changed;
         }
 
         private static bool Under(string path, string root) =>
@@ -99,9 +131,10 @@ namespace deepduplicates
         /// Rewrites every stored path under the alias to the main name. When a video is stored under both names,
         /// the two rows become one: the one with screenshots is kept (else the one already under the main name).
         /// </summary>
-        public static SynonymUpdateReport Update(PathSynonym synonym)
+        public static SynonymUpdateReport Update(PathSynonym synonym, IProgress<SynonymProgress> progress = null)
         {
             var s = new PathSynonym { Main = PathMapper.NormalizeRoot(synonym.Main), Alias = PathMapper.NormalizeRoot(synonym.Alias) };
+            progress?.Report(new SynonymProgress("Reading the database", null));
             var rows = ReadRows();
             var byPath = new Dictionary<string, Row>(KeyComparer(s));
             foreach (var r in rows) byPath.TryAdd(r.Path, r);
@@ -124,8 +157,12 @@ namespace deepduplicates
                 cmd.ExecuteNonQuery();
             }
 
-            foreach (var row in rows.Where(r => Under(r.Path, s.Alias)))
+            var affected = rows.Where(r => Under(r.Path, s.Alias)).ToList();
+            int done = 0, reportEvery = Math.Max(1, affected.Count / 100);
+            foreach (var row in affected)
             {
+                if (done++ % reportEvery == 0)
+                    progress?.Report(new SynonymProgress($"Updating paths ({done - 1:N0} of {affected.Count:N0})", (done - 1) / (double)affected.Count));
                 string newPath = Rename(row.Path, s);
                 if (byPath.TryGetValue(newPath, out var other) && other.Id != row.Id)
                 {
@@ -148,6 +185,7 @@ namespace deepduplicates
                     updated++;
                 }
             }
+            progress?.Report(new SynonymProgress("Saving the changes", null));
             tx.Commit();
 
             // Screenshots of the rows that were merged away

@@ -298,6 +298,27 @@ button.icon:hover:not(:disabled) { border-color: var(--accent); background: var(
 .player-head h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dialog.player video { width: 100%; max-height: 70vh; background: #000; border-radius: 3px; display: block; }
 .dialog.player p { margin: 10px 0 0; }
+.player-box { display: flex; flex-direction: column; background: #000; border-radius: 3px; }
+.player-box video { cursor: pointer; flex: 1 1 auto; min-height: 0; }
+.player-box:fullscreen video { max-height: none; height: 100%; }
+/* Own controls: the seek bar is a tall target (40px) with a thicker line that grows when you point at it */
+.pc { background: var(--sheet); border: 1px solid var(--rule); border-top: 0; border-radius: 0 0 3px 3px; padding: 0 12px 8px; }
+.pc-seek { position: relative; height: 40px; cursor: pointer; touch-action: none; outline-offset: -2px; }
+.pc-track { position: absolute; left: 0; right: 0; top: 50%; height: 10px; transform: translateY(-50%); background: var(--table); border-radius: 5px; overflow: hidden; transition: height .12s; }
+.pc-seek:hover .pc-track, .pc-seek.dragging .pc-track, .pc-seek:focus-visible .pc-track { height: 16px; }
+.pc-buf { position: absolute; inset: 0 auto 0 0; width: 0; background: color-mix(in srgb, var(--accent) 30%, transparent); }
+.pc-fill { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--accent); }
+.pc-thumb { position: absolute; top: 50%; left: 0; width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%; background: var(--accent); border: 2px solid var(--sheet); box-shadow: 0 0 0 1px var(--accent); pointer-events: none; transform: scale(.8); transition: transform .12s; }
+.pc-seek:hover .pc-thumb, .pc-seek.dragging .pc-thumb { transform: scale(1.15); }
+.pc-tip { position: absolute; bottom: 100%; left: 0; transform: translateX(-50%); margin-bottom: -4px; padding: 2px 7px; border-radius: 3px; background: var(--ink, #222); color: var(--sheet, #fff); font-size: .8rem; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .1s; }
+.pc-seek:hover .pc-tip, .pc-seek.dragging .pc-tip { opacity: 1; }
+.pc-row { display: flex; align-items: center; gap: 12px; }
+.pc-row button { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; height: 36px; }
+.pc-time { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pc-hint { flex: 1; text-align: right; font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pc-vol { width: 90px; }
+@media (max-width: 700px) { .pc-hint { display: none; } .pc-row { flex-wrap: wrap; } }
+@media (prefers-reduced-motion: reduce) { .pc-track, .pc-thumb, .pc-tip { transition: none; } }
 
 /* False positives */
 .crumb { margin-bottom: 4px; }
