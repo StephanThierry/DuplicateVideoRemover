@@ -136,7 +136,7 @@
 @code {
     private ScanProgress p = new();
     private readonly List<int> recent = new();
-    private RunRecord last;
+    private RunRecord? last;
     private bool stopping;
 
     // One phase: name, its own bar (striped while the total isn't known) and what it is doing

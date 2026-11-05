@@ -194,13 +194,13 @@
     private List<switchPrioritySet> switches = new();
     private string testPath = "";
     private bool dirty;
-    private string savedMessage;
+    private string? savedMessage;
     private int falsePositiveCount;
     // Synonyms (other names for the same place) and their checks
     private List<PathSynonym> synonyms = new();
     private readonly System.Collections.Concurrent.ConcurrentDictionary<PathSynonym, MappingCheck> synChecks = new();
     private readonly System.Collections.Concurrent.ConcurrentDictionary<PathSynonym, CancellationTokenSource> synRuns = new();
-    private PathSynonym confirmSynonym;
+    private PathSynonym? confirmSynonym;
     private bool updating;
     private string updateStep = "";
     private double? updateFraction;

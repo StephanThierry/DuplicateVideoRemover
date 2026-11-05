@@ -36,7 +36,7 @@
 
     private async Task Key(KeyboardEventArgs e) { if (e.Key == "Enter") await Add(); }
 
-    private async Task Update(int i, string value)
+    private async Task Update(int i, string? value)
     {
         Items[i] = value ?? "";
         await Changed.InvokeAsync();

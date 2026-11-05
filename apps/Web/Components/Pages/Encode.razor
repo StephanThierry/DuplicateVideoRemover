@@ -143,20 +143,20 @@
 @code {
     [Inject] private IJSRuntime JS { get; set; } = default!;
     private readonly HashSet<string> hidden = new(StringComparer.OrdinalIgnoreCase);   // folders hidden with "Exclude folder"
-    private EncodeCandidate deleting;
-    private VideoEntry playing;
+    private EncodeCandidate? deleting;
+    private VideoEntry? playing;
 
     private static VideoEntry ToEntry(EncodeCandidate c) =>
         new() { Id = c.Id, Path = c.Path, SizeBytes = c.SizeBytes, DurationSeconds = c.DurationSeconds };
-    private string toast;
-    private CancellationTokenSource toastTimer;
+    private string? toast;
+    private CancellationTokenSource? toastTimer;
     private EncodeSettings enc = EncodeSettings.CreateDefault();
-    private List<EncodeCandidate> candidates;
+    private List<EncodeCandidate>? candidates;
     private readonly HashSet<int> picked = new();
     private string search = "";
     private int minKbps;
     private int shown = 100;
-    private string scriptPath;
+    private string? scriptPath;
     private int scriptCount;
     private bool confirming;
     private double targetKbps;
@@ -179,7 +179,7 @@
 
     private void OnDataChanged() => InvokeAsync(async () => { await Load(); StateHasChanged(); });
 
-    private IEnumerable<EncodeCandidate> Visible() => candidates.Where(c =>
+    private IEnumerable<EncodeCandidate> Visible() => (candidates ?? new()).Where(c =>
         c.AverageKbps >= minKbps && !hidden.Contains(c.Folder) &&
         (string.IsNullOrWhiteSpace(search) || c.Path.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase)));
 
@@ -227,7 +227,7 @@
     private void HideFolder(string folder)
     {
         hidden.Add(folder);
-        foreach (var c in candidates.Where(c => string.Equals(c.Folder, folder, StringComparison.OrdinalIgnoreCase))) picked.Remove(c.Id);
+        foreach (var c in (candidates ?? new()).Where(c => string.Equals(c.Folder, folder, StringComparison.OrdinalIgnoreCase))) picked.Remove(c.Id);
         ShowToast($"Hid the videos in {folder}.");
     }
 
@@ -248,7 +248,7 @@
         if (c == null) return;
         var error = App.DeleteVideoFile(c.Id, c.Path);
         if (error != null) { ShowToast($"Could not delete {c.FileName}: {error}", 10000); return; }
-        candidates.Remove(c);
+        candidates?.Remove(c);
         picked.Remove(c.Id);
         ShowToast($"Deleted {c.FileName} ({Fmt.Size(c.SizeBytes)}).");
     }
@@ -266,10 +266,10 @@
     {
         confirming = false;
         // In list order: highest bitrate first
-        var videos = candidates.Where(c => picked.Contains(c.Id)).ToList();
+        var videos = (candidates ?? new()).Where(c => picked.Contains(c.Id)).ToList();
         var result = App.WriteEncodeScript(videos);
         // Files that are gone since the scan are left out of the script and the list
-        foreach (var gone in result.Missing) { candidates.RemoveAll(c => c.Id == gone.Id); picked.Remove(gone.Id); }
+        foreach (var gone in result.Missing) { candidates?.RemoveAll(c => c.Id == gone.Id); picked.Remove(gone.Id); }
         if (result.Missing.Count > 0)
             ShowToast($"{Fmt.Plural(result.Missing.Count, "file was", "files were")} not found any more and left out.", 10000);
         if (result.Path == null) return;

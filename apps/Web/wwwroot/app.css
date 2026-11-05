@@ -160,6 +160,7 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
 .name { font-weight: 600; word-break: break-word; }
 .folderlink { color: var(--muted); font-weight: 400; text-align: left; word-break: break-all; }
 .folderlink:hover { color: var(--accent); }
+.folderline { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; }
 .meta { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--muted); font-size: .85rem; margin-top: 2px; }
 .reason { font-size: .82rem; color: var(--muted); margin-top: 4px; }
 .row-actions { white-space: nowrap; }
@@ -356,6 +357,8 @@ button.icon:hover:not(:disabled) { border-color: var(--accent); background: var(
 
 /* ---------- All files ---------- */
 .toolbar input.files-search { flex: 1 1 360px; font-size: 1.05rem; padding: 9px 12px; }
+.toolbar .sortpick { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); white-space: nowrap; }
+.toolbar .sortpick select { padding: 8px 10px; }
 .files-list { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius-sheet); overflow: hidden; }
 .file-row { display: grid; grid-template-columns: auto 34px 1fr; gap: 14px; align-items: center; padding: 10px 14px; }
 .file-row + .file-row { border-top: 1px solid var(--rule); }
