@@ -54,7 +54,11 @@ namespace deepduplicates
 public List<VideoInfo> checkChecksumOfAllSimilarVideos_Optimized(List<VideoInfo> mediaList, Settings settings, Action<double> progress = null)
 {
     // 1. PRE-FILTERING & GROUPING:
-    var videosToProcess = mediaList.Where(v => !(v.remove ?? false) && v.duration.HasValue && v.path != null);
+    var videosToProcess = mediaList.Where(v => !(v.remove ?? false) && v.duration.HasValue && v.path != null).ToList();
+    // Each hash as 4 x 64 bits once, so a pair is compared with a few XORs instead of 256 steps
+    packedHashes = new Dictionary<VideoInfo, ulong[][]>(ReferenceEqualityComparer.Instance);
+    foreach (var v in videosToProcess)
+        packedHashes[v] = new[] { PackHash(v.image1hash), PackHash(v.image2hash), PackHash(v.image3hash) };
     var videosByDuration = videosToProcess.ToLookup(v => v.duration);
 
     // Get a sorted list of unique durations 
@@ -152,10 +156,14 @@ public List<VideoInfo> checkChecksumOfAllSimilarVideos_Optimized(List<VideoInfo>
 // Helper method to contain the core comparison logic
 private void CompareVideosInGroup(List<VideoInfo> group, Settings settings)
 {
+    // The folder name of each video, worked out once (not for every pair: FileInfo is slow)
+    var dirNames = new string[group.Count];
+    string DirName(int idx) => dirNames[idx] ??= new System.IO.FileInfo(group[idx].path).Directory.Name;
+
     for (int i = 0; i < group.Count - 1; i++)
     {
         var video1 = group[i];
-        
+
         if (video1.remove == true) continue;
 
         for (int n = i + 1; n < group.Count; n++)
@@ -172,7 +180,7 @@ private void CompareVideosInGroup(List<VideoInfo> group, Settings settings)
 
             // Determine which match settings to use
             // (falls back to matchSettings when matchSettings_sameFolder is not set in settings.json)
-            var currentMatchset = new System.IO.FileInfo(video1.path).Directory.Name == new System.IO.FileInfo(video2.path).Directory.Name
+            var currentMatchset = DirName(i) == DirName(n)
                 ? settings.matchSettings_sameFolder ?? settings.matchSettings
                 : settings.matchSettings;
 
@@ -191,22 +199,24 @@ private void CompareVideosInGroup(List<VideoInfo> group, Settings settings)
             }
 
             // Checksum and hash comparison
-            rgb[] diff = new rgb[3];
             double[] diffHash = new double[3];
-
-            diff[0] = imageChecksumDiff(video1.image1Checksum, video2.image1Checksum);
-            diff[1] = imageChecksumDiff(video1.image2Checksum, video2.image2Checksum);
-            diff[2] = imageChecksumDiff(video1.image3Checksum, video2.image3Checksum);
-            diffHash[0] = CompareImageHash(video1.image1hash, video2.image1hash);
-            diffHash[1] = CompareImageHash(video1.image2hash, video2.image2hash);
-            diffHash[2] = CompareImageHash(video1.image3hash, video2.image3hash);
+            diffHash[0] = HashMatch(video1, video2, 0);
+            diffHash[1] = HashMatch(video1, video2, 1);
+            diffHash[2] = HashMatch(video1, video2, 2);
 
             int score = 0;
             for (int k = 0; k < 3; k++)
-            {
-                if (diff[k].r < currentMatchset.colorTolerance && diff[k].g < currentMatchset.colorTolerance && diff[k].b < currentMatchset.colorTolerance) score++;
                 if (diffHash[k] > currentMatchset.shapeMatch) score++;
-            }
+
+            // The three colour checks can add at most 3: most pairs are rejected here, without the colour work
+            if (score + 3 < 6 - currentMatchset.faultTolerance) continue;
+
+            rgb[] diff = new rgb[3];
+            diff[0] = imageChecksumDiff(video1.image1Checksum, video2.image1Checksum);
+            diff[1] = imageChecksumDiff(video1.image2Checksum, video2.image2Checksum);
+            diff[2] = imageChecksumDiff(video1.image3Checksum, video2.image3Checksum);
+            for (int k = 0; k < 3; k++)
+                if (diff[k].r < currentMatchset.colorTolerance && diff[k].g < currentMatchset.colorTolerance && diff[k].b < currentMatchset.colorTolerance) score++;
 
             if (score >= 6 - currentMatchset.faultTolerance)
             {
@@ -242,10 +252,38 @@ private void CompareVideosInGroup(List<VideoInfo> group, Settings settings)
             return((Math.Round(Math.Abs((double)(a - b) / (double)((a + b) / 2)) * 100, 2)));
         }
 
+        private Dictionary<VideoInfo, ulong[][]> packedHashes;
+
+        // The bits in 64-bit words, the number of bits in the last word
+        private static ulong[] PackHash(List<bool> h)
+        {
+            if (h == null) return null;
+            var r = new ulong[(h.Count + 63) / 64 + 1];
+            for (int i = 0; i < h.Count; i++) if (h[i]) r[i >> 6] |= 1UL << (i & 63);
+            r[^1] = (ulong)h.Count;
+            return r;
+        }
+
+        /// <summary>Share of equal bits (0-100) of the n'th screenshot hash of two videos.</summary>
+        private double HashMatch(VideoInfo a, VideoInfo b, int n)
+        {
+            if (packedHashes != null && packedHashes.TryGetValue(a, out var pa) && packedHashes.TryGetValue(b, out var pb) && pa[n] != null && pb[n] != null && pa[n].Length == pb[n].Length && pa[n][^1] == pb[n][^1])
+            {
+                // Same as counting the equal bits one by one (and dividing by 256, as before)
+                int different = 0;
+                var x = pa[n]; var y = pb[n];
+                for (int k = 0; k < x.Length - 1; k++) different += System.Numerics.BitOperations.PopCount(x[k] ^ y[k]);
+                return ((int)x[^1] - different) / 256.0 * 100;
+            }
+            return n == 0 ? CompareImageHash(a.image1hash, b.image1hash) : n == 1 ? CompareImageHash(a.image2hash, b.image2hash) : CompareImageHash(a.image3hash, b.image3hash);
+        }
+
         public double CompareImageHash(List<bool> iHash1, List<bool> iHash2)
         {
             //if(iHash1.Count() != 256 || iHash1.Count() != iHash2.Count()) return(0);
-            return ((((double)iHash1.Zip(iHash2, (i, j) => i == j).Count(eq => eq)) / 256) * 100);
+            int equal = 0, len = Math.Min(iHash1.Count, iHash2.Count);
+            for (int k = 0; k < len; k++) if (iHash1[k] == iHash2[k]) equal++;
+            return (equal / 256.0) * 100;
         }
     }
 }
