@@ -54,10 +54,22 @@ namespace deepduplicates
         /// <summary>Estimated time left of finding (from the pace so far, or the last scan's timing).</summary>
         public TimeSpan? FindRemaining { get; init; }
 
-        /// <summary>Phase A, 0..1: files found against the number expected from the last scan.</summary>
+        /// <summary>Folders walked so far, folders known but not walked yet, and folders the last scan walked.</summary>
+        public int DirsDone { get; init; }
+        public int DirsQueued { get; init; }
+        public int? DirsExpected { get; init; }
+
+        /// <summary>True when finding has gone past what the last scan led us to expect (the folders grew).</summary>
+        public bool FindOverrun =>
+            Phase == ScanPhase.FindingFiles &&
+            (DirsExpected > 0 ? DirsDone >= DirsExpected : ExpectedFiles > 0 && FilesFound >= ExpectedFiles);
+
+        /// <summary>Phase A, 0..1: folders walked against the number from the last scan (files, if no folder count yet).</summary>
         public double FindFraction =>
             FilesListed || Phase == ScanPhase.Done ? 1
-            : Phase == ScanPhase.FindingFiles && ExpectedFiles > 0 ? Math.Min(FilesFound / (double)ExpectedFiles.Value, 0.99)
+            : Phase != ScanPhase.FindingFiles ? 0
+            : DirsExpected > 0 ? Math.Min(DirsDone / (double)DirsExpected.Value, 0.99)
+            : ExpectedFiles > 0 ? Math.Min(FilesFound / (double)ExpectedFiles.Value, 0.99)
             : 0;
 
         /// <summary>Phase B, 0..1: new videos read of those that need reading (or files checked, when none are new).</summary>
@@ -103,7 +115,8 @@ namespace deepduplicates
             : PhaseState.Waiting;
 
         /// <summary>True while finding with nothing to measure against (first scan of these folders).</summary>
-        public static bool FindUnknownTotal(ScanProgress p) => FindState(p) == PhaseState.Active && !(p.ExpectedFiles > 0);
+        public static bool FindUnknownTotal(ScanProgress p) =>
+            FindState(p) == PhaseState.Active && (!(p.ExpectedFiles > 0 || p.DirsExpected > 0) || p.FindOverrun);
 
         public static string FindDetail(ScanProgress p)
         {
@@ -111,6 +124,10 @@ namespace deepduplicates
             if (FindState(p) == PhaseState.Done)
                 return $"{Fmt.Plural(p.FilesFound, "video", "videos")} found" + (p.FindTime is TimeSpan t ? $" in {Fmt.Time(t)}" : "");
             if (p.Phase != ScanPhase.FindingFiles) return "";
+            if (p.FindOverrun)
+                return $"{Fmt.Plural(p.FilesFound, "video", "videos")} found - more than last time, {Fmt.Plural(p.DirsQueued, "folder", "folders")} left to check";
+            if (p.DirsExpected > 0)
+                return $"{Fmt.Plural(p.FilesFound, "video", "videos")} found, {p.DirsDone:N0} of about {p.DirsExpected.Value:N0} folders checked";
             return p.ExpectedFiles > 0
                 ? $"{p.FilesFound:N0} of about {p.ExpectedFiles.Value:N0} videos (as many as last time)"
                 : $"{Fmt.Plural(p.FilesFound, "video", "videos")} found - first scan of these folders, so the total isn't known yet";
@@ -119,9 +136,8 @@ namespace deepduplicates
         public static string FindLeft(ScanProgress p)
         {
             if (p.Phase != ScanPhase.FindingFiles) return "";
-            if (p.ExpectedFiles > 0 && p.FilesFound >= p.ExpectedFiles) return "Almost done";
-            if (p.FindRemaining is not TimeSpan r) return "";
-            return Fmt.Approx(r) + " left" + (p.EstimateFromHistory ? " (from the last scan)" : "");
+            if (p.FindRemaining is not TimeSpan r) return p.FindOverrun ? "Almost done" : "";
+            return Fmt.Approx(r) + " left" + (p.EstimateFromHistory ? " (from the last scan)" : p.FindOverrun ? " (rough)" : "");
         }
 
         // --- B) Processing the files ---

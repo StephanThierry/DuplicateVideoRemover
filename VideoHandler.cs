@@ -116,6 +116,15 @@ namespace deepduplicates
                 }
                 index++;
                 Report(wrapper.path, false);
+
+                // A file another process is still writing: skip it now, the next scan reads it
+                if ((wrapper.item == null || ((wrapper.item.duration == -1 || wrapper.item.image1Checksum == null || wrapper.item.image1hash_blob == null) && wrapper.item.formatNotSupported != true))
+                    && FileHandler.IsBeingWritten(wrapper.path))
+                {
+                    Console.WriteLine("Skipping, still being written: " + wrapper.path);
+                    newTotal--;
+                    continue;
+                }
                 //stopWatch.Start();
                 if (index % fileHandler.settings.logInterval == 0) Console.WriteLine(index + "/" + fileHandler.allFilesCount + " checking: " + wrapper.path);
 

@@ -127,32 +127,115 @@ namespace deepduplicates
             }
         }
 
-        /// <summary>Finds all video files in the content folders. Reports the running count to onCount.</summary>
-        public void FindFiles(Action<int> onCount, CancellationToken ct)
+        /// <summary>How the walk of the folders is going: videos found, folders done and folders known so far.</summary>
+        public readonly record struct FindProgress(int Files, int DirsDone, int DirsKnown);
+
+        /// <summary>How many folders the last FindFiles walked (for estimating the next walk).</summary>
+        public int allDirsCount { get; private set; }
+
+        /// <summary>
+        /// Finds all video files in the content folders. Reports the progress about 5 times a second.
+        /// The folders are walked by several threads at once, one pass per folder (no second call for the files).
+        /// </summary>
+        public void FindFiles(Action<FindProgress> onProgress, CancellationToken ct)
         {
-            var found = new List<string>();
-            foreach (string contentFolder in settings.contentFolders)
+            string[] roots = settings.contentFolders.Where(Directory.Exists).ToArray();
+            foreach (string missing in settings.contentFolders.Except(roots))
+                Console.WriteLine("Failed to get " + missing + " - skipping.");
+            Console.WriteLine("Indexing all files in: " + string.Join(", ", roots) + "...");
+
+            var queue = new System.Collections.Concurrent.BlockingCollection<string>();
+            int pending = 0, dirsDone = 0, dirsKnown = 0, files = 0;
+            var results = new System.Collections.Concurrent.ConcurrentBag<List<string>>();
+            string[] exclude = settings.excludePaths ?? Array.Empty<string>();
+            var options = new EnumerationOptions
             {
+                IgnoreInaccessible = true,
+                AttributesToSkip = 0, // like Directory.GetFiles: hidden and system files too
+                RecurseSubdirectories = false,
+                ReturnSpecialDirectories = false
+            };
+
+            void Add(string dir)
+            {
+                Interlocked.Increment(ref pending);
+                Interlocked.Increment(ref dirsKnown);
+                queue.Add(dir);
+            }
+            foreach (string root in roots) Add(root);
+            if (roots.Length == 0) queue.CompleteAdding();
+
+            void Worker()
+            {
+                var mine = new List<string>();
+                results.Add(mine);
                 try
                 {
-                    Console.WriteLine("Indexing all files in: " + contentFolder + "...");
-                    foreach (string file in GetFiles(contentFolder, VideoExtensions, settings.excludePaths))
+                    foreach (string dir in queue.GetConsumingEnumerable(ct))
                     {
-                        ct.ThrowIfCancellationRequested();
-                        found.Add(file);
-                        if (found.Count % 200 == 0) onCount?.Invoke(found.Count);
+                        try
+                        {
+                            var entries = new System.IO.Enumeration.FileSystemEnumerable<(string Path, bool IsDir)>(dir,
+                                (ref System.IO.Enumeration.FileSystemEntry e) => (e.ToFullPath(), e.IsDirectory), options)
+                            {
+                                ShouldIncludePredicate = (ref System.IO.Enumeration.FileSystemEntry e) => e.IsDirectory || IsVideo(e.FileName)
+                            };
+                            foreach (var (path, isDir) in entries)
+                            {
+                                // A path with an excluded text in it: so is everything below it, no need to walk it
+                                if (exclude.Any(x => path.Contains(x))) continue;
+                                if (isDir) Add(path);
+                                else { mine.Add(path); Interlocked.Increment(ref files); }
+                            }
+                        }
+                        catch { /* unreadable folder: skip it */ }
+                        Interlocked.Increment(ref dirsDone);
+                        if (Interlocked.Decrement(ref pending) == 0) queue.CompleteAdding();
                     }
-                    Console.WriteLine("Found a total of " + found.Count + " video files.");
                 }
-                catch (OperationCanceledException) { throw; }
-                catch
-                {
-                    Console.WriteLine("Failed to get " + contentFolder + " - skipping.");
-                }
+                catch (OperationCanceledException) { }
             }
-            onCount?.Invoke(found.Count);
+
+            int threads = Math.Clamp(Environment.ProcessorCount, 4, 16);
+            var tasks = Enumerable.Range(0, threads).Select(_ => Task.Factory.StartNew(Worker, TaskCreationOptions.LongRunning)).ToArray();
+            while (!Task.WaitAll(tasks, 200))
+                onProgress?.Invoke(new FindProgress(Volatile.Read(ref files), Volatile.Read(ref dirsDone), Volatile.Read(ref dirsKnown)));
+            ct.ThrowIfCancellationRequested();
+
+            var found = results.SelectMany(r => r).ToList();
+            found.Sort(StringComparer.Ordinal); // the threads finish in any order: keep the list the same every time
+            Console.WriteLine("Found a total of " + found.Count + " video files in " + dirsDone + " folders.");
+            onProgress?.Invoke(new FindProgress(found.Count, dirsDone, dirsKnown));
             this.allFiles = found;
             this.allFilesCount = found.Count;
+            this.allDirsCount = dirsDone;
+        }
+
+        /// <summary>
+        /// True while another process is still writing the file (a download, a recording, a copy): it is open
+        /// for writing elsewhere, or was changed within the last couple of minutes. Reading such a file is slow
+        /// and gives a broken result, so it is left for the next scan.
+        /// </summary>
+        public static bool IsBeingWritten(string path)
+        {
+            try
+            {
+                if (DateTime.UtcNow - File.GetLastWriteTimeUtc(path) < TimeSpan.FromMinutes(2)) return true;
+                // FileShare.Read fails if anyone has the file open for writing
+                using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+                return false;
+            }
+            catch (IOException) { return true; }
+            catch { return false; } // missing or no access: the normal read reports that
+        }
+
+        // Extension match ignores case, so ".MP4" is found too
+        private static bool IsVideo(ReadOnlySpan<char> fileName)
+        {
+            ReadOnlySpan<char> extension = Path.GetExtension(fileName);
+            foreach (string ext in VideoExtensions)
+                if (extension.Equals(ext, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
         }
 
         public static readonly string[] VideoExtensions = { ".avi", ".divx", ".mp4", ".m4v", ".mov", ".wmv", ".mpg", ".mpeg", ".flv", ".mkv" };
@@ -218,53 +301,6 @@ namespace deepduplicates
                 return (-1);
             }
         }
-        private IEnumerable<string> GetFiles(string path, string[] ext, string[] excludePaths)
-        {
-            Queue<string> queue = new Queue<string>();
-            queue.Enqueue(path);
-            while (queue.Count > 0)
-            {
-                path = queue.Dequeue();
-                try
-                {
-                    foreach (string subDir in Directory.GetDirectories(path))
-                    {
-                        queue.Enqueue(subDir);
-                    }
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    // Ignore this error
-                }
-                catch //(Exception ex)
-                {
-                    //Console.Error.WriteLine(ex); -- ignore
-                }
-                string[] files = null;
-                try
-                {
-                    files = Directory.GetFiles(path);
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    // ignore this error
-                }
-                catch //(Exception ex)
-                {
-                    //Console.Error.WriteLine(ex); - ignore
-                }
-                if (files != null)
-                {
-                    for (int i = 0; i < files.Length; i++)
-                    {
-                        // Extension match ignores case, so ".MP4" is found too
-                        if (ext.Contains(Path.GetExtension(files[i]), StringComparer.OrdinalIgnoreCase) && !excludePaths.Any(x => files[i].Contains(x) || files[i].Equals(x))) yield return files[i];
-                    }
-                }
-            }
-        }
-
-
         // Writes delete_all_dupes.ps1 on Windows, delete_all_dupes.sh on Linux/macOS
         public void generateBatchFile(List<VideoInfo> mediaList)
         {

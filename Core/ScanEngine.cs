@@ -78,18 +78,32 @@ namespace deepduplicates
                 int? expected = RunHistory.ExpectedFiles(settings);
                 double? lastFindSeconds = RunHistory.FindSeconds(settings);
                 var find = Stopwatch.StartNew();
-                ScanProgress Finding(int count)
+                int? expectedDirs = RunHistory.ExpectedDirs(settings);
+                ScanProgress Finding(FileHandler.FindProgress fp)
                 {
-                    // The pace so far once there is enough to go on, before that the last scan's timing
+                    int count = fp.Files, done = fp.DirsDone, queued = Math.Max(fp.DirsKnown - fp.DirsDone, 0);
+                    // The work follows the folders: pace so far once there is enough to go on, before that the last scan's timing
                     TimeSpan? left = null;
                     bool fromHistory = false;
-                    if (expected is int exp && exp > count)
+                    double elapsed = find.Elapsed.TotalSeconds;
+                    bool pace = done >= 50 && elapsed >= 5;
+                    if (expectedDirs is int ed)
                     {
-                        if (count >= 500 && find.Elapsed.TotalSeconds >= 5)
-                            left = TimeSpan.FromSeconds(find.Elapsed.TotalSeconds * (exp - count) / count);
+                        if (done < ed && pace) left = TimeSpan.FromSeconds(elapsed * (ed - done) / done);
+                        else if (done >= ed && pace) left = TimeSpan.FromSeconds(elapsed * queued / done); // past the expected: what is queued
+                        else if (lastFindSeconds is double s && done < ed)
+                        {
+                            left = TimeSpan.FromSeconds(Math.Max(s - elapsed, 0));
+                            fromHistory = true;
+                        }
+                    }
+                    else if (expected is int exp && exp > count)
+                    {
+                        if (count >= 500 && elapsed >= 5)
+                            left = TimeSpan.FromSeconds(elapsed * (exp - count) / count);
                         else if (lastFindSeconds is double s)
                         {
-                            left = TimeSpan.FromSeconds(Math.Max(s - find.Elapsed.TotalSeconds, 0));
+                            left = TimeSpan.FromSeconds(Math.Max(s - elapsed, 0));
                             fromHistory = true;
                         }
                     }
@@ -98,16 +112,20 @@ namespace deepduplicates
                         Phase = ScanPhase.FindingFiles,
                         Message = "Finding video files",
                         FilesFound = count,
+                        DirsDone = done,
+                        DirsQueued = queued,
+                        DirsExpected = expectedDirs,
                         ExpectedFiles = expected,
                         FindRemaining = left,
                         EstimateFromHistory = fromHistory,
                         Elapsed = total.Elapsed
                     };
                 }
-                Report(Finding(0));
-                fileHandler.FindFiles(count => Report(Finding(count)), ct);
+                Report(Finding(default));
+                fileHandler.FindFiles(fp => Report(Finding(fp)), ct);
                 var findTime = find.Elapsed;
                 record.FilesInScope = fileHandler.allFilesCount;
+                record.DirsInScope = fileHandler.allDirsCount;
                 record.FindSeconds = findTime.TotalSeconds;
 
                 // Phase B: processing. Loading the database can take a while on a large library - say so

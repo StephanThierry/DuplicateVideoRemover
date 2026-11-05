@@ -21,6 +21,8 @@ namespace deepduplicates
         public bool Completed { get; set; }
         /// <summary>Seconds spent finding the files (walking the folders), for the progress bar.</summary>
         public double FindSeconds { get; set; }
+        /// <summary>How many folders the walk went through (the work finding takes follows folders, not videos).</summary>
+        public int DirsInScope { get; set; }
         /// <summary>Seconds spent comparing the videos, for the progress bar.</summary>
         public double CompareSeconds { get; set; }
     }
@@ -95,6 +97,14 @@ namespace deepduplicates
             var scope = ScopeKey(settings);
             var last = Load().LastOrDefault(r => r.ScopeKey == scope && r.Completed && r.FilesInScope > 0);
             return last?.FilesInScope;
+        }
+
+        /// <summary>How many folders the last scan of this scope walked, or null.</summary>
+        public static int? ExpectedDirs(Settings settings)
+        {
+            var scope = ScopeKey(settings);
+            var last = Load().LastOrDefault(r => r.ScopeKey == scope && r.Completed && r.DirsInScope > 0);
+            return last?.DirsInScope;
         }
 
         public static RunRecord LastRun(Settings settings)
