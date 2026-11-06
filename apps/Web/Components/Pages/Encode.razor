@@ -56,6 +56,7 @@
                 <button @onclick="() => { hidden.Clear(); ResetPaging(); }" title="@string.Join("\n", hidden)">Unhide folders (@hidden.Count)</button>
             }
             <label class="inline">Only above <input type="number" min="0" step="500" @bind="minKbps" @bind:after="ResetPaging" aria-label="Minimum bitrate" /> kbit/s</label>
+            <label class="inline">and above <input type="number" min="0" step="50" @bind="minMb" @bind:after="ResetPaging" aria-label="Minimum file size in MB" /> MB</label>
             <input type="search" placeholder="Filter by file or folder name" @bind="search" @bind:event="oninput" @bind:after="ResetPaging" aria-label="Filter by file or folder name" />
         </div>
 
@@ -155,6 +156,7 @@
     private readonly HashSet<int> picked = new();
     private string search = "";
     private int minKbps;
+    private int minMb = 100;
     private int shown = 100;
     private string? scriptPath;
     private int scriptCount;
@@ -180,7 +182,7 @@
     private void OnDataChanged() => InvokeAsync(async () => { await Load(); StateHasChanged(); });
 
     private IEnumerable<EncodeCandidate> Visible() => (candidates ?? new()).Where(c =>
-        c.AverageKbps >= minKbps && !hidden.Contains(c.Folder) &&
+        c.AverageKbps >= minKbps && c.SizeBytes >= (long)minMb * 1024 * 1024 && !hidden.Contains(c.Folder) &&
         (string.IsNullOrWhiteSpace(search) || c.Path.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase)));
 
     private long PickedBytes => candidates?.Where(c => picked.Contains(c.Id)).Sum(c => c.SizeBytes) ?? 0;

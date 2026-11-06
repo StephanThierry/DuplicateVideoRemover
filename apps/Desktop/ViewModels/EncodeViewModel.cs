@@ -42,6 +42,7 @@ public partial class EncodeViewModel : ObservableObject
     [ObservableProperty] private string qualitySummary = "";
     [ObservableProperty] private string search = "";
     [ObservableProperty] private decimal minKbps;
+    [ObservableProperty] private decimal minMb = 100;
     [ObservableProperty] private bool loading;
     [ObservableProperty] private bool hasVideos;
     [ObservableProperty] private string pickedText = "";
@@ -69,6 +70,7 @@ public partial class EncodeViewModel : ObservableObject
     partial void OnScriptPathChanged(string? value) => OnPropertyChanged(nameof(HasResult));
     partial void OnSearchChanged(string value) => Filter();
     partial void OnMinKbpsChanged(decimal value) => Filter();
+    partial void OnMinMbChanged(decimal value) => Filter();
 
     /// <summary>Loads the list again (when the screen is opened, after a scan or new settings).</summary>
     public async Task Reload()
@@ -88,7 +90,7 @@ public partial class EncodeViewModel : ObservableObject
     }
 
     private IEnumerable<EncodeRow> Visible() => all.Where(r =>
-        r.Candidate.AverageKbps >= (double)MinKbps && !hidden.Contains(r.Candidate.Folder) &&
+        r.Candidate.AverageKbps >= (double)MinKbps && r.Candidate.SizeBytes >= (double)MinMb * 1024 * 1024 && !hidden.Contains(r.Candidate.Folder) &&
         (string.IsNullOrWhiteSpace(Search) || r.Candidate.Path.Contains(Search.Trim(), StringComparison.OrdinalIgnoreCase)));
 
     private void Filter()
