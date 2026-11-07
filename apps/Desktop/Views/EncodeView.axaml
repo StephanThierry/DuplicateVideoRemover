@@ -29,7 +29,7 @@
       </WrapPanel>
     </Border>
 
-    <Border Grid.Row="2" IsVisible="{Binding HasResult}" Background="{DynamicResource KeepWash}" CornerRadius="6" Padding="16,12" Margin="0,0,0,12">
+    <Border Grid.Row="2" IsVisible="{Binding HasResult}" Background="{DynamicResource KeepWash}" CornerRadius="10" Padding="16,12" Margin="0,0,0,12">
       <StackPanel Spacing="6">
         <SelectableTextBlock Text="{Binding ResultText}" FontWeight="SemiBold" TextWrapping="Wrap"/>
         <SelectableTextBlock Text="{Binding RunText}" Classes="muted" TextWrapping="Wrap"/>
@@ -60,7 +60,7 @@
       </StackPanel>
     </Border>
 
-    <Border Grid.Row="4" BorderBrush="{DynamicResource Rule}" BorderThickness="1" CornerRadius="6" ClipToBounds="True" IsVisible="{Binding HasVideos}">
+    <Border Grid.Row="4" BorderBrush="{DynamicResource Rule}" BorderThickness="1" CornerRadius="10" ClipToBounds="True" IsVisible="{Binding HasVideos}">
       <DockPanel>
         <Border DockPanel.Dock="Top" Background="{DynamicResource Table}" Padding="12,6,32,6">
           <Grid ColumnDefinitions="32,316,48,*,120,90,160">

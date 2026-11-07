@@ -1,51 +1,71 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="DuplicateVideoRemover.Desktop.App"
-             RequestedThemeVariant="Default">
+             RequestedThemeVariant="Dark">
 
-  <!-- Same palette as the web interface: a light table with contact sheets, red grease pencil for removal -->
+  <!-- "Midnight": a deep navy-graphite dark theme (the default) with an indigo accent, in the style of modern
+       Avalonia apps such as ByteSync and Stability Matrix. Green still means keep, red still means remove. -->
   <Application.Resources>
     <ResourceDictionary>
       <ResourceDictionary.ThemeDictionaries>
         <ResourceDictionary x:Key="Light">
-          <SolidColorBrush x:Key="Table" Color="#E9EDF0"/>
+          <SolidColorBrush x:Key="Table" Color="#F3F4F8"/>
+          <SolidColorBrush x:Key="Sidebar" Color="#EBEDF3"/>
           <SolidColorBrush x:Key="Sheet" Color="#FFFFFF"/>
-          <SolidColorBrush x:Key="Ink" Color="#1C2630"/>
-          <SolidColorBrush x:Key="Muted" Color="#5B6875"/>
-          <SolidColorBrush x:Key="Rule" Color="#D3DAE0"/>
-          <SolidColorBrush x:Key="Accent" Color="#1F5C8A"/>
-          <SolidColorBrush x:Key="AccentHover" Color="#1A6FB0"/>
-          <SolidColorBrush x:Key="AccentPressed" Color="#174D75"/>
-          <SolidColorBrush x:Key="Keep" Color="#2F6B4F"/>
-          <SolidColorBrush x:Key="KeepWash" Color="#E3F0E8"/>
-          <SolidColorBrush x:Key="Grease" Color="#CF2F2F"/>
-          <SolidColorBrush x:Key="GreaseHover" Color="#E23A3A"/>
-          <SolidColorBrush x:Key="GreaseWash" Color="#FBECEB"/>
-          <SolidColorBrush x:Key="Frame" Color="#2A3036"/>
+          <SolidColorBrush x:Key="Raised" Color="#E4E7EF"/>
+          <SolidColorBrush x:Key="Ink" Color="#161A22"/>
+          <SolidColorBrush x:Key="Muted" Color="#5D6575"/>
+          <SolidColorBrush x:Key="Rule" Color="#DCE0E8"/>
+          <SolidColorBrush x:Key="Accent" Color="#4F5BD5"/>
+          <SolidColorBrush x:Key="AccentHover" Color="#6270E6"/>
+          <SolidColorBrush x:Key="AccentPressed" Color="#4049B8"/>
+          <SolidColorBrush x:Key="AccentWash" Color="#E3E6FB"/>
+          <SolidColorBrush x:Key="Keep" Color="#1F7A4D"/>
+          <SolidColorBrush x:Key="KeepWash" Color="#E2F3EA"/>
+          <SolidColorBrush x:Key="Grease" Color="#D63A3A"/>
+          <SolidColorBrush x:Key="GreaseHover" Color="#E54B4B"/>
+          <SolidColorBrush x:Key="GreaseWash" Color="#FCEBEB"/>
+          <SolidColorBrush x:Key="Warn" Color="#8A4B00"/>
+          <SolidColorBrush x:Key="WarnWash" Color="#FFF3D6"/>
+          <SolidColorBrush x:Key="Frame" Color="#1D222B"/>
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
-          <SolidColorBrush x:Key="Table" Color="#15191D"/>
-          <SolidColorBrush x:Key="Sheet" Color="#1E2429"/>
-          <SolidColorBrush x:Key="Ink" Color="#E5EAEE"/>
-          <SolidColorBrush x:Key="Muted" Color="#9AA7B2"/>
-          <SolidColorBrush x:Key="Rule" Color="#2E363D"/>
-          <SolidColorBrush x:Key="Accent" Color="#5B9FD6"/>
-          <SolidColorBrush x:Key="AccentHover" Color="#7DB8EA"/>
-          <SolidColorBrush x:Key="AccentPressed" Color="#4A88BC"/>
-          <SolidColorBrush x:Key="Keep" Color="#6CC196"/>
-          <SolidColorBrush x:Key="KeepWash" Color="#1B2D24"/>
-          <SolidColorBrush x:Key="Grease" Color="#FF6B5E"/>
-          <SolidColorBrush x:Key="GreaseHover" Color="#FF8478"/>
-          <SolidColorBrush x:Key="GreaseWash" Color="#351C1B"/>
-          <SolidColorBrush x:Key="Frame" Color="#0B0E10"/>
+          <SolidColorBrush x:Key="Table" Color="#0E1116"/>
+          <SolidColorBrush x:Key="Sidebar" Color="#12161D"/>
+          <SolidColorBrush x:Key="Sheet" Color="#171B23"/>
+          <SolidColorBrush x:Key="Raised" Color="#212732"/>
+          <SolidColorBrush x:Key="Ink" Color="#E7EAF0"/>
+          <SolidColorBrush x:Key="Muted" Color="#8C95A6"/>
+          <SolidColorBrush x:Key="Rule" Color="#262C37"/>
+          <SolidColorBrush x:Key="Accent" Color="#6573F2"/>
+          <SolidColorBrush x:Key="AccentHover" Color="#7B87F7"/>
+          <SolidColorBrush x:Key="AccentPressed" Color="#525FDB"/>
+          <SolidColorBrush x:Key="AccentWash" Color="#1F2442"/>
+          <SolidColorBrush x:Key="Keep" Color="#4FCF8E"/>
+          <SolidColorBrush x:Key="KeepWash" Color="#11271C"/>
+          <SolidColorBrush x:Key="Grease" Color="#F2605A"/>
+          <SolidColorBrush x:Key="GreaseHover" Color="#FF7A74"/>
+          <SolidColorBrush x:Key="GreaseWash" Color="#2E1619"/>
+          <SolidColorBrush x:Key="Warn" Color="#F2B84B"/>
+          <SolidColorBrush x:Key="WarnWash" Color="#2B2312"/>
+          <SolidColorBrush x:Key="Frame" Color="#06080B"/>
         </ResourceDictionary>
       </ResourceDictionary.ThemeDictionaries>
+      <!-- Softer, rounder controls than stock Fluent -->
+      <CornerRadius x:Key="ControlCornerRadius">7</CornerRadius>
+      <CornerRadius x:Key="OverlayCornerRadius">10</CornerRadius>
     </ResourceDictionary>
   </Application.Resources>
 
   <Application.Styles>
-    <FluentTheme />
-    <Style Selector="TextBlock.h1"><Setter Property="FontSize" Value="24"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+    <!-- Fluent's own controls (sliders, checkboxes, progress bars, focus) follow the same accent and background -->
+    <FluentTheme>
+      <FluentTheme.Palettes>
+        <ColorPaletteResources x:Key="Light" Accent="#4F5BD5" RegionColor="#F3F4F8"/>
+        <ColorPaletteResources x:Key="Dark" Accent="#6573F2" RegionColor="#0E1116"/>
+      </FluentTheme.Palettes>
+    </FluentTheme>
+    <Style Selector="TextBlock.h1"><Setter Property="FontSize" Value="26"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="LetterSpacing" Value="-0.3"/></Style>
     <Style Selector="TextBlock.h2"><Setter Property="FontSize" Value="17"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
     <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource Muted}"/></Style>
     <Style Selector="TextBlock.small"><Setter Property="FontSize" Value="12"/></Style>
@@ -53,14 +73,20 @@
       <Setter Property="Background" Value="{DynamicResource Sheet}"/>
       <Setter Property="BorderBrush" Value="{DynamicResource Rule}"/>
       <Setter Property="BorderThickness" Value="1"/>
-      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="CornerRadius" Value="12"/>
       <Setter Property="Padding" Value="20"/>
+      <Setter Property="BoxShadow" Value="0 2 12 0 #26000000"/>
+    </Style>
+    <Style Selector="Button">
+      <Setter Property="Padding" Value="14,7"/>
     </Style>
     <Style Selector="Button.primary">
+      <Setter Property="FontWeight" Value="SemiBold"/>
       <Setter Property="Background" Value="{DynamicResource Accent}"/>
       <Setter Property="Foreground" Value="White"/>
     </Style>
     <Style Selector="Button.danger">
+      <Setter Property="FontWeight" Value="SemiBold"/>
       <Setter Property="Background" Value="{DynamicResource Grease}"/>
       <Setter Property="Foreground" Value="White"/>
     </Style>
@@ -147,7 +173,7 @@
       <Setter Property="Padding" Value="0,0,20,0"/>
     </Style>
     <Style Selector="ScrollBar /template/ Thumb">
-      <Setter Property="Background" Value="{DynamicResource Muted}"/>
+      <Setter Property="Background" Value="{DynamicResource Raised}"/>
       <Setter Property="CornerRadius" Value="6"/>
     </Style>
     <Style Selector="ScrollBar:vertical /template/ Thumb">
@@ -167,7 +193,7 @@
 
     <!-- A folder shown as a tag -->
     <Style Selector="Border.tag">
-      <Setter Property="Background" Value="{DynamicResource Table}"/>
+      <Setter Property="Background" Value="{DynamicResource Raised}"/>
       <Setter Property="BorderBrush" Value="{DynamicResource Rule}"/>
       <Setter Property="BorderThickness" Value="1"/>
       <Setter Property="CornerRadius" Value="14"/>
@@ -176,6 +202,62 @@
     </Style>
     <Style Selector="CheckBox.grease">
       <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+    </Style>
+
+    <!-- Left navigation sidebar (MainWindow): the tab strip becomes a column of rounded items with icons.
+         The sidebar background, logo and data folder are drawn behind it in MainWindow. -->
+    <Style Selector="TabControl.nav /template/ ItemsPresenter#PART_ItemsPresenter">
+      <Setter Property="Width" Value="232"/>
+      <Setter Property="Margin" Value="0,78,0,0"/>
+    </Style>
+    <Style Selector="TabControl.nav TabItem">
+      <Setter Property="Width" Value="208"/>
+      <Setter Property="Height" Value="42"/>
+      <Setter Property="MinHeight" Value="42"/>
+      <Setter Property="Margin" Value="12,0,12,4"/>
+      <Setter Property="Padding" Value="10,0"/>
+      <Setter Property="CornerRadius" Value="9"/>
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <!-- Text settings go on the header presenter, not the TabItem: the page itself is the TabItem's content and
+         would inherit them -->
+    <Style Selector="TabControl.nav TabItem /template/ Border#PART_LayoutRoot">
+      <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="TabControl.nav TabItem /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="FontWeight" Value="Medium"/>
+      <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
+    </Style>
+    <Style Selector="TabControl.nav TabItem:pointerover /template/ Border#PART_LayoutRoot, TabControl.nav TabItem:pressed /template/ Border#PART_LayoutRoot">
+      <Setter Property="Background" Value="{DynamicResource Raised}"/>
+    </Style>
+    <Style Selector="TabControl.nav TabItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+    </Style>
+    <Style Selector="TabControl.nav TabItem:selected">
+      <Setter Property="Background" Value="{DynamicResource AccentWash}"/>
+    </Style>
+    <Style Selector="TabControl.nav TabItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+    <Style Selector="TabControl.nav TabItem:selected:pointerover /template/ Border#PART_LayoutRoot, TabControl.nav TabItem:selected:pressed /template/ Border#PART_LayoutRoot">
+      <Setter Property="Background" Value="{DynamicResource AccentWash}"/>
+    </Style>
+    <Style Selector="TabControl.nav TabItem /template/ Border#PART_SelectedPipe">
+      <Setter Property="Background" Value="{DynamicResource Accent}"/>
+      <Setter Property="Width" Value="3"/>
+      <Setter Property="Height" Value="18"/>
+      <Setter Property="Margin" Value="-6,0,0,0"/>
+      <Setter Property="CornerRadius" Value="2"/>
+    </Style>
+    <Style Selector="PathIcon.nav">
+      <Setter Property="Width" Value="18"/>
+      <Setter Property="Height" Value="18"/>
+    </Style>
+    <Style Selector="TabItem:selected PathIcon.nav">
+      <Setter Property="Foreground" Value="{DynamicResource AccentHover}"/>
     </Style>
   </Application.Styles>
 </Application>

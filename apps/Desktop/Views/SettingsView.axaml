@@ -10,8 +10,8 @@
     <Style Selector="Border.mapcheck TextBlock"><Setter Property="Foreground" Value="{DynamicResource Muted}"/></Style>
     <Style Selector="Border.mapcheck.ok"><Setter Property="Background" Value="{DynamicResource KeepWash}"/></Style>
     <Style Selector="Border.mapcheck.ok TextBlock"><Setter Property="Foreground" Value="{DynamicResource Keep}"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
-    <Style Selector="Border.mapcheck.warning"><Setter Property="Background" Value="#FFF3D6"/></Style>
-    <Style Selector="Border.mapcheck.warning TextBlock"><Setter Property="Foreground" Value="#8A4B00"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+    <Style Selector="Border.mapcheck.warning"><Setter Property="Background" Value="{DynamicResource WarnWash}"/></Style>
+    <Style Selector="Border.mapcheck.warning TextBlock"><Setter Property="Foreground" Value="{DynamicResource Warn}"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
     <Style Selector="Border.mapcheck.error"><Setter Property="Background" Value="{DynamicResource GreaseWash}"/></Style>
     <Style Selector="Border.mapcheck.error TextBlock"><Setter Property="Foreground" Value="{DynamicResource Grease}"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
   </UserControl.Styles>
