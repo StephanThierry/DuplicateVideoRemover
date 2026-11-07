@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -33,6 +34,9 @@ public partial class EncodeQueueViewModel : ObservableObject
     [ObservableProperty] private bool hasWaiting;
     [ObservableProperty] private bool hasFinished;
     [ObservableProperty] private bool isEmpty = true;
+    // An empty list shrinks to its header, so the other one gets the room
+    [ObservableProperty] private GridLength waitingRowHeight = GridLength.Auto;
+    [ObservableProperty] private GridLength finishedRowHeight = GridLength.Auto;
     [ObservableProperty] private string headline = "Nothing in the queue";
     [ObservableProperty] private string left = "";
     [ObservableProperty] private string totals = "";
@@ -89,6 +93,8 @@ public partial class EncodeQueueViewModel : ObservableObject
         CanStart = !p.Running && p.QueuedCount > 0;
         HasWaiting = p.QueuedCount > 0;
         HasFinished = p.FinishedCount > 0;
+        WaitingRowHeight = p.QueuedCount > 0 ? new GridLength(1, GridUnitType.Star) : GridLength.Auto;
+        FinishedRowHeight = p.FinishedCount > 0 ? new GridLength(1, GridUnitType.Star) : GridLength.Auto;
         IsEmpty = items.Count == 0;
         Headline = EncodeText.Headline(p);
         Left = EncodeText.Left(p);

@@ -84,7 +84,11 @@
     </Border>
 
     <!-- Waiting and finished videos share the room that is left -->
-    <Grid Grid.Row="4" RowDefinitions="*,*" RowSpacing="12" IsVisible="{Binding !IsEmpty}">
+    <Grid Grid.Row="4" RowSpacing="12" IsVisible="{Binding !IsEmpty}">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="{Binding WaitingRowHeight}"/>
+        <RowDefinition Height="{Binding FinishedRowHeight}"/>
+      </Grid.RowDefinitions>
       <Border Grid.Row="0" BorderBrush="{DynamicResource Rule}" BorderThickness="1" CornerRadius="10" ClipToBounds="True">
         <DockPanel>
           <Border DockPanel.Dock="Top" Background="{DynamicResource Table}" Padding="12,6,12,6">

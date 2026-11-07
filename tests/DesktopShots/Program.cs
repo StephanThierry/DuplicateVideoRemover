@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Avalonia.VisualTree;
 using Avalonia;
 using Avalonia.Headless;
@@ -59,12 +60,16 @@ if (Environment.GetEnvironmentVariable("SHOT_QUEUE") == "1")
     {
         string clip = Path.Combine(videos, $"Holiday clip {n + 1}.mp4");
         if (File.Exists(clip)) continue;
-        gen.RunAsync(FileHandler.FFmpegPath, new[] { "-hide_banner", "-y", "-f", "lavfi", "-i", $"testsrc2=duration={lengths[n]}:size=1280x720:rate=25",
-            "-f", "lavfi", "-i", "sine=duration=" + lengths[n], "-shortest", "-c:v", "libx264", "-preset", "ultrafast", "-crf", (20 + n).ToString(), "-pix_fmt", "yuv420p", "-c:a", "aac", clip },
-            _ => { }, _ => { }, CancellationToken.None).GetAwaiter().GetResult();
+        int seconds = lengths[n];
+        // Off the UI thread: waiting for an async call on it would deadlock under Avalonia's synchronization context
+        Task.Run(() => gen.RunAsync(FileHandler.FFmpegPath, new[] { "-hide_banner", "-y", "-f", "lavfi", "-i", $"testsrc2=duration={seconds}:size=1280x720:rate=25",
+            "-f", "lavfi", "-i", "sine=duration=" + seconds, "-shortest", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "30", "-pix_fmt", "yuv420p", "-c:a", "aac", clip },
+            _ => { }, _ => { }, CancellationToken.None)).GetAwaiter().GetResult();
     }
     string bad = Path.Combine(videos, "Broken download.mp4");
     File.WriteAllText(bad, "this is not a video");
+    // The scan leaves out files that were changed in the last minutes ("still being written")
+    foreach (var f in Directory.GetFiles(videos)) File.SetLastWriteTime(f, DateTime.Now.AddHours(-2));
     Console.WriteLine("clips made");
 
     var settings = controller.Settings.Clone();
@@ -116,6 +121,22 @@ if (Environment.GetEnvironmentVariable("SHOT_QUEUE") == "1")
     Console.WriteLine($"final: {EncodeText.Headline(final)} | {EncodeText.Totals(final)} | {EncodeText.Saved(final)}");
     foreach (var i in final.Items) Console.WriteLine($"  {i.FileName}: {EncodeText.Status(i)}");
     Console.WriteLine("part files left: " + Directory.GetFiles(videos, "*.part").Length);
+    // Stop in the middle: the running video goes back in the queue, nothing is left half done, Start carries on
+    controller.Encoder.ClearFinished();
+    foreach (var f in Directory.GetFiles(videos, "*_720p_x264.mp4")) File.Delete(f);
+    controller.EnqueueEncode(controller.EncodeCandidates().Take(4));
+    run = DateTime.UtcNow;
+    while (!(controller.Encoder.Current.Current?.Fraction > 0.2) && DateTime.UtcNow - run < TimeSpan.FromMinutes(2)) Pump(20);
+    controller.Encoder.Stop();
+    while (controller.Encoder.IsRunning) Pump(50);
+    Pump(500); vm.SelectedTab = MainViewModel.QueueTab; Shot("q_stopped");
+    var stopped = controller.Encoder.Current;
+    Console.WriteLine($"stopped: {EncodeText.Headline(stopped)} | halted {stopped.Halted}, waiting {stopped.QueuedCount}, part files {Directory.GetFiles(videos, "*.part").Length}");
+    vm.EncodeQueue.StartCommand.Execute(null);
+    run = DateTime.UtcNow;
+    while (controller.Encoder.Current.PendingCount > 0 && DateTime.UtcNow - run < TimeSpan.FromMinutes(3)) Pump(100);
+    Pump(500); Shot("q_after_restart");
+    Console.WriteLine($"after start: {EncodeText.Headline(controller.Encoder.Current)} | {EncodeText.Totals(controller.Encoder.Current)}");
     controller.Encoder.Shutdown();
     return;
 }

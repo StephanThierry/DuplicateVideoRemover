@@ -334,9 +334,10 @@ namespace deepduplicates
 
                 if (exit != 0)
                 {
-                    string why = tail.LastOrDefault(l => !string.IsNullOrWhiteSpace(l)) ?? "no message";
+                    // FFmpeg's last words say why; its exit code (often a large negative number) means little to the user
+                    string? why = tail.LastOrDefault(l => !string.IsNullOrWhiteSpace(l))?.Trim();
                     TryDelete(part);
-                    Finish(item, EncodeItemStatus.Failed, $"FFmpeg stopped with code {exit} ({why.Trim()})");
+                    Finish(item, EncodeItemStatus.Failed, why != null ? "FFmpeg could not encode it: " + why : $"FFmpeg stopped with code {exit}");
                     return;
                 }
                 if (!File.Exists(part) || new FileInfo(part).Length == 0) { TryDelete(part); Finish(item, EncodeItemStatus.Failed, "FFmpeg made no file"); return; }
