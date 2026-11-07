@@ -23,6 +23,21 @@
           <TextBlock Classes="muted" Text="Which folders to scan and how alike two videos must be to count as duplicates." Margin="0,4,0,0"/>
         </StackPanel>
 
+        <!-- Where this app keeps its own files -->
+        <Border Background="{DynamicResource AccentWash}" CornerRadius="10" Padding="16,12">
+          <DockPanel>
+            <PathIcon DockPanel.Dock="Left" Width="20" Height="20" Margin="0,2,14,0" VerticalAlignment="Top"
+                      Foreground="{DynamicResource AccentHover}"
+                      Data="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+            <StackPanel Spacing="3">
+              <TextBlock Text="Data folder" FontWeight="SemiBold"/>
+              <SelectableTextBlock Text="{Binding DataFolder}" TextWrapping="Wrap"/>
+              <SelectableTextBlock Text="{Binding DatabaseFolder, StringFormat='Database: {0}'}" TextWrapping="Wrap" IsVisible="{Binding HasSeparateDatabase}"/>
+              <TextBlock Classes="muted small" Text="Settings, the database and screenshots are kept here." TextWrapping="Wrap"/>
+            </StackPanel>
+          </DockPanel>
+        </Border>
+
         <Border Classes="panel">
           <StackPanel Spacing="16">
             <TextBlock Classes="h2" Text="Folders"/>

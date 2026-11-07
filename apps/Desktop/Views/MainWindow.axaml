@@ -22,19 +22,10 @@
             <TextBlock Text="Remover" Classes="muted small"/>
           </StackPanel>
         </StackPanel>
-        <Border DockPanel.Dock="Bottom" VerticalAlignment="Bottom" Margin="12,0,12,14" Padding="12,10"
-                CornerRadius="9" Background="{DynamicResource Sheet}" BorderBrush="{DynamicResource Rule}" BorderThickness="1"
-                ToolTip.Tip="Data folder (settings, database, screenshots)">
-          <StackPanel Spacing="2">
-            <TextBlock Text="DATA FOLDER" Classes="muted" FontSize="10" FontWeight="SemiBold" LetterSpacing="0.8"/>
-            <TextBlock Text="{Binding DataFolder}" Classes="small" TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis"/>
-          </StackPanel>
-        </Border>
         <Panel/>
       </DockPanel>
     </Border>
 
-    <!-- No background, so the data folder card behind the strip still gets its tooltip -->
     <TabControl Classes="nav" TabStripPlacement="Left" Background="{x:Null}" Padding="16,8,16,0"
                 SelectedIndex="{Binding SelectedTab}">
       <TabItem>

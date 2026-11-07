@@ -17,10 +17,6 @@ public partial class MainViewModel : ObservableObject
     /// <summary>0 = Scan, 1 = Review, 2 = Re-encode, 3 = All files, 4 = Settings.</summary>
     [ObservableProperty] private int selectedTab;
 
-    public string DataFolder => App.DatabaseFolder == App.DataFolder
-        ? App.DataFolder
-        : $"{App.DataFolder}   (database: {App.DatabaseFolder})";
-
     public MainViewModel(AppController app)
     {
         App = app;
