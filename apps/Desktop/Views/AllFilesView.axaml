@@ -14,6 +14,14 @@
       <Setter Property="BorderThickness" Value="0,0,0,1"/>
       <Setter Property="Padding" Value="12,10"/>
     </Style>
+    <!-- The screenshots shrink when the list gets narrower, so the name and the buttons always have room -->
+    <Style Selector="Image.shot"><Setter Property="Width" Value="240"/><Setter Property="Height" Value="160"/></Style>
+    <ContainerQuery Name="files" Query="max-width:1120">
+      <Style Selector="Image.shot"><Setter Property="Width" Value="160"/><Setter Property="Height" Value="107"/></Style>
+    </ContainerQuery>
+    <ContainerQuery Name="files" Query="max-width:880">
+      <Style Selector="Image.shot"><Setter Property="Width" Value="120"/><Setter Property="Height" Value="80"/></Style>
+    </ContainerQuery>
   </UserControl.Styles>
 
   <Grid RowDefinitions="Auto,Auto,*" Margin="12,16,12,0">
@@ -50,7 +58,7 @@
     <TextBlock Grid.Row="2" Text="No path contains all the words of the search." Classes="muted" VerticalAlignment="Top"
                IsVisible="{Binding !HasMatches}"/>
 
-    <Border Grid.Row="2" BorderBrush="{DynamicResource Rule}" BorderThickness="1" CornerRadius="6" ClipToBounds="True" Margin="0,0,0,12">
+    <Border Grid.Row="2" BorderBrush="{DynamicResource Rule}" BorderThickness="1" CornerRadius="10" ClipToBounds="True" Margin="0,0,0,12">
       <Border.IsVisible>
         <MultiBinding Converter="{x:Static BoolConverters.And}">
           <Binding Path="HasFiles"/>
@@ -58,17 +66,17 @@
         </MultiBinding>
       </Border.IsVisible>
       <!-- Virtualized: only the rows on screen exist and load their screenshots -->
-      <ListBox Classes="rows" ItemsSource="{Binding Rows}" Background="Transparent">
+      <ListBox Classes="rows" ItemsSource="{Binding Rows}" Background="Transparent" Container.Name="files" Container.Sizing="Width">
         <ListBox.ItemTemplate>
           <DataTemplate x:DataType="vm:FileRow">
             <Border Classes="filerow">
               <Grid ColumnDefinitions="Auto,48,*" ColumnSpacing="12">
-                <!-- The screenshots at the size they are stored (240 x 160) -->
+                <!-- The screenshots at the size they are stored (240 x 160), smaller in a narrow window -->
                 <Border Background="{DynamicResource Frame}" CornerRadius="3" Padding="4">
                   <StackPanel Orientation="Horizontal" Spacing="3">
-                    <Image Source="{Binding Shot1}" Width="240" Height="160" Stretch="UniformToFill"/>
-                    <Image Source="{Binding Shot2}" Width="240" Height="160" Stretch="UniformToFill"/>
-                    <Image Source="{Binding Shot3}" Width="240" Height="160" Stretch="UniformToFill"/>
+                    <Image Classes="shot" Source="{Binding Shot1}" Stretch="UniformToFill"/>
+                    <Image Classes="shot" Source="{Binding Shot2}" Stretch="UniformToFill"/>
+                    <Image Classes="shot" Source="{Binding Shot3}" Stretch="UniformToFill"/>
                   </StackPanel>
                 </Border>
                 <Button Grid.Column="1" Classes="icon" Command="{Binding PlayCommand}" ToolTip.Tip="Play (opens the default player)"
@@ -79,11 +87,12 @@
                   <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextWrapping="Wrap"/>
                   <TextBlock Text="{Binding Folder}" Classes="muted small" TextWrapping="Wrap"/>
                   <TextBlock Text="{Binding Meta}" Classes="muted small"/>
-                  <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
+                  <!-- Buttons move to the next line when there is no room, so Delete never disappears -->
+                  <WrapPanel Orientation="Horizontal" ItemSpacing="6" LineSpacing="6" Margin="0,4,0,0">
                     <Button Classes="small" Content="Exclude folder" Command="{Binding ExcludeFolderCommand}" ToolTip.Tip="{Binding Folder, StringFormat='Hide every video in {0}'}"/>
                     <Button Classes="small" Content="Copy path" Command="{Binding CopyPathCommand}" ToolTip.Tip="Copy the full path"/>
                     <Button Classes="small dangerOutline" Content="Delete" Command="{Binding DeleteCommand}" ToolTip.Tip="Delete this file"/>
-                  </StackPanel>
+                  </WrapPanel>
                 </StackPanel>
               </Grid>
             </Border>

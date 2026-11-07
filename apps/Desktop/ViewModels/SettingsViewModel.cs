@@ -53,6 +53,11 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string falsePositivesStatus = "";
     public ObservableCollection<FalsePositiveItem> FalsePositiveItems { get; } = new();
 
+    /// <summary>Where settings, database and screenshots are kept (shown at the top of Settings).</summary>
+    public string DataFolder => app.DataFolder;
+    public bool HasSeparateDatabase => app.DatabaseFolder != app.DataFolder;
+    public string DatabaseFolder => app.DatabaseFolder;
+
     public string Placeholder => OperatingSystem.IsWindows() ? @"D:\Videos or \\nas\videos" : "/mnt/videos";
 
     public SettingsViewModel(AppController app)
