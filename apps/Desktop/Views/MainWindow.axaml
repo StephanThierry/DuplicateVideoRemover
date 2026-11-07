@@ -69,6 +69,19 @@
       </TabItem>
       <TabItem>
         <TabItem.Header>
+          <StackPanel Orientation="Horizontal" Spacing="12" ToolTip.Tip="Encoding" ToolTip.Placement="Right">
+            <PathIcon Classes="nav" Data="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8 12.5v-9l6 4.5-6 4.5z"/>
+            <TextBlock Classes="navlabel" Text="Encoding" VerticalAlignment="Center"/>
+            <!-- Videos waiting or being encoded -->
+            <Border IsVisible="{Binding EncodeQueue.HasBadge}" Background="{DynamicResource Accent}" CornerRadius="9" MinWidth="18" Height="18" Padding="5,0" VerticalAlignment="Center">
+              <TextBlock Text="{Binding EncodeQueue.Badge}" Foreground="White" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+          </StackPanel>
+        </TabItem.Header>
+        <v:EncodeQueueView DataContext="{Binding EncodeQueue}"/>
+      </TabItem>
+      <TabItem>
+        <TabItem.Header>
           <StackPanel Orientation="Horizontal" Spacing="12" ToolTip.Tip="All files" ToolTip.Placement="Right">
             <PathIcon Classes="nav" Data="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/>
             <TextBlock Classes="navlabel" Text="All files" VerticalAlignment="Center"/>

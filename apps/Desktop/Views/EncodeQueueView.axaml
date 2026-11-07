@@ -1,0 +1,173 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DuplicateVideoRemover.Desktop.ViewModels"
+             x:Class="DuplicateVideoRemover.Desktop.Views.EncodeQueueView"
+             x:DataType="vm:EncodeQueueViewModel">
+  <UserControl.Styles>
+    <Style Selector="ListBox.rows ListBoxItem"><Setter Property="Padding" Value="0"/></Style>
+    <Style Selector="ListBox.rows ListBoxItem:selected /template/ ContentPresenter"><Setter Property="Background" Value="Transparent"/></Style>
+    <Style Selector="ListBox.rows ListBoxItem:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="Transparent"/></Style>
+    <Style Selector="Border.qrow"><Setter Property="Background" Value="{DynamicResource Sheet}"/><Setter Property="Padding" Value="12,8"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Rule}"/><Setter Property="BorderThickness" Value="0,0,0,1"/></Style>
+    <Style Selector="ProgressBar.overall"><Setter Property="Foreground" Value="{DynamicResource Accent}"/></Style>
+    <Style Selector="ProgressBar.current"><Setter Property="Foreground" Value="{DynamicResource Keep}"/></Style>
+    <Style Selector="TextBlock.ok"><Setter Property="Foreground" Value="{DynamicResource Keep}"/></Style>
+    <Style Selector="TextBlock.bad"><Setter Property="Foreground" Value="{DynamicResource Grease}"/></Style>
+    <Style Selector="TextBlock.skip"><Setter Property="Foreground" Value="{DynamicResource Warn}"/></Style>
+    <Style Selector="Image.qshot"><Setter Property="Width" Value="96"/><Setter Property="Height" Value="64"/></Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto" Margin="12,16,12,12">
+    <!-- Title and the controls of the run -->
+    <DockPanel Grid.Row="0" Margin="0,0,0,14">
+      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+        <Button Classes="primary" Content="Start encoding" Command="{Binding StartCommand}" IsVisible="{Binding CanStart}" FontSize="15" Padding="20,9"/>
+        <Button Content="Skip this video" Command="{Binding SkipCurrentCommand}" IsVisible="{Binding HasCurrent}" FontSize="15" Padding="20,9"
+                ToolTip.Tip="Gives up on the video being encoded (it is marked as skipped) and goes on with the next"/>
+        <Button Content="Stop" Command="{Binding StopCommand}" IsVisible="{Binding IsRunning}" FontSize="15" Padding="20,9"
+                ToolTip.Tip="Stops encoding. The video being encoded goes back in the queue, and everything keeps waiting until you press Start"/>
+      </StackPanel>
+      <StackPanel>
+        <TextBlock Classes="h1" Text="Encoding"/>
+        <TextBlock Classes="muted" Margin="0,4,0,0" TextWrapping="Wrap"
+                   Text="Videos you add on the Re-encode screen wait here and are encoded one at a time. The queue is kept if you close the program."/>
+      </StackPanel>
+    </DockPanel>
+
+    <!-- Nothing queued yet -->
+    <Border Grid.Row="1" Grid.RowSpan="5" Classes="panel" Padding="40" VerticalAlignment="Top" IsVisible="{Binding IsEmpty}">
+      <StackPanel HorizontalAlignment="Center" Spacing="10">
+        <TextBlock Classes="h2" Text="Nothing in the queue" HorizontalAlignment="Center"/>
+        <TextBlock Classes="muted" Text="Pick videos on the Re-encode screen and add them to the queue. They are encoded here, with progress." HorizontalAlignment="Center"/>
+        <Button Classes="primary" Content="Go to Re-encode" Command="{Binding GoToEncodeCommand}" HorizontalAlignment="Center"/>
+      </StackPanel>
+    </Border>
+
+    <!-- The whole queue: where it is, time left, what it saved -->
+    <Border Grid.Row="1" Classes="panel" Padding="20,16" Margin="0,0,0,12" IsVisible="{Binding !IsEmpty}">
+      <StackPanel Spacing="8">
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Right" Text="{Binding PercentText}" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Bottom"/>
+          <TextBlock Text="{Binding Headline}" Classes="h2" VerticalAlignment="Bottom" TextWrapping="Wrap"/>
+        </DockPanel>
+        <ProgressBar Classes="overall" Value="{Binding Percent}" Maximum="100" Height="14" CornerRadius="7"/>
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Right" Classes="muted" Text="{Binding Left}" Margin="12,0,0,0"/>
+          <TextBlock Text="{Binding Totals}" TextWrapping="Wrap"/>
+        </DockPanel>
+        <WrapPanel>
+          <TextBlock Classes="muted" Text="Time so far " />
+          <TextBlock Text="{Binding Elapsed}" FontWeight="SemiBold" Margin="0,0,16,0"/>
+          <TextBlock Text="{Binding Saved}" Classes="ok" FontWeight="SemiBold" IsVisible="{Binding Saved, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+        </WrapPanel>
+        <Border IsVisible="{Binding HasError}" Background="{DynamicResource GreaseWash}" CornerRadius="6" Padding="12,10" Margin="0,4,0,0">
+          <TextBlock Text="{Binding Error}" TextWrapping="Wrap"/>
+        </Border>
+      </StackPanel>
+    </Border>
+
+    <!-- The video being encoded now -->
+    <Border Grid.Row="2" Classes="panel" Padding="16,14" Margin="0,0,0,12" IsVisible="{Binding HasCurrent}">
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16" DataContext="{Binding Current}" x:DataType="vm:EncodeQueueRow">
+        <Border Background="{DynamicResource Frame}" CornerRadius="3" Padding="4" VerticalAlignment="Top">
+          <Image Source="{Binding Shot}" Width="168" Height="112" Stretch="UniformToFill"/>
+        </Border>
+        <StackPanel Grid.Column="1" Spacing="6">
+          <TextBlock Text="Encoding now" Classes="muted small"/>
+          <TextBlock Text="{Binding FileName}" FontSize="17" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+          <TextBlock Text="{Binding Folder}" Classes="muted small" TextTrimming="CharacterEllipsis"/>
+          <TextBlock Classes="muted small"><Run Text="{Binding Size}"/><Run Text=", "/><Run Text="{Binding Length}"/><Run Text=" - "/><Run Text="{Binding Summary}"/></TextBlock>
+          <ProgressBar Classes="current" Value="{Binding Percent}" Maximum="100" Height="12" CornerRadius="6" Margin="0,6,0,0"/>
+          <TextBlock Text="{Binding Detail}" TextWrapping="Wrap"/>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Waiting and finished videos share the room that is left -->
+    <Grid Grid.Row="4" RowDefinitions="*,*" RowSpacing="12" IsVisible="{Binding !IsEmpty}">
+      <Border Grid.Row="0" BorderBrush="{DynamicResource Rule}" BorderThickness="1" CornerRadius="10" ClipToBounds="True">
+        <DockPanel>
+          <Border DockPanel.Dock="Top" Background="{DynamicResource Table}" Padding="12,6,12,6">
+            <DockPanel>
+              <Button DockPanel.Dock="Right" Classes="small" Content="Clear waiting" Command="{Binding ClearWaitingCommand}" IsVisible="{Binding HasWaiting}"
+                      ToolTip.Tip="Takes every waiting video out of the queue"/>
+              <TextBlock Text="{Binding WaitingTitle}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+            </DockPanel>
+          </Border>
+          <TextBlock DockPanel.Dock="Top" Classes="muted" Text="Nothing is waiting. Add more on the Re-encode screen." Margin="14,12" IsVisible="{Binding !HasWaiting}"/>
+          <ListBox Classes="rows" ItemsSource="{Binding Waiting}" Background="Transparent" IsVisible="{Binding HasWaiting}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:EncodeQueueRow">
+                <Border Classes="qrow">
+                  <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="14">
+                    <Border Background="{DynamicResource Frame}" CornerRadius="3" Padding="3" VerticalAlignment="Center">
+                      <Image Classes="qshot" Source="{Binding Shot}" Stretch="UniformToFill"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                      <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                      <TextBlock Text="{Binding Folder}" Classes="muted small" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
+                      <TextBlock Text="{Binding Size}" HorizontalAlignment="Right"/>
+                      <TextBlock Text="{Binding Length}" Classes="muted small" HorizontalAlignment="Right"/>
+                    </StackPanel>
+                    <Button Grid.Column="3" Classes="small" Content="Remove" Command="{Binding RemoveCommand}" VerticalAlignment="Center"
+                            ToolTip.Tip="Take this video out of the queue"/>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </DockPanel>
+      </Border>
+
+      <Border Grid.Row="1" BorderBrush="{DynamicResource Rule}" BorderThickness="1" CornerRadius="10" ClipToBounds="True">
+        <DockPanel>
+          <Border DockPanel.Dock="Top" Background="{DynamicResource Table}" Padding="12,6,12,6">
+            <DockPanel>
+              <Button DockPanel.Dock="Right" Classes="small" Content="Clear finished" Command="{Binding ClearFinishedCommand}" IsVisible="{Binding HasFinished}"
+                      ToolTip.Tip="Takes the finished videos out of this list. They can be picked again on the Re-encode screen"/>
+              <TextBlock Text="{Binding FinishedTitle}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+            </DockPanel>
+          </Border>
+          <TextBlock DockPanel.Dock="Top" Classes="muted" Text="Nothing has finished yet." Margin="14,12" IsVisible="{Binding !HasFinished}"/>
+          <ListBox Classes="rows" ItemsSource="{Binding Finished}" Background="Transparent" IsVisible="{Binding HasFinished}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:EncodeQueueRow">
+                <Border Classes="qrow">
+                  <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+                    <Border Background="{DynamicResource Frame}" CornerRadius="3" Padding="3" VerticalAlignment="Center">
+                      <Image Classes="qshot" Source="{Binding Shot}" Stretch="UniformToFill"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                      <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                      <TextBlock Text="{Binding Folder}" Classes="muted small" TextTrimming="CharacterEllipsis"/>
+                      <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" FontSize="13" Classes.ok="{Binding IsDone}" Classes.bad="{Binding IsFailed}" Classes.skip="{Binding IsSkipped}"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Spacing="4">
+                      <TextBlock Text="{Binding ResultText}" HorizontalAlignment="Right" IsVisible="{Binding IsDone}"/>
+                      <TextBlock Text="{Binding WhenText}" Classes="muted small" HorizontalAlignment="Right"/>
+                      <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+                        <Button Classes="small" Content="Try again" Command="{Binding RetryCommand}" IsVisible="{Binding CanRetry}"/>
+                        <Button Classes="small" Content="Open folder" Command="{Binding ShowFolderCommand}"/>
+                      </StackPanel>
+                    </StackPanel>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </DockPanel>
+      </Border>
+    </Grid>
+
+    <!-- What FFmpeg said -->
+    <Expander Grid.Row="5" Header="Log" Margin="0,10,0,0" IsVisible="{Binding !IsEmpty}">
+      <Border Background="{DynamicResource Table}" CornerRadius="4" Padding="10,8" Height="170">
+        <ScrollViewer>
+          <SelectableTextBlock Text="{Binding Log}" FontFamily="Consolas, Menlo, monospace" FontSize="12" TextWrapping="Wrap"/>
+        </ScrollViewer>
+      </Border>
+    </Expander>
+  </Grid>
+</UserControl>

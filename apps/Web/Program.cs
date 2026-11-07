@@ -34,6 +34,7 @@ builder.WebHost.UseStaticWebAssets();
 
 var controller = AppController.Open(dataFolder, databaseFolder);
 controller.Scanner.ProgramName = "the web app";
+controller.Encoder.ProgramName = "the web app";
 builder.Services.AddSingleton(controller);
 // Keep the keys that protect forms in the data folder, so a restart (or a new container) doesn't break open pages
 builder.Services.AddDataProtection()
@@ -120,6 +121,10 @@ app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 
 string address = urls.Split(';')[0].Replace("0.0.0.0", Dns.GetHostName()).Replace("[::]", Dns.GetHostName());
 string openUrl = token == null ? address : $"{address}/?token={token}";
+// A server has nobody to press "Start" after a restart: the saved encode queue carries on by itself
+app.Lifetime.ApplicationStarted.Register(controller.Encoder.Start);
+// Stops FFmpeg and deletes its partial file; the rest of the queue is kept for the next start
+app.Lifetime.ApplicationStopping.Register(controller.Encoder.Shutdown);
 app.Lifetime.ApplicationStarted.Register(() =>
 {
     Console.WriteLine();

@@ -1,0 +1,174 @@
+@page "/encoding"
+@implements IDisposable
+@inject AppController App
+@inject NavigationManager Nav
+
+<PageTitle>Encoding</PageTitle>
+
+<div class="page">
+    <div class="page-head">
+        <div>
+            <h1>Encoding</h1>
+            <p>Videos you add on the Re-encode page wait here and are encoded one at a time, on the computer that runs this program. The queue is kept if the program restarts.</p>
+        </div>
+        <div class="inline">
+            @if (!p.Running && p.QueuedCount > 0)
+            {
+                <button class="primary big" @onclick="() => App.Encoder.Start()">Start encoding</button>
+            }
+            @if (p.Current != null)
+            {
+                <button class="big" @onclick="() => App.Encoder.SkipCurrent()" title="Gives up on the video being encoded (it is marked as skipped) and goes on with the next">Skip this video</button>
+            }
+            @if (p.Running)
+            {
+                <button class="big" @onclick="() => App.Encoder.Stop()" title="Stops encoding. The video being encoded goes back in the queue, and everything keeps waiting until you press Start">Stop</button>
+            }
+        </div>
+    </div>
+
+    @if (p.Items.Count == 0)
+    {
+        <div class="empty">
+            <h2>Nothing in the queue</h2>
+            <p>Pick videos on the Re-encode page and add them to the queue. They are encoded here, with progress.</p>
+            <button class="primary big" @onclick='() => Nav.NavigateTo("encode")'>Go to Re-encode</button>
+        </div>
+    }
+    else
+    {
+        <section class="panel" aria-live="polite">
+            <div class="phase active">
+                <div class="phase-head">
+                    <span class="phase-name">@EncodeText.Headline(p)</span>
+                    <span class="phase-pct num">@EncodeText.Percent(p.Fraction)</span>
+                </div>
+                <div class="bar" role="progressbar" aria-label="All videos in the queue" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@((int)Math.Floor(p.Fraction * 100))">
+                    <div style="width:@Width(p.Fraction)%"></div>
+                </div>
+                <div class="phase-detail"><span>@EncodeText.Totals(p)</span><span class="muted">@EncodeText.Left(p)</span></div>
+            </div>
+            <dl class="stats">
+                <div><dt>Time so far</dt><dd>@Fmt.Time(p.Elapsed)</dd></div>
+                @if (p.DoneCount > 0)
+                {
+                    <div><dt>Encoded</dt><dd>@Fmt.Size(p.DoneOriginalBytes) became @Fmt.Size(p.DoneNewBytes)</dd></div>
+                    <div><dt>Saved</dt><dd class="saved">@Fmt.Size(p.SavedBytes) (@EncodeText.Percent(p.DoneOriginalBytes, p.DoneNewBytes))</dd></div>
+                }
+            </dl>
+            @if (p.Error.Length > 0)
+            {
+                <div class="notice warn"><p><strong>Stopped:</strong> @p.Error</p></div>
+            }
+        </section>
+
+        @if (p.Current is { } now)
+        {
+            <section class="panel q-current" aria-live="polite">
+                <img src="shots/@(now.VideoId)_2.png" alt="" onerror="this.style.visibility='hidden'" />
+                <div>
+                    <div class="muted" style="font-size:.85rem">Encoding now</div>
+                    <div class="name">@now.FileName</div>
+                    <div class="muted" style="font-size:.85rem;word-break:break-all">@now.Folder</div>
+                    <div class="muted" style="font-size:.85rem">@Fmt.Size(now.SizeBytes), @Fmt.Duration(now.DurationSeconds) - @now.Summary</div>
+                    <div class="bar current" role="progressbar" aria-label="@now.FileName" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@((int)Math.Floor(now.Fraction * 100))" style="margin-top:10px">
+                        <div style="width:@Width(now.Fraction)%"></div>
+                    </div>
+                    <div style="margin-top:6px">@EncodeText.CurrentDetail(now)</div>
+                </div>
+            </section>
+        }
+
+        <section class="panel q-list">
+            <div class="q-head">
+                <h2>Waiting (@p.QueuedCount.ToString("N0"))</h2>
+                @if (p.QueuedCount > 0) { <button class="small" @onclick="() => App.Encoder.ClearQueued()" title="Takes every waiting video out of the queue">Clear waiting</button> }
+            </div>
+            @if (p.QueuedCount == 0)
+            {
+                <p class="muted">Nothing is waiting. Add more on the Re-encode page.</p>
+            }
+            else
+            {
+                var waiting = p.Items.Where(i => i.Status == EncodeItemStatus.Queued).ToList();
+                @foreach (var i in waiting.Take(waitShown))
+                {
+                    <div class="q-row" @key="i.Id">
+                        <img src="shots/@(i.VideoId)_2.png" alt="" loading="lazy" onerror="this.style.visibility='hidden'" />
+                        <div class="info"><div class="name">@i.FileName</div><div class="muted" style="font-size:.85rem;word-break:break-all">@i.Folder</div></div>
+                        <div class="num">@Fmt.Size(i.SizeBytes)<br /><small class="muted">@Fmt.Duration(i.DurationSeconds)</small></div>
+                        <button class="small" @onclick="() => App.Encoder.Remove(i.Id)" title="Take this video out of the queue">Remove</button>
+                    </div>
+                }
+                @if (waiting.Count > waitShown)
+                {
+                    <div class="more"><button @onclick="() => waitShown += 100">Show @Math.Min(100, waiting.Count - waitShown) more</button></div>
+                }
+            }
+        </section>
+
+        <section class="panel q-list">
+            <div class="q-head">
+                <h2>Finished (@p.FinishedCount.ToString("N0"))</h2>
+                @if (p.FinishedCount > 0) { <button class="small" @onclick="() => App.Encoder.ClearFinished()" title="Takes the finished videos out of this list. They can be picked again on the Re-encode page">Clear finished</button> }
+            </div>
+            @if (p.FinishedCount == 0)
+            {
+                <p class="muted">Nothing has finished yet.</p>
+            }
+            else
+            {
+                var finished = p.Items.Where(i => i.IsFinished).OrderByDescending(i => i.FinishedUtc).ToList();
+                @foreach (var i in finished.Take(doneShown))
+                {
+                    <div class="q-row" @key="i.Id">
+                        <img src="shots/@(i.VideoId)_2.png" alt="" loading="lazy" onerror="this.style.visibility='hidden'" />
+                        <div class="info">
+                            <div class="name">@i.FileName</div>
+                            <div class="muted" style="font-size:.85rem;word-break:break-all">@i.Folder</div>
+                            <div class="q-status @Css(i)">@EncodeText.Status(i)</div>
+                            @if (i.Status == EncodeItemStatus.Done) { <div class="muted" style="font-size:.85rem;word-break:break-all">Saved as @System.IO.Path.GetFileName(i.OutputPath)</div> }
+                        </div>
+                        <div class="num">
+                            @if (i.Status == EncodeItemStatus.Done) { <span>@Fmt.Size(i.SizeBytes) became @Fmt.Size(i.OutputBytes)</span><br /> }
+                            <small class="muted">@(i.FinishedUtc is DateTime t ? Fmt.When(t) : "")</small>
+                        </div>
+                        @if (i.Status != EncodeItemStatus.Done) { <button class="small" @onclick="() => App.Encoder.Retry(i.Id)">Try again</button> } else { <span></span> }
+                    </div>
+                }
+                @if (finished.Count > doneShown)
+                {
+                    <div class="more"><button @onclick="() => doneShown += 100">Show @Math.Min(100, finished.Count - doneShown) more</button></div>
+                }
+            }
+        </section>
+
+        <details class="panel q-log">
+            <summary style="cursor:pointer;font-weight:600">Log</summary>
+            <pre class="command" style="max-height:260px;overflow:auto">@string.Join("\n", p.Log)</pre>
+        </details>
+    }
+</div>
+
+@code {
+    private EncodeProgress p = new();
+    private int waitShown = 100, doneShown = 100;
+
+    protected override void OnInitialized()
+    {
+        p = App.Encoder.Current;
+        App.Encoder.ProgressChanged += OnProgress;
+    }
+
+    private void OnProgress(EncodeProgress progress)
+    {
+        p = progress;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private static string Width(double fraction) => (fraction * 100).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static string Css(EncodeItemInfo i) => i.Status switch { EncodeItemStatus.Done => "ok", EncodeItemStatus.Failed => "bad", _ => "skip" };
+
+    public void Dispose() => App.Encoder.ProgressChanged -= OnProgress;
+}

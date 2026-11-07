@@ -40,6 +40,85 @@ void Shot(string name)
     Console.WriteLine("saved " + name);
 }
 
+// SHOT_QUEUE=1 (with SHOT_FFMPEG=<folder with ffmpeg and ffprobe>, and an empty data folder): the whole encode queue for real -
+// makes a few clips, scans them, adds some to the queue in the Re-encode screen, then adds more while it runs
+if (Environment.GetEnvironmentVariable("SHOT_QUEUE") == "1")
+{
+    string ffSource = Environment.GetEnvironmentVariable("SHOT_FFMPEG")!;
+    string ffTarget = Path.Combine(FileHandler.AppFolder, "ffmpeg");
+    if (!File.Exists(FileHandler.FFmpegPath))
+    {
+        Directory.CreateDirectory(ffTarget);
+        foreach (var f in Directory.GetFiles(ffSource)) File.Copy(f, Path.Combine(ffTarget, Path.GetFileName(f)), true);
+    }
+    string videos = Path.Combine(FileHandler.AppFolder, "videos");
+    Directory.CreateDirectory(videos);
+    var gen = new ProcessEncodeRunner();
+    int[] lengths = { 140, 120, 100, 110, 130, 105 };
+    for (int n = 0; n < lengths.Length; n++)
+    {
+        string clip = Path.Combine(videos, $"Holiday clip {n + 1}.mp4");
+        if (File.Exists(clip)) continue;
+        gen.RunAsync(FileHandler.FFmpegPath, new[] { "-hide_banner", "-y", "-f", "lavfi", "-i", $"testsrc2=duration={lengths[n]}:size=1280x720:rate=25",
+            "-f", "lavfi", "-i", "sine=duration=" + lengths[n], "-shortest", "-c:v", "libx264", "-preset", "ultrafast", "-crf", (20 + n).ToString(), "-pix_fmt", "yuv420p", "-c:a", "aac", clip },
+            _ => { }, _ => { }, CancellationToken.None).GetAwaiter().GetResult();
+    }
+    string bad = Path.Combine(videos, "Broken download.mp4");
+    File.WriteAllText(bad, "this is not a video");
+    Console.WriteLine("clips made");
+
+    var settings = controller.Settings.Clone();
+    settings.contentFolders = new[] { videos };
+    settings.encodeSettings = new EncodeSettings { codec = "x264", preset = "veryfast", resolution = 720, crf = 24, container = "mp4" };
+    controller.SaveSettings(settings, PathMapper.Mappings);
+    controller.StartScan();
+    var scanStart = DateTime.UtcNow;
+    while ((controller.Scanner.IsRunning || controller.Scanner.Current.Phase == ScanPhase.Idle) && DateTime.UtcNow - scanStart < TimeSpan.FromMinutes(3)) Pump(200);
+    Console.WriteLine("scan: " + controller.Scanner.Current.Phase + " " + controller.Scanner.Current.Message);
+
+    vm.SelectedTab = MainViewModel.QueueTab; Pump(500); Shot("q_empty");
+    vm.SelectedTab = MainViewModel.EncodeTab; Pump(500);
+    var loadWait = DateTime.UtcNow;
+    while ((vm.Encode.Loading || vm.Encode.Rows.Count == 0) && DateTime.UtcNow - loadWait < TimeSpan.FromMinutes(1)) Pump(200);
+    vm.Encode.MinMb = 0; vm.Encode.MinKbps = 0; Pump(300);
+    Console.WriteLine($"picker: {vm.Encode.Rows.Count} videos, button '{vm.Encode.PrimaryText}'");
+    vm.Encode.RowClicked(vm.Encode.Rows[0], false);
+    vm.Encode.RowClicked(vm.Encode.Rows[2], true); Pump(300); Shot("q_picked");
+
+    vm.Encode.PrimaryCommand.Execute(null); Pump(400);
+    Console.WriteLine("after add: " + vm.Encode.Toast + " | " + vm.Encode.QueueSummary + " | queued rows " + vm.Encode.Rows.Count(r => r.IsQueued));
+    // A click on a queued row does nothing
+    vm.Encode.RowClicked(vm.Encode.Rows[0], false);
+    Console.WriteLine("click on queued row picks it: " + vm.Encode.Rows[0].IsPicked);
+    Shot("q_added");
+
+    // More, while the first batch runs: a video that cannot be encoded, and the rest of the list
+    controller.Encoder.Enqueue(new[] { new EncodeCandidate { Id = 99999, Path = bad, SizeBytes = 20, DurationSeconds = 30 } }, settings.EncodeOrDefault());
+    foreach (var row in vm.Encode.Rows.Where(r => !r.IsQueued)) vm.Encode.RowClicked(row, false);
+    vm.Encode.PrimaryCommand.Execute(null); Pump(400);
+    Console.WriteLine("second add: " + vm.Encode.Toast);
+
+    var run = DateTime.UtcNow;
+    while (!(controller.Encoder.Current.Current?.Fraction > 0.3) && DateTime.UtcNow - run < TimeSpan.FromMinutes(2)) Pump(100);
+    vm.SelectedTab = MainViewModel.QueueTab; Pump(300); Shot("q_running");
+    vm.Encode.HideQueued = true; vm.SelectedTab = MainViewModel.EncodeTab; Pump(400);
+    Console.WriteLine($"hide queued: {vm.Encode.Rows.Count} rows left"); Shot("q_picker_hidden");
+    vm.Encode.HideQueued = false; Pump(300); Shot("q_picker_greyed");
+
+    run = DateTime.UtcNow;
+    while (controller.Encoder.Current.Items.Count(i => i.IsFinished) < 3 && DateTime.UtcNow - run < TimeSpan.FromMinutes(3)) Pump(200);
+    vm.SelectedTab = MainViewModel.QueueTab; Pump(300); Shot("q_midway");
+
+    run = DateTime.UtcNow;
+    while (controller.Encoder.Current.PendingCount > 0 && DateTime.UtcNow - run < TimeSpan.FromMinutes(5)) Pump(200);
+    Pump(500); Shot("q_done");
+    var final = controller.Encoder.Current;
+    Console.WriteLine($"final: {EncodeText.Headline(final)} | {EncodeText.Totals(final)} | {EncodeText.Saved(final)}");
+    foreach (var i in final.Items) Console.WriteLine($"  {i.FileName}: {EncodeText.Status(i)}");
+    Console.WriteLine("part files left: " + Directory.GetFiles(videos, "*.part").Length);
+    controller.Encoder.Shutdown();
+    return;
+}
 if (scan)
 {
     vm.SelectedTab = 1;

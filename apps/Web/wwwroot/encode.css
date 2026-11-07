@@ -33,3 +33,30 @@ select { cursor: pointer; }
 button.small { padding: 3px 10px; font-size: .82rem; font-weight: 500; }
 button.danger-outline { color: var(--grease); border-color: var(--grease); background: var(--sheet); }
 button.danger-outline:hover:not(:disabled) { background: var(--grease-wash); border-color: var(--grease); }
+
+/* ---------- Encoding (the queue) ---------- */
+.enc-row.is-queued, .enc-row.is-queued:hover { opacity: .45; cursor: default; background: transparent; }
+.enc-row.is-queued input[type=checkbox] { opacity: .6; }
+.q-tag { color: var(--accent); font-weight: 600; font-size: .85rem; margin-top: 2px; }
+.q-current { display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: start; }
+.q-current img { width: 168px; height: 112px; object-fit: cover; display: block; background: var(--frame); border: 4px solid var(--frame); border-radius: 3px; }
+.q-current .name, .q-row .name { font-weight: 600; word-break: break-word; }
+.q-current .name { font-size: 1.1rem; }
+.bar.current > div { background: var(--keep); }
+.q-list .q-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.q-list .q-head h2 { margin: 0; }
+.q-row { display: grid; grid-template-columns: 96px 1fr 150px auto; gap: 14px; align-items: center; padding: 8px 0; }
+.q-row + .q-row { border-top: 1px solid var(--rule); }
+.q-row img { width: 96px; height: 64px; object-fit: cover; display: block; background: var(--frame); border-radius: 3px; }
+.q-row .num { text-align: right; }
+.q-status { font-size: .9rem; margin-top: 2px; word-break: break-word; }
+.q-status.ok { color: var(--keep); font-weight: 600; }
+.q-status.bad { color: var(--grease); font-weight: 600; }
+.q-status.skip { color: #8a4b00; font-weight: 600; }
+@media (prefers-color-scheme: dark) { .q-status.skip { color: #ffc46b; } }
+@media (max-width: 760px) {
+    .q-current { grid-template-columns: 1fr; }
+    .q-row { grid-template-columns: 72px 1fr auto; }
+    .q-row .num { display: none; }
+    .q-row img { width: 72px; height: 48px; }
+}

@@ -33,6 +33,11 @@ On Linux, also install FFmpeg (`sudo apt install ffmpeg`). If it is installed, i
 
 **Re-encoding:** the **Re-encode** screen lists the videos that aren't duplicates or broken, highest average bitrate first (those shrink the most). Pick videos (or "Select top 20") and press "Create encoding script" to get `output/encode_selected.ps1` (Windows) or `.sh` (Linux) with one FFmpeg command per video. The new files are saved next to the originals with a name ending like `_1080p_x265`; the originals are not changed. Nothing is encoded until you run the script. Only files the last scan found on disk are listed (the database also remembers moved and missing files - see [TECHNICAL.md](TECHNICAL.md)), and picked files are checked again when the script is made. Each video has "Exclude folder" (hides that folder until "Unhide folders"), "Copy path" and "Delete" (after a confirmation).
 
+**Encoding in the app:** by default the Re-encode screen does not make a script: the main button says **Add to queue**, and the picked videos are encoded for you with FFmpeg, one at a time, on the computer that runs the program (on a server, that is the server). Use the choice next to the button to create a script instead, for one batch; the default for that choice is set under **Settings > Re-encoding > When you pick videos to re-encode**.
+
+The **Encoding** screen (a menu item of its own, with the number of videos waiting) shows the whole queue: overall progress with time left and the space saved so far, the video being encoded now (percent, speed, frames per second, size so far, time left), the videos waiting (with "Remove"), the finished ones (new size, saved space, "Try again" for failures and skipped videos), a log of what FFmpeg said, and the buttons **Start**, **Stop** and **Skip this video**. You can keep adding videos on the Re-encode screen while it runs: they join the end of the queue, and videos in the queue are greyed out in the list (tick "Hide videos in the queue" to hide them). The queue is saved in `output/encodequeue.json` and survives a restart: the desktop app waits for you to press Start, the web app carries on by itself. Each video is written to a `.part` file next to the original and only gets its real name when FFmpeg has finished, so stopping, closing the program or a crash never leaves half a video with a real name. Originals are never changed or deleted. Settings are remembered per video when it is queued, so changing them later does not change what is already waiting.
+
+
 How it encodes is set under **Settings > Re-encoding**, each with a recommended default:
 
 | Setting | Choices | Default |
@@ -48,6 +53,7 @@ How it encodes is set under **Settings > Re-encoding**, each with a recommended 
 | Never overwrite existing files | on/off | on |
 | Leave out | file types, videos of N seconds or shorter | .mpg .mpeg .wmv, 2 s |
 | Extra video filter (advanced) | FFmpeg filter, e.g. `yadif` | none |
+| When you pick videos | encode here (queue), or create a script | encode here |
 
 These are stored as `encodeSettings` in `settings.json` (older files with `scale`, `compressionLevelcrf` and `compressionPreset` are converted). When that section exists, the command-line version also writes `output/encoding-template.ps1`/`.sh` with every video, highest bitrate first.
 

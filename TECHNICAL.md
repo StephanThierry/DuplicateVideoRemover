@@ -40,6 +40,39 @@ one of those videos has to be read again. Do not run it automatically, and do no
 
 Rows are only deleted from the database when the program deletes the file itself (Review, Re-encode).
 
+## The encode queue
+
+`EncodeEngine` (Core/EncodeEngine.cs) is owned by `AppController.Encoder`, so there is one queue per process and
+the web and desktop screens only subscribe to it (`ProgressChanged`, an `EncodeProgress` snapshot, a few times a
+second from a background thread - screens coalesce it onto their UI thread).
+
+- **One video at a time.** Videos are added at any time (`Enqueue`, also while it runs) and run in order.
+  Statuses: Queued, Running, Done, Failed, Skipped. `Stop` puts the running video back as Queued and halts;
+  `Start` resumes; `SkipCurrent` marks the running one Skipped; `Remove` / `ClearQueued` / `ClearFinished` / `Retry`.
+  Adding while halted does not start it. A path that is queued, running or done is not added twice.
+- **FFmpeg is run directly**, not through a script: `EncodePlanner.Arguments(input, settings, partOutput)` is the same
+  argument list the scripts use, plus `-progress pipe:1 -nostats -nostdin`. Progress comes from the `key=value`
+  blocks on stdout (`FfmpegProgressParser`: `out_time_us`, `fps`, `speed`, `total_size`; early blocks hold `N/A`).
+  Percent is `out_time` over the duration already in the database. stderr goes to the log and the failure message.
+- **`.part` files.** The output is written to `<new name>.part` with `-f mp4|matroska` named explicitly, and renamed
+  when FFmpeg exits with 0. The `.part` extension keeps a scan that runs at the same time from picking up half a
+  video, which is why scans and encodes are not made to exclude each other. A stop, skip or failure deletes the
+  `.part` file (with retries: FFmpeg may still hold it). Stale ones left by a crash are deleted at the next start
+  and before each video is encoded.
+- **The queue is saved** to `output/encodequeue.json` (data folder, per installation, like `lastscan.json`) on
+  every status change, written to a temp file and moved into place. After a restart a video that was running is
+  Queued again and nothing starts by itself (`Halted`); the web app calls `Start()` when it has started, because a
+  server has nobody to press the button. The saved state does not remember a deliberate Stop, so a restart after
+  a Stop carries on in the web app. At most 300 finished videos are kept.
+- **Per video settings.** `EncodeSettings` are cloned into each queue item, so later changes do not alter what waits.
+- **`encode.lock`** (next to `encodequeue.json`; the `ScanLock` mechanism with a heartbeat) stops two programs that
+  share a data folder from working the same queue. The encoder does not touch the database.
+- **Time left** is the speed of this run so far (video seconds encoded per second of work, the running video counted as
+  far as it got) applied to the video seconds left, so long videos weigh more than short ones.
+- **Tests.** `tests/CoreTests` (`dotnet test tests/CoreTests`): the parser, the arguments, and the engine with a fake
+  runner (`IEncodeRunner`); two tests encode and stop a real clip when `ffmpeg/ffmpeg(.exe)` exists in the repo.
+  `SHOT_QUEUE=1` in `tests/DesktopShots` runs the whole thing through the desktop UI (see Program.cs).
+
 ## Recognising a video when its path changes
 
 Paths change (moves, renames, drive letters), so anything that must follow a video across moves uses a
@@ -54,6 +87,7 @@ use it. Database ids are not stable either: a moved file gets a new row and a ne
 | `settings.json`, `pathmapping.json` | data folder | settings, Windows/Linux path pairs and synonyms |
 | `output/results.json` | data folder | the last results shown in Review |
 | `output/lastscan.json` | data folder | the files the last scan found on disk |
+| `output/encodequeue.json`, `output/encode.lock` | data folder | the encode queue, and who is working it |
 | `deepdupes.db`, `_screens/` | database folder | the read cache and screenshots (named by row id) |
 | `runhistory.json` | database folder | scan timings for estimates |
 | `falsepositives.json` | database folder | pairs marked "False positive", by fingerprint |

@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:DuplicateVideoRemover.Desktop.ViewModels"
+             xmlns:core="using:deepduplicates"
              x:Class="DuplicateVideoRemover.Desktop.Views.EncodeView"
              x:DataType="vm:EncodeViewModel">
   <UserControl.Styles>
@@ -11,6 +12,9 @@
       <Setter Property="BorderBrush" Value="{DynamicResource Rule}"/><Setter Property="BorderThickness" Value="0,0,0,1"/></Style>
     <Style Selector="Border.encrow:pointerover"><Setter Property="Background" Value="{DynamicResource Table}"/></Style>
     <Style Selector="Border.encrow.picked"><Setter Property="Background" Value="{DynamicResource KeepWash}"/></Style>
+    <!-- In the encode queue: greyed out, not clickable -->
+    <Style Selector="Border.encrow.queued"><Setter Property="Opacity" Value="0.45"/><Setter Property="Cursor" Value="Arrow"/></Style>
+    <Style Selector="Border.encrow.queued:pointerover"><Setter Property="Background" Value="{DynamicResource Sheet}"/></Style>
     <!-- Smaller screenshots in a narrow window; the number columns are only as wide as their contents -->
     <Style Selector="Image.shot"><Setter Property="Width" Value="96"/><Setter Property="Height" Value="64"/></Style>
     <ContainerQuery Name="enc" Query="max-width:1000">
@@ -23,15 +27,22 @@
     <StackPanel Grid.Row="0" Margin="0,0,0,12">
       <TextBlock Classes="h1" Text="Re-encode"/>
       <TextBlock Classes="muted" TextWrapping="Wrap" Margin="0,4,0,0"
-                 Text="Videos with the highest bitrate first - they usually shrink the most. Click a video to pick it, Shift-click to pick everything in between, then create the encoding script."/>
+                 Text="Videos with the highest bitrate first - they usually shrink the most. Click a video to pick it, Shift-click to pick everything in between, then add them to the encode queue (or create a script)."/>
     </StackPanel>
 
     <Border Grid.Row="1" Classes="panel" Padding="16,12" Margin="0,0,0,12">
-      <WrapPanel>
-        <TextBlock Text="{Binding SettingsSummary}" FontWeight="SemiBold" Margin="0,0,14,0" VerticalAlignment="Center"/>
-        <TextBlock Text="{Binding QualitySummary}" Classes="muted" Margin="0,0,14,0" VerticalAlignment="Center"/>
-        <Button Classes="link" Content="Change in Settings" Command="{Binding EditSettingsCommand}"/>
-      </WrapPanel>
+      <StackPanel Spacing="6">
+        <WrapPanel>
+          <TextBlock Text="{Binding SettingsSummary}" FontWeight="SemiBold" Margin="0,0,14,0" VerticalAlignment="Center"/>
+          <TextBlock Text="{Binding QualitySummary}" Classes="muted" Margin="0,0,14,0" VerticalAlignment="Center"/>
+          <Button Classes="link" Content="Change in Settings" Command="{Binding EditSettingsCommand}"/>
+        </WrapPanel>
+        <!-- What is in the encode queue right now -->
+        <WrapPanel IsVisible="{Binding HasQueueSummary}">
+          <TextBlock Text="{Binding QueueSummary}" Margin="0,0,14,0" VerticalAlignment="Center"/>
+          <Button Classes="link" Content="Open Encoding" Command="{Binding OpenQueueCommand}"/>
+        </WrapPanel>
+      </StackPanel>
     </Border>
 
     <Border Grid.Row="2" IsVisible="{Binding HasResult}" Background="{DynamicResource KeepWash}" CornerRadius="10" Padding="16,12" Margin="0,0,0,12">
@@ -47,6 +58,7 @@
       <Button Content="Select top 20" Command="{Binding SelectTopCommand}" Margin="0,0,8,6"/>
       <Button Content="Select none" Command="{Binding SelectNoneCommand}" IsEnabled="{Binding HasPicked}" Margin="0,0,8,6"/>
       <Button Content="{Binding UnhideText}" Command="{Binding UnhideFoldersCommand}" IsVisible="{Binding HasHidden}" Margin="0,0,8,6"/>
+      <CheckBox Content="Hide videos in the queue" IsChecked="{Binding HideQueued}" IsVisible="{Binding HasQueueSummary}" Margin="0,0,8,6"/>
       <Panel Width="8"/>
       <TextBlock Text="Only above" VerticalAlignment="Center" Margin="0,0,6,6"/>
       <NumericUpDown Value="{Binding MinKbps}" Minimum="0" Increment="500" FormatString="0" Width="140" Margin="0,0,6,6"/>
@@ -90,7 +102,7 @@
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="vm:EncodeRow">
               <!-- The whole row is clickable; Shift-click picks a range (see EncodeView.axaml.cs) -->
-              <Border Classes="encrow" Classes.picked="{Binding IsPicked}" PointerPressed="Row_PointerPressed" Cursor="Hand">
+              <Border Classes="encrow" Classes.picked="{Binding IsPicked}" Classes.queued="{Binding IsQueued}" PointerPressed="Row_PointerPressed" Cursor="Hand">
                 <Grid ColumnSpacing="12">
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="32"/>
@@ -101,7 +113,7 @@
                     <ColumnDefinition Width="Auto" MinWidth="80" SharedSizeGroup="size"/>
                     <ColumnDefinition Width="Auto" MinWidth="110" SharedSizeGroup="estimate"/>
                   </Grid.ColumnDefinitions>
-                  <CheckBox IsChecked="{Binding IsPicked}" IsHitTestVisible="False" VerticalAlignment="Center"/>
+                  <CheckBox IsChecked="{Binding IsPicked}" IsEnabled="{Binding !IsQueued}" IsHitTestVisible="False" VerticalAlignment="Center"/>
                   <Border Grid.Column="1" Background="{DynamicResource Frame}" CornerRadius="3" Padding="4" HorizontalAlignment="Left">
                     <StackPanel Orientation="Horizontal" Spacing="3">
                       <Image Classes="shot" Source="{Binding Shot1}" Stretch="UniformToFill"/>
@@ -117,6 +129,7 @@
                     <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                     <TextBlock Text="{Binding Folder}" Classes="muted small" TextTrimming="CharacterEllipsis"/>
                     <TextBlock Text="{Binding Length}" Classes="muted small"/>
+                    <TextBlock Text="{Binding QueueLabel}" FontWeight="SemiBold" Foreground="{DynamicResource Accent}" IsVisible="{Binding IsQueued}"/>
                     <!-- Buttons take the click, so they don't pick the row -->
                     <WrapPanel Orientation="Horizontal" ItemSpacing="6" LineSpacing="6" Margin="0,4,0,0">
                       <Button Classes="small" Content="Exclude folder" Command="{Binding ExcludeFolderCommand}" ToolTip.Tip="{Binding Folder, StringFormat='Hide every video in {0}'}"/>
@@ -140,7 +153,11 @@
 
     <Border Grid.Row="5" Background="{DynamicResource Sheet}" BorderBrush="{DynamicResource Rule}" BorderThickness="0,1,0,0" Padding="16,12" Margin="-12,12,-12,0" IsVisible="{Binding HasVideos}">
       <DockPanel>
-        <Button DockPanel.Dock="Right" Classes="primary" Content="Create encoding script" Command="{Binding AskCreateCommand}" IsEnabled="{Binding HasPicked}" FontSize="15" Padding="18,8"/>
+        <Button DockPanel.Dock="Right" Classes="primary" Content="{Binding PrimaryText}" Command="{Binding PrimaryCommand}" IsEnabled="{Binding HasPicked}" FontSize="15" Padding="18,8"/>
+        <!-- Per batch: encode here in the queue, or create a script (the default is set in Settings) -->
+        <ComboBox DockPanel.Dock="Right" ItemsSource="{Binding RunModes}" SelectedItem="{Binding RunMode}" Margin="0,0,10,0" VerticalAlignment="Center" MinWidth="280">
+          <ComboBox.ItemTemplate><DataTemplate x:DataType="core:ChoiceOption"><TextBlock Text="{Binding Label}"/></DataTemplate></ComboBox.ItemTemplate>
+        </ComboBox>
         <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
           <TextBlock Text="{Binding PickedText}" FontSize="16" FontWeight="SemiBold"/>
           <TextBlock Text="{Binding PickedSize}" Classes="muted" VerticalAlignment="Bottom"/>

@@ -9,7 +9,7 @@
     <div class="page-head">
         <div>
             <h1>Re-encode</h1>
-            <p>Videos with the highest bitrate first - they usually shrink the most. Click a video to pick it, Shift-click to pick everything in between, then create the encoding script.</p>
+            <p>Videos with the highest bitrate first - they usually shrink the most. Click a video to pick it, Shift-click to pick everything in between, then add them to the encode queue (or create a script).</p>
         </div>
     </div>
 
@@ -20,6 +20,14 @@
             <span class="muted">Speed: @enc.preset, @(enc.audio == "copy" ? "original sound" : "AAC sound"), @enc.container.ToUpperInvariant()</span>
             <button class="link" @onclick='() => Nav.NavigateTo("settings#encoding")'>Change in Settings</button>
         </div>
+        @* What is in the encode queue right now *@
+        @if (queueMap.Count > 0)
+        {
+            <div class="enc-summary" style="margin-top:8px">
+                <span>@QueueSummary()</span>
+                <button class="link" @onclick='() => Nav.NavigateTo("encoding")'>Open Encoding</button>
+            </div>
+        }
     </div>
 
     @if (scriptPath != null)
@@ -55,6 +63,10 @@
             {
                 <button @onclick="() => { hidden.Clear(); ResetPaging(); }" title="@string.Join("\n", hidden)">Unhide folders (@hidden.Count)</button>
             }
+            @if (queueMap.Count > 0)
+            {
+                <label class="inline"><input type="checkbox" checked="@hideQueued" @onchange="e => { hideQueued = (bool)e.Value!; ResetPaging(); }" /> Hide videos in the queue</label>
+            }
             <label class="inline">Only above <input type="number" min="0" step="500" @bind="minKbps" @bind:after="ResetPaging" aria-label="Minimum bitrate" /> kbit/s</label>
             <label class="inline">and above <input type="number" min="0" step="50" @bind="minMb" @bind:after="ResetPaging" aria-label="Minimum file size in MB" /> MB</label>
             <input type="search" placeholder="Filter by file or folder name" @bind="search" @bind:event="oninput" @bind:after="ResetPaging" aria-label="Filter by file or folder name" />
@@ -67,16 +79,18 @@
             @foreach (var c in visible.Take(shown))
             {
                 bool on = picked.Contains(c.Id);
+                bool queued = queueMap.TryGetValue(c.Path, out var queueState);
                 long est = EncodeEstimator.EstimatedBytes(c, enc, targetKbps);
-                <div class="enc-row @(on ? "is-picked" : "")" @key="c.Id" @onclick="e => RowClick(c.Id, e)" role="checkbox" aria-checked="@(on ? "true" : "false")" tabindex="0"
+                <div class="enc-row @(on ? "is-picked" : "") @(queued ? "is-queued" : "")" @key="c.Id" @onclick="e => RowClick(c.Id, e)" role="checkbox" aria-checked="@(on ? "true" : "false")" aria-disabled="@(queued ? "true" : null)" tabindex="0"
                      @onkeydown="e => RowKey(c.Id, e)" aria-label="@c.FileName">
-                    <input type="checkbox" checked="@on" tabindex="-1" aria-hidden="true" />
+                    <input type="checkbox" checked="@on" disabled="@queued" tabindex="-1" aria-hidden="true" />
                     <div class="enc-strip">
                         @for (int i = 1; i <= 3; i++) { <img loading="lazy" src="shots/@(c.Id)_@(i).png" alt="" onerror="this.style.visibility='hidden'" /> }
                     </div>
                     <button class="icon" @onclick="() => playing = ToEntry(c)" @onclick:stopPropagation="true" @onkeydown:stopPropagation="true" title="Play" aria-label="Play @c.FileName">@VideoPlayer.Icon</button>
                     <div class="info">
                         <div class="name">@c.FileName</div><div class="muted" style="font-size:.85rem;word-break:break-all">@c.Folder</div><div class="muted" style="font-size:.85rem">@Fmt.Duration(c.DurationSeconds)</div>
+                        @if (queued) { <div class="q-tag">@QueueLabel(queueState)</div> }
                         <div class="enc-actions" @onclick:stopPropagation="true" @onkeydown:stopPropagation="true">
                             <button class="small" @onclick="() => HideFolder(c.Folder)" title="Hide every video in @c.Folder">Exclude folder</button>
                             <button class="small" @onclick="() => CopyPath(c)" title="Copy the full path">Copy path</button>
@@ -100,7 +114,11 @@
                     @Fmt.Plural(picked.Count, "video", "videos") picked
                     <small>@Fmt.Size(PickedBytes) now, about @Fmt.Size(PickedEstimate) after. Saves about @Fmt.Size(PickedBytes - PickedEstimate)@PercentText(PickedBytes, PickedEstimate)</small>
                 </div>
-                <button class="primary big" style="margin-left:auto" disabled="@(picked.Count == 0)" @onclick="() => confirming = true">Create encoding script</button>
+                @* Per batch: encode here in the queue, or create a script (the default is set in Settings) *@
+                <select style="margin-left:auto" @bind="runMode" aria-label="What to do with the picked videos">
+                    @foreach (var m in EncodeOptions.RunModes) { <option value="@m.Id">@m.Label</option> }
+                </select>
+                <button class="primary big" disabled="@(picked.Count == 0)" @onclick="Primary">@(runMode == "run" ? "Add to queue" : "Create encoding script")</button>
             </div>
         </div>
     }
@@ -138,7 +156,7 @@
 
 @if (toast != null)
 {
-    <div class="toast" role="status">@toast</div>
+    <div class="toast" role="status">@toast @if (toastQueueLink) { <button class="link" @onclick='() => Nav.NavigateTo("encoding")'>Open Encoding</button> }</div>
 }
 
 @code {
@@ -165,24 +183,61 @@
     private int? anchorId;          // last clicked video, for Shift-click ranges
     private bool anchorState = true;
 
+    // The encode queue: videos in it are greyed out here (and can be hidden)
+    private Dictionary<string, EncodeItemStatus> queueMap = new();
+    private bool hideQueued;
+    private string queueSig = "";
+    private string runMode = EncodeOptions.DefaultRunMode;   // per batch; starts as the saved default
+    private string lastDefaultMode = "";
+    private bool toastQueueLink;
+
     protected override async Task OnInitializedAsync()
     {
         App.DataChanged += OnDataChanged;
+        App.Encoder.ProgressChanged += OnQueue;
+        RefreshQueue();
         await Load();
     }
+
+    // Progress ticks change nothing here: only when videos join the queue, start or finish
+    private void OnQueue(EncodeProgress p)
+    {
+        if (QueueSignature(p) == queueSig) return;
+        InvokeAsync(() => { RefreshQueue(); StateHasChanged(); });
+    }
+
+    private static string QueueSignature(EncodeProgress p) => $"{p.Items.Count}|{p.QueuedCount}|{p.Current?.Id}|{p.DoneCount}";
+
+    private void RefreshQueue()
+    {
+        var p = App.Encoder.Current;
+        queueSig = QueueSignature(p);
+        queueMap = p.StatusByPath();
+        if (candidates != null) picked.ExceptWith(candidates.Where(c => queueMap.ContainsKey(c.Path)).Select(c => c.Id));
+    }
+
+    private string QueueSummary()
+    {
+        int waiting = queueMap.Values.Count(s => s == EncodeItemStatus.Queued), running = queueMap.Values.Count(s => s == EncodeItemStatus.Running), done = queueMap.Values.Count(s => s == EncodeItemStatus.Done);
+        return "Encode queue: " + string.Join(", ", new[] { running > 0 ? "1 encoding" : null, waiting > 0 ? $"{waiting:N0} waiting" : null, done > 0 ? $"{done:N0} done" : null }.Where(x => x != null)) + ".";
+    }
+
+    private static string QueueLabel(EncodeItemStatus s) => s switch { EncodeItemStatus.Queued => "In the queue", EncodeItemStatus.Running => "Encoding now", _ => "Encoded" };
 
     private async Task Load()
     {
         enc = App.Settings.EncodeOrDefault();
+        if (enc.runMode != lastDefaultMode) { lastDefaultMode = enc.runMode; runMode = enc.runMode; }
         targetKbps = EncodeEstimator.TargetKbps(enc);
         candidates = await Task.Run(App.EncodeCandidates);
         picked.IntersectWith(candidates.Select(c => c.Id));
+        RefreshQueue();
     }
 
     private void OnDataChanged() => InvokeAsync(async () => { await Load(); StateHasChanged(); });
 
     private IEnumerable<EncodeCandidate> Visible() => (candidates ?? new()).Where(c =>
-        c.AverageKbps >= minKbps && c.SizeBytes >= (long)minMb * 1024 * 1024 && !hidden.Contains(c.Folder) &&
+        !(hideQueued && queueMap.ContainsKey(c.Path)) && c.AverageKbps >= minKbps && c.SizeBytes >= (long)minMb * 1024 * 1024 && !hidden.Contains(c.Folder) &&
         (string.IsNullOrWhiteSpace(search) || c.Path.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase)));
 
     private long PickedBytes => candidates?.Where(c => picked.Contains(c.Id)).Sum(c => c.SizeBytes) ?? 0;
@@ -199,12 +254,13 @@
     private void RowClick(int id, MouseEventArgs e)
     {
         var visible = Visible().ToList();
+        if (visible.FirstOrDefault(c => c.Id == id) is { } clicked && queueMap.ContainsKey(clicked.Path)) return;   // already in the queue
         if (e.ShiftKey && anchorId is int anchor)
         {
             int a = visible.FindIndex(c => c.Id == anchor), b = visible.FindIndex(c => c.Id == id);
             if (a >= 0 && b >= 0)
             {
-                foreach (var c in visible.Skip(Math.Min(a, b)).Take(Math.Abs(a - b) + 1))
+                foreach (var c in visible.Skip(Math.Min(a, b)).Take(Math.Abs(a - b) + 1).Where(c => !queueMap.ContainsKey(c.Path)))
                     if (anchorState) picked.Add(c.Id); else picked.Remove(c.Id);
                 return;
             }
@@ -219,9 +275,9 @@
         if (e.Key == " " || e.Key == "Enter") RowClick(id, new MouseEventArgs { ShiftKey = e.ShiftKey });
     }
 
-    private void SelectTop(int n) { foreach (var c in Visible().Take(n)) picked.Add(c.Id); }
+    private void SelectTop(int n) { foreach (var c in Visible().Where(c => !queueMap.ContainsKey(c.Path)).Take(n)) picked.Add(c.Id); }
 
-    private void SelectVisible() { foreach (var c in Visible()) picked.Add(c.Id); }
+    private void SelectVisible() { foreach (var c in Visible().Where(c => !queueMap.ContainsKey(c.Path))) picked.Add(c.Id); }
 
     private void ResetPaging() => shown = 100;
 
@@ -255,13 +311,37 @@
         ShowToast($"Deleted {c.FileName} ({Fmt.Size(c.SizeBytes)}).");
     }
 
-    private void ShowToast(string text, int ms = 4000)
+    private void ShowToast(string text, int ms = 4000, bool queueLink = false)
     {
         toast = text;
+        toastQueueLink = queueLink;
         toastTimer?.Cancel();
         toastTimer = new CancellationTokenSource();
         var token = toastTimer.Token;
         _ = Task.Delay(ms, token).ContinueWith(t => { if (t.IsCanceled) return; toast = null; InvokeAsync(StateHasChanged); });
+    }
+
+    // The main button: add the picked videos to the encode queue, or ask before creating the script
+    private void Primary()
+    {
+        if (runMode == "run") AddToQueue(); else confirming = true;
+    }
+
+    private void AddToQueue()
+    {
+        // In list order: highest bitrate first
+        var videos = (candidates ?? new()).Where(c => picked.Contains(c.Id) && !queueMap.ContainsKey(c.Path)).ToList();
+        if (videos.Count == 0) return;
+        var result = App.EnqueueEncode(videos);
+        // Files that are gone since the scan are not queued and leave the list
+        foreach (var gone in result.Missing) { candidates?.RemoveAll(c => c.Id == gone.Id); picked.Remove(gone.Id); }
+        picked.Clear();
+        RefreshQueue();
+        var parts = new List<string> { $"Added {Fmt.Plural(result.Added, "video", "videos")} to the queue." };
+        if (result.AlreadyThere > 0) parts.Add($"{Fmt.Plural(result.AlreadyThere, "was", "were")} in it already.");
+        if (result.Missing.Count > 0) parts.Add($"{Fmt.Plural(result.Missing.Count, "file was", "files were")} not found any more and left out.");
+        if (App.Encoder.Current.Halted && App.Encoder.Current.QueuedCount > 0) parts.Add("The queue is stopped: press Start on the Encoding page.");
+        ShowToast(string.Join(" ", parts), result.Missing.Count > 0 ? 10000 : 6000, queueLink: true);
     }
 
     private void Create()
@@ -282,6 +362,7 @@
     public void Dispose()
     {
         App.DataChanged -= OnDataChanged;
+        App.Encoder.ProgressChanged -= OnQueue;
         toastTimer?.Cancel();
     }
 }
