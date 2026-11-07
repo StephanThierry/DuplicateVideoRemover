@@ -346,7 +346,7 @@
                               <TextBlock Text="over" VerticalAlignment="Center" Margin="6,0"/>
                               <TextBox Text="{Binding Down}" Width="90"/>
                               <TextBlock Text="when sizes differ by less than" VerticalAlignment="Center" Margin="6,0"/>
-                              <NumericUpDown Value="{Binding Percent}" Minimum="0" Maximum="100" FormatString="0" Width="110"/>
+                              <NumericUpDown Value="{Binding Percent}" Minimum="0" FormatString="0" Width="110"/>
                               <TextBlock Text="%" VerticalAlignment="Center" Margin="6,0"/>
                               <Button Content="Remove" Command="{Binding #Root.((vm:SettingsViewModel)DataContext).RemoveSwitchCommand}" CommandParameter="{Binding}"/>
                             </WrapPanel>
