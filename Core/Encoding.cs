@@ -53,6 +53,14 @@ namespace deepduplicates
             new("mkv", "MKV"),
         };
 
+        /// <summary>What "Re-encode" does with the videos you pick.</summary>
+        public static readonly ChoiceOption[] RunModes =
+        {
+            new("run", "Encode here in the app - recommended"),
+            new("script", "Create a script that I run myself"),
+        };
+        public const string DefaultRunMode = "run";
+
         public static CodecOption Codec(string id) => Codecs.FirstOrDefault(c => c.Id == id) ?? Codecs[0];
 
         public static int NearestResolution(int height) =>
@@ -153,8 +161,21 @@ namespace deepduplicates
             return Path.Combine(dir, Path.GetFileNameWithoutExtension(input) + e.EffectiveSuffix + "." + e.container);
         }
 
-        /// <summary>The FFmpeg arguments for one video.</summary>
-        public static List<string> Arguments(string input, EncodeSettings e)
+        /// <summary>The FFmpeg arguments for one video (as written in the script).</summary>
+        public static List<string> Arguments(string input, EncodeSettings e) => Arguments(input, e, null);
+
+        /// <summary>The temporary file an encode is written to before it gets its final name.</summary>
+        public static string PartPath(string output) => output + ".part";
+
+        /// <summary>FFmpeg's name for the container, needed when the file does not end in .mp4 / .mkv.</summary>
+        public static string FormatName(EncodeSettings e) => e.container == "mkv" ? "matroska" : "mp4";
+
+        /// <summary>
+        /// The FFmpeg arguments for one video. With <paramref name="partOutput"/> (the app's own encoding) the video is
+        /// written there with its container named explicitly, always overwriting (the caller has already decided about
+        /// an existing result), and FFmpeg reports its progress on standard output.
+        /// </summary>
+        public static List<string> Arguments(string input, EncodeSettings e, string partOutput)
         {
             var codec = EncodeOptions.Codec(e.codec);
             // Scale to the target height keeping the aspect ratio (width divisible by 2); never enlarge.
@@ -162,13 +183,16 @@ namespace deepduplicates
             string scale = $"scale=-2:min({e.resolution}\\,ih)";
             string filter = string.IsNullOrWhiteSpace(e.extraFilter) ? scale : e.extraFilter + "," + scale;
 
-            var args = new List<string> { e.neverOverwrite ? "-n" : "-y", "-i", input, "-map", "0:v:0", "-map", "0:a?",
-                "-c:v", codec.Encoder, "-crf", e.crf.ToString(), "-preset", e.preset, "-vf", filter, "-pix_fmt", "yuv420p" };
+            var args = new List<string>();
+            if (partOutput != null) args.AddRange(new[] { "-hide_banner", "-nostdin", "-progress", "pipe:1", "-nostats" });
+            args.AddRange(new[] { partOutput != null ? "-y" : e.neverOverwrite ? "-n" : "-y", "-i", input, "-map", "0:v:0", "-map", "0:a?",
+                "-c:v", codec.Encoder, "-crf", e.crf.ToString(), "-preset", e.preset, "-vf", filter, "-pix_fmt", "yuv420p" });
             if (codec.Id == "x265" && e.container == "mp4" && e.appleCompatible) args.AddRange(new[] { "-tag:v", "hvc1" });
             if (e.audio == "aac") args.AddRange(new[] { "-c:a", "aac", "-b:a", "160k" });
             else args.AddRange(new[] { "-c:a", "copy" });
             if (e.container == "mp4") args.AddRange(new[] { "-movflags", "+faststart" });
-            args.Add(OutputPath(input, e));
+            if (partOutput != null) args.AddRange(new[] { "-f", FormatName(e), partOutput });
+            else args.Add(OutputPath(input, e));
             return args;
         }
 

@@ -106,6 +106,9 @@ namespace deepduplicates
             return (instance);
         }
 
+        /// <summary>Where the program's own ffmpeg is (the ffmpeg folder next to the data).</summary>
+        public static string FFmpegPath => Path.Combine(appFolder, "ffmpeg", OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg");
+
         /// <summary>Makes sure ffmpeg/ffprobe are available (system install on Linux, else downloaded).</summary>
         public static async Task EnsureFFmpegAsync()
         {

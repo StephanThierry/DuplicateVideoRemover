@@ -8,6 +8,9 @@ namespace deepduplicates
     /// <summary>The encoding script: where it was written (null when nothing was left), how many videos, and the missing files left out.</summary>
     public sealed record EncodeScriptResult(string Path, int Videos, List<EncodeCandidate> Missing);
 
+    /// <summary>What happened when videos were added to the encode queue.</summary>
+    public sealed record EncodeQueueResult(int Added, int AlreadyThere, List<EncodeCandidate> Missing);
+
     /// <summary>A false positive with the two videos as they are in the database now (null when gone).</summary>
     public sealed record FalsePositiveDetail(FalsePositive Pair, VideoEntry NowA, VideoEntry NowB)
     {
@@ -31,6 +34,8 @@ namespace deepduplicates
         /// <summary>True when settings.json did not exist and was created with defaults.</summary>
         public bool IsFirstRun { get; }
         public ScanEngine Scanner { get; } = new();
+        /// <summary>The encode queue (Re-encode adds videos, the Encoding screen shows it).</summary>
+        public EncodeEngine Encoder { get; }
         public ResultSession Session { get; private set; }
 
         /// <summary>Raised when there is a new review session (after a scan, or new results).</summary>
@@ -51,6 +56,7 @@ namespace deepduplicates
             try { if (UseMainNames(Settings)) FileHandler.SaveSettings(Settings); }
             catch (Exception e) { Console.WriteLine("Could not update the rules to the main names: " + e.Message); }
             Session = new ResultSession(ResultSet.LoadSaved());
+            Encoder = new EncodeEngine(Path.Combine(FileHandler.AppFolder, "output", "encodequeue.json"), PrepareFFmpeg);
             Scanner.Completed += results =>
             {
                 InvalidateCache();
@@ -255,6 +261,27 @@ namespace deepduplicates
         }
 
         public const string EncodeScriptName = "encode_selected";
+
+        /// <summary>
+        /// Adds videos to the encode queue (it starts by itself unless it was stopped), with the saved encode
+        /// settings. Files that no longer exist are not added and are counted in Missing.
+        /// </summary>
+        public EncodeQueueResult EnqueueEncode(IEnumerable<EncodeCandidate> videos)
+        {
+            var list = videos.ToList();
+            var exists = LastScan.Exist(list.Select(c => c.Path).ToList());
+            var present = list.Where((c, i) => exists[i]).ToList();
+            var missing = list.Where((c, i) => !exists[i]).ToList();
+            var added = present.Count == 0 ? new EnqueueResult(0, 0) : Encoder.Enqueue(present, Settings.EncodeOrDefault());
+            return new EncodeQueueResult(added.Added, added.AlreadyThere, missing);
+        }
+
+        // The program's own ffmpeg is used when it is there; only a missing one is fetched (works offline afterwards)
+        private static async System.Threading.Tasks.Task<string> PrepareFFmpeg()
+        {
+            if (!File.Exists(FileHandler.FFmpegPath)) await FileHandler.EnsureFFmpegAsync();
+            return FileHandler.FFmpegPath;
+        }
 
         /// <summary>
         /// Rewrites the stored paths under the synonym's alias to its main name (see SynonymTools.Update).

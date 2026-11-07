@@ -100,6 +100,8 @@ namespace deepduplicates
         public int minDurationSeconds { get; set; }
         /// <summary>Advanced: extra FFmpeg video filter, applied before scaling (e.g. "yadif" to deinterlace).</summary>
         public string extraFilter { get; set; }
+        /// <summary>"run" encodes in the app (queue), "script" creates a script to run yourself. Can be changed per run.</summary>
+        public string runMode { get; set; }
 
         // Older settings files (read only; converted by Normalize)
         [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
@@ -147,6 +149,7 @@ namespace deepduplicates
             skipExtensions ??= new[] { ".mpg", ".mpeg", ".wmv" };
             if (minDurationSeconds <= 0) minDurationSeconds = 2;
             extraFilter = (extraFilter ?? "").Trim().TrimEnd(',');
+            runMode = EncodeOptions.RunModes.Any(m => m.Id == runMode) ? runMode : EncodeOptions.DefaultRunMode;
         }
 
         /// <summary>What is added to the file name: the chosen ending, or "_720p_x265" style.</summary>
