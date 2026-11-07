@@ -11,6 +11,11 @@
       <Setter Property="BorderBrush" Value="{DynamicResource Rule}"/><Setter Property="BorderThickness" Value="0,0,0,1"/></Style>
     <Style Selector="Border.encrow:pointerover"><Setter Property="Background" Value="{DynamicResource Table}"/></Style>
     <Style Selector="Border.encrow.picked"><Setter Property="Background" Value="{DynamicResource KeepWash}"/></Style>
+    <!-- Smaller screenshots in a narrow window; the number columns are only as wide as their contents -->
+    <Style Selector="Image.shot"><Setter Property="Width" Value="96"/><Setter Property="Height" Value="64"/></Style>
+    <ContainerQuery Name="enc" Query="max-width:1000">
+      <Style Selector="Image.shot"><Setter Property="Width" Value="72"/><Setter Property="Height" Value="48"/></Style>
+    </ContainerQuery>
     <Style Selector="TextBlock.saving"><Setter Property="Foreground" Value="{DynamicResource Keep}"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
   </UserControl.Styles>
 
@@ -60,10 +65,21 @@
       </StackPanel>
     </Border>
 
-    <Border Grid.Row="4" BorderBrush="{DynamicResource Rule}" BorderThickness="1" CornerRadius="10" ClipToBounds="True" IsVisible="{Binding HasVideos}">
+    <!-- Header and rows share their column widths (SharedSizeGroup) -->
+    <Border Grid.Row="4" BorderBrush="{DynamicResource Rule}" BorderThickness="1" CornerRadius="10" ClipToBounds="True" IsVisible="{Binding HasVideos}"
+            Grid.IsSharedSizeScope="True" Container.Name="enc" Container.Sizing="Width">
       <DockPanel>
         <Border DockPanel.Dock="Top" Background="{DynamicResource Table}" Padding="12,6,32,6">
-          <Grid ColumnDefinitions="32,316,48,*,120,90,160">
+          <Grid ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="32"/>
+              <ColumnDefinition Width="Auto" SharedSizeGroup="strip"/>
+              <ColumnDefinition Width="48"/>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="Auto" MinWidth="80" SharedSizeGroup="rate"/>
+              <ColumnDefinition Width="Auto" MinWidth="80" SharedSizeGroup="size"/>
+              <ColumnDefinition Width="Auto" MinWidth="110" SharedSizeGroup="estimate"/>
+            </Grid.ColumnDefinitions>
             <TextBlock Grid.Column="3" Text="Video" Classes="muted small" FontWeight="SemiBold"/>
             <TextBlock Grid.Column="4" Text="Bitrate" Classes="muted small" FontWeight="SemiBold" HorizontalAlignment="Right"/>
             <TextBlock Grid.Column="5" Text="Size now" Classes="muted small" FontWeight="SemiBold" HorizontalAlignment="Right"/>
@@ -75,29 +91,38 @@
             <DataTemplate x:DataType="vm:EncodeRow">
               <!-- The whole row is clickable; Shift-click picks a range (see EncodeView.axaml.cs) -->
               <Border Classes="encrow" Classes.picked="{Binding IsPicked}" PointerPressed="Row_PointerPressed" Cursor="Hand">
-                <Grid ColumnDefinitions="32,316,48,*,120,90,160">
+                <Grid ColumnSpacing="12">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="32"/>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="strip"/>
+                    <ColumnDefinition Width="48"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto" MinWidth="80" SharedSizeGroup="rate"/>
+                    <ColumnDefinition Width="Auto" MinWidth="80" SharedSizeGroup="size"/>
+                    <ColumnDefinition Width="Auto" MinWidth="110" SharedSizeGroup="estimate"/>
+                  </Grid.ColumnDefinitions>
                   <CheckBox IsChecked="{Binding IsPicked}" IsHitTestVisible="False" VerticalAlignment="Center"/>
                   <Border Grid.Column="1" Background="{DynamicResource Frame}" CornerRadius="3" Padding="4" HorizontalAlignment="Left">
                     <StackPanel Orientation="Horizontal" Spacing="3">
-                      <Image Source="{Binding Shot1}" Width="96" Height="64" Stretch="UniformToFill"/>
-                      <Image Source="{Binding Shot2}" Width="96" Height="64" Stretch="UniformToFill"/>
-                      <Image Source="{Binding Shot3}" Width="96" Height="64" Stretch="UniformToFill"/>
+                      <Image Classes="shot" Source="{Binding Shot1}" Stretch="UniformToFill"/>
+                      <Image Classes="shot" Source="{Binding Shot2}" Stretch="UniformToFill"/>
+                      <Image Classes="shot" Source="{Binding Shot3}" Stretch="UniformToFill"/>
                     </StackPanel>
                   </Border>
                   <!-- Play: opens the default player; the button takes the click, so the row isn't picked -->
                   <Button Grid.Column="2" Classes="icon" Command="{Binding PlayCommand}" ToolTip.Tip="Play (opens the default player)" VerticalAlignment="Center" HorizontalAlignment="Center">
                     <Path Data="M3,1.5 L3,12.5 L12,7 Z" Fill="{Binding $parent[Button].Foreground}" Width="14" Height="14"/>
                   </Button>
-                  <StackPanel Grid.Column="3" VerticalAlignment="Center" Spacing="2" Margin="8,0,0,0">
+                  <StackPanel Grid.Column="3" VerticalAlignment="Center" Spacing="2">
                     <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                     <TextBlock Text="{Binding Folder}" Classes="muted small" TextTrimming="CharacterEllipsis"/>
                     <TextBlock Text="{Binding Length}" Classes="muted small"/>
                     <!-- Buttons take the click, so they don't pick the row -->
-                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
+                    <WrapPanel Orientation="Horizontal" ItemSpacing="6" LineSpacing="6" Margin="0,4,0,0">
                       <Button Classes="small" Content="Exclude folder" Command="{Binding ExcludeFolderCommand}" ToolTip.Tip="{Binding Folder, StringFormat='Hide every video in {0}'}"/>
                       <Button Classes="small" Content="Copy path" Command="{Binding CopyPathCommand}" ToolTip.Tip="Copy the full path"/>
                       <Button Classes="small dangerOutline" Content="Delete" Command="{Binding DeleteCommand}" ToolTip.Tip="Delete this file"/>
-                    </StackPanel>
+                    </WrapPanel>
                   </StackPanel>
                   <TextBlock Grid.Column="4" Text="{Binding Bitrate}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                   <TextBlock Grid.Column="5" Text="{Binding Size}" HorizontalAlignment="Right" VerticalAlignment="Center"/>

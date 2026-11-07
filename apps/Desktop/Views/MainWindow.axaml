@@ -6,18 +6,30 @@
         x:DataType="vm:MainViewModel"
         Title="Duplicate Video Remover"
         Icon="/Assets/appicon.ico"
-        Width="1320" Height="860" MinWidth="980" MinHeight="600"
+        Width="1320" Height="860" MinWidth="1100" MinHeight="700"
         Background="{DynamicResource Table}">
-  <Panel>
-    <!-- Sidebar: drawn behind the tab strip, which TabControl.nav lays out in its 232 px column (see App.axaml) -->
-    <Border Width="232" HorizontalAlignment="Left" Background="{DynamicResource Sidebar}"
+  <Window.Styles>
+    <Style Selector="Border.sidebar"><Setter Property="Width" Value="232"/></Style>
+    <!-- Narrow window: the sidebar shows only the icons (names as tooltips), which gives the pages 160 px more -->
+    <ContainerQuery Name="app" Query="max-width:1280">
+      <Style Selector="Border.sidebar"><Setter Property="Width" Value="72"/></Style>
+      <Style Selector="StackPanel.brandtext"><Setter Property="IsVisible" Value="False"/></Style>
+      <Style Selector="StackPanel.brand"><Setter Property="Margin" Value="19,22,0,0"/></Style>
+      <Style Selector="TabControl.nav /template/ ItemsPresenter#PART_ItemsPresenter"><Setter Property="Width" Value="72"/></Style>
+      <Style Selector="TabControl.nav TabItem"><Setter Property="Width" Value="48"/><Setter Property="Padding" Value="15,0"/></Style>
+      <Style Selector="TextBlock.navlabel"><Setter Property="IsVisible" Value="False"/></Style>
+    </ContainerQuery>
+  </Window.Styles>
+  <Panel Container.Name="app" Container.Sizing="Width">
+    <!-- Sidebar: drawn behind the tab strip, which TabControl.nav lays out in the same column width (see App.axaml) -->
+    <Border Classes="sidebar" HorizontalAlignment="Left" Background="{DynamicResource Sidebar}"
             BorderBrush="{DynamicResource Rule}" BorderThickness="0,0,1,0">
       <DockPanel>
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="20,22,16,0" VerticalAlignment="Top">
+        <StackPanel Classes="brand" DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="20,22,16,0" VerticalAlignment="Top">
           <Border Width="34" Height="34" CornerRadius="9" Background="{DynamicResource AccentWash}">
             <Image Source="/Assets/appicon-32.png" Width="22" Height="22"/>
           </Border>
-          <StackPanel VerticalAlignment="Center">
+          <StackPanel Classes="brandtext" VerticalAlignment="Center">
             <TextBlock Text="Duplicate Video" FontWeight="Bold" FontSize="14"/>
             <TextBlock Text="Remover" Classes="muted small"/>
           </StackPanel>
@@ -30,45 +42,45 @@
                 SelectedIndex="{Binding SelectedTab}">
       <TabItem>
         <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="12">
+          <StackPanel Orientation="Horizontal" Spacing="12" ToolTip.Tip="Scan" ToolTip.Placement="Right">
             <PathIcon Classes="nav" Data="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-            <TextBlock Text="Scan" VerticalAlignment="Center"/>
+            <TextBlock Classes="navlabel" Text="Scan" VerticalAlignment="Center"/>
           </StackPanel>
         </TabItem.Header>
         <v:ScanView DataContext="{Binding Scan}"/>
       </TabItem>
       <TabItem>
         <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="12">
+          <StackPanel Orientation="Horizontal" Spacing="12" ToolTip.Tip="Review" ToolTip.Placement="Right">
             <PathIcon Classes="nav" Data="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
-            <TextBlock Text="Review" VerticalAlignment="Center"/>
+            <TextBlock Classes="navlabel" Text="Review" VerticalAlignment="Center"/>
           </StackPanel>
         </TabItem.Header>
         <v:ReviewView DataContext="{Binding Review}"/>
       </TabItem>
       <TabItem>
         <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="12">
+          <StackPanel Orientation="Horizontal" Spacing="12" ToolTip.Tip="Re-encode" ToolTip.Placement="Right">
             <PathIcon Classes="nav" Data="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/>
-            <TextBlock Text="Re-encode" VerticalAlignment="Center"/>
+            <TextBlock Classes="navlabel" Text="Re-encode" VerticalAlignment="Center"/>
           </StackPanel>
         </TabItem.Header>
         <v:EncodeView DataContext="{Binding Encode}"/>
       </TabItem>
       <TabItem>
         <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="12">
+          <StackPanel Orientation="Horizontal" Spacing="12" ToolTip.Tip="All files" ToolTip.Placement="Right">
             <PathIcon Classes="nav" Data="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/>
-            <TextBlock Text="All files" VerticalAlignment="Center"/>
+            <TextBlock Classes="navlabel" Text="All files" VerticalAlignment="Center"/>
           </StackPanel>
         </TabItem.Header>
         <v:AllFilesView DataContext="{Binding Files}"/>
       </TabItem>
       <TabItem>
         <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="12">
+          <StackPanel Orientation="Horizontal" Spacing="12" ToolTip.Tip="Settings" ToolTip.Placement="Right">
             <PathIcon Classes="nav" Data="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/>
-            <TextBlock Text="Settings" VerticalAlignment="Center"/>
+            <TextBlock Classes="navlabel" Text="Settings" VerticalAlignment="Center"/>
           </StackPanel>
         </TabItem.Header>
         <v:SettingsView DataContext="{Binding Settings}"/>

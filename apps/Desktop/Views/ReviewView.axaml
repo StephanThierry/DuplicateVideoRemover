@@ -37,6 +37,15 @@
       <Setter Property="Padding" Value="10,6"/>
       <Setter Property="CornerRadius" Value="0"/>
     </Style>
+    <!-- Narrower window: a narrower folder list, then smaller screenshots, so each card keeps room for its text -->
+    <Style Selector="DockPanel.folders"><Setter Property="Width" Value="280"/></Style>
+    <ContainerQuery Name="review" Query="max-width:1060">
+      <Style Selector="DockPanel.folders"><Setter Property="Width" Value="220"/></Style>
+    </ContainerQuery>
+    <Style Selector="Image.shot"><Setter Property="Width" Value="120"/><Setter Property="Height" Value="80"/></Style>
+    <ContainerQuery Name="cards" Query="max-width:760">
+      <Style Selector="Image.shot"><Setter Property="Width" Value="96"/><Setter Property="Height" Value="64"/></Style>
+    </ContainerQuery>
     <Style Selector="Button.folder.active">
       <Setter Property="Background" Value="{DynamicResource Sheet}"/>
       <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
@@ -66,9 +75,9 @@
       </StackPanel>
     </Border>
 
-    <Grid Grid.Row="1" ColumnDefinitions="280,*" IsVisible="{Binding HasResults}" Margin="12,0">
+    <Grid Grid.Row="1" ColumnDefinitions="Auto,*" IsVisible="{Binding HasResults}" Margin="12,0" Container.Name="review" Container.Sizing="Width">
       <!-- Folders -->
-      <DockPanel Grid.Column="0" Margin="0,0,20,0">
+      <DockPanel Grid.Column="0" Classes="folders" Margin="0,0,20,0">
         <TextBlock DockPanel.Dock="Top" Classes="h2" Text="Folders" Margin="0,0,0,8"/>
         <ScrollViewer Classes="gutter">
           <ItemsControl ItemsSource="{Binding Folders}">
@@ -109,7 +118,7 @@
           </WrapPanel>
         </Border>
 
-        <ListBox Classes="rows" ItemsSource="{Binding Rows}" Background="Transparent" SelectionMode="Single">
+        <ListBox Classes="rows" ItemsSource="{Binding Rows}" Background="Transparent" SelectionMode="Single" Container.Name="cards" Container.Sizing="Width">
           <ListBox.DataTemplates>
             <DataTemplate DataType="vm:SectionRow">
               <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,18,0,8">
@@ -141,9 +150,9 @@
                     <Grid>
                       <Border Background="{DynamicResource Frame}" CornerRadius="3" Padding="4">
                         <StackPanel Orientation="Horizontal" Spacing="3">
-                          <Image Source="{Binding Shot1}" Width="120" Height="80" Stretch="UniformToFill"/>
-                          <Image Source="{Binding Shot2}" Width="120" Height="80" Stretch="UniformToFill"/>
-                          <Image Source="{Binding Shot3}" Width="120" Height="80" Stretch="UniformToFill"/>
+                          <Image Classes="shot" Source="{Binding Shot1}" Stretch="UniformToFill"/>
+                          <Image Classes="shot" Source="{Binding Shot2}" Stretch="UniformToFill"/>
+                          <Image Classes="shot" Source="{Binding Shot3}" Stretch="UniformToFill"/>
                         </StackPanel>
                       </Border>
                       <Viewbox Stretch="Fill" IsVisible="{Binding IsSelected}" IsHitTestVisible="False">
@@ -158,17 +167,19 @@
                     <Path Data="M3,1.5 L3,12.5 L12,7 Z" Fill="{Binding $parent[Button].Foreground}" Width="14" Height="14"/>
                   </Button>
                   <StackPanel Grid.Column="3" VerticalAlignment="Center" Spacing="2">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
+                    <WrapPanel Orientation="Horizontal" ItemSpacing="8">
                       <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextWrapping="Wrap"/>
                       <Border IsVisible="{Binding IsKept}" Background="{DynamicResource KeepWash}" CornerRadius="9" Padding="8,1" VerticalAlignment="Center">
                         <TextBlock Text="Keep" Foreground="{DynamicResource Keep}" FontSize="11" FontWeight="SemiBold"/>
                       </Border>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                      <Button Classes="link" Content="{Binding Folder}" Command="{Binding ShowFolderCommand}" ToolTip.Tip="Show only this folder"/>
+                    </WrapPanel>
+                    <WrapPanel Orientation="Horizontal" ItemSpacing="10" LineSpacing="4">
+                      <Button Classes="link" Command="{Binding ShowFolderCommand}" ToolTip.Tip="Show only this folder">
+                        <TextBlock Text="{Binding Folder}" TextTrimming="CharacterEllipsis"/>
+                      </Button>
                       <Button Classes="small" Content="Exclude this folder" Command="{Binding ExcludeFolderCommand}"
                               ToolTip.Tip="Skip this folder in later scans (added to the paths to skip) and take its files out of the matches"/>
-                    </StackPanel>
+                    </WrapPanel>
                     <TextBlock Classes="muted small" Text="{Binding Meta}"/>
                     <TextBlock Classes="muted small" Text="{Binding Reason}" IsVisible="{Binding ShowReason}" TextWrapping="Wrap"/>
                   </StackPanel>

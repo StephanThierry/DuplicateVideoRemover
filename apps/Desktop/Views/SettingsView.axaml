@@ -56,6 +56,11 @@
       <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
     </Style>
     <Style Selector="StackPanel.subbody"><Setter Property="Margin" Value="22,2,0,0"/></Style>
+    <!-- The right column gets narrower in a narrow window -->
+    <Style Selector="StackPanel.side"><Setter Property="Width" Value="300"/></Style>
+    <ContainerQuery Name="settings" Query="max-width:1000">
+      <Style Selector="StackPanel.side"><Setter Property="Width" Value="250"/></Style>
+    </ContainerQuery>
     <!-- "On this page" list -->
     <Style Selector="Button.jump">
       <Setter Property="Background" Value="Transparent"/>
@@ -70,13 +75,14 @@
       <Setter Property="Background" Value="{DynamicResource Raised}"/>
       <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
     </Style>
+    <Style Selector="Button.jump TextBlock"><Setter Property="TextTrimming" Value="CharacterEllipsis"/></Style>
     <Style Selector="Button.jump.current">
       <Setter Property="Background" Value="{DynamicResource Raised}"/>
       <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
       <Setter Property="FontWeight" Value="SemiBold"/>
     </Style>
   </UserControl.Styles>
-  <Grid ColumnDefinitions="*,300" ColumnSpacing="20" Margin="12,16,12,12">
+  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20" Margin="12,16,12,12" Container.Name="settings" Container.Sizing="Width">
     <ScrollViewer Grid.Column="0" Classes="gutter" x:Name="Scroller">
       <StackPanel Spacing="16" Margin="0,0,8,0">
         <StackPanel>
@@ -359,7 +365,7 @@
     </ScrollViewer>
 
     <!-- Save, and a list of the sections that jumps to them and shows where you are -->
-    <StackPanel Grid.Column="1" Spacing="16" VerticalAlignment="Top">
+    <StackPanel Grid.Column="1" Classes="side" Spacing="16" VerticalAlignment="Top">
       <Border Classes="panel">
         <StackPanel Spacing="10">
           <Button Classes="primary" Content="Save settings" Command="{Binding SaveCommand}" IsEnabled="{Binding Dirty}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
