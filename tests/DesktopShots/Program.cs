@@ -148,6 +148,7 @@ if (Environment.GetEnvironmentVariable("SHOT_QUEUE") == "1")
         q.ConfirmYesCommand.Execute(null); Pump(1500);
         Console.WriteLine($"after deleting the last copy: toast '{q.Toast}', row still listed: {q.Finished.Contains(originalGone)}, can delete original {originalGone.CanDeleteOriginal}, can delete new {originalGone.CanDeleteNew}, both greyed: {originalGone.OriginalDeleted && originalGone.NewDeleted}");
         Shot("c_both_gone");
+        q.Compact = true; Pump(500); Shot("c_compact_deleted"); q.Compact = false; Pump(300);
         // "Confirm before deleting" off: no dialog, the file goes at once
         Console.WriteLine($"confirm before deleting is on by default: {q.ConfirmDeletes}");
         q.ConfirmDeletes = false; Pump(300); Shot("c_confirm_option_off");

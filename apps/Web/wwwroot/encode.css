@@ -106,7 +106,9 @@ button.icon.sm { width: 24px; height: 24px; padding: 0; }
 button.icon.sm svg { width: 11px; height: 11px; }
 
 /* A copy that has been deleted: greyed out */
-.q-strip.gone, .cfile.gone { opacity: .35; }
+.enc-strip.gone, .csz.gone { opacity: .35; }
+/* The "Deleted" tag where the play and delete icons were */
+.q-deleted { display: inline-block; font-size: .75rem; font-weight: 650; color: var(--grease); background: var(--grease-wash); border-radius: 10px; padding: 2px 9px; white-space: nowrap; }
 
 /* Log, with the "Confirm before deleting" switch to its right */
 .q-bottom { display: flex; gap: 16px; align-items: flex-start; margin-top: 16px; }

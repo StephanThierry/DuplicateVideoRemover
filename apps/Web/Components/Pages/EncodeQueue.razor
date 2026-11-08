@@ -151,15 +151,17 @@
                         <div class="q-crow q-cdone" @key='"c" + i.Id'>
                             <div class="cname" title="@i.Path">@i.FileName</div>
                             <div class="q-status @Css(i)" title="@EncodeText.Status(i)">@ShortStatus(i)</div>
-                            <div class="cfile @(i.OriginalDeleted ? "gone" : "")">
-                                <span class="csz">@Fmt.Size(i.SizeBytes)</span>
+                            <div class="cfile">
+                                <span class="csz @(i.OriginalDeleted ? "gone" : "")">@Fmt.Size(i.SizeBytes)</span>
+                                @if (i.OriginalDeleted) { <span class="q-deleted">Deleted</span> }
                                 @if (!i.OriginalDeleted) { <button class="icon sm" @onclick="() => PlayOriginal(i)" title="Play the original" aria-label="Play the original @i.FileName">@VideoPlayer.Icon</button> }
                                 @if (i.CanDeleteOriginal) { <button class="icon sm del" @onclick="() => AskDeleteOriginal(i)" title="Delete the original (to the Recycle Bin, asks first)" aria-label="Delete the original of @i.FileName">@Trash</button> }
                             </div>
-                            <div class="cfile @(i.NewDeleted ? "gone" : "")">
+                            <div class="cfile">
                                 @if (i.HasCheck)
                                 {
-                                    <span class="csz">@Fmt.Size(i.OutputBytes)</span>
+                                    <span class="csz @(i.NewDeleted ? "gone" : "")">@Fmt.Size(i.OutputBytes)</span>
+                                    @if (i.NewDeleted) { <span class="q-deleted">Deleted</span> }
                                     @if (!i.NewDeleted) { <button class="icon sm" @onclick="() => PlayNew(i)" title="Play the new file" aria-label="Play the new file of @i.FileName">@VideoPlayer.Icon</button> }
                                     @if (i.CanDeleteNew) { <button class="icon sm del" @onclick="() => AskDeleteNew(i)" title="Delete the new file (to the Recycle Bin, asks first). The original is kept" aria-label="Delete the new file of @i.FileName">@Trash</button> }
                                 }
@@ -189,9 +191,10 @@
                             <div class="q-check">
                                 <div class="q-side">
                                     <div class="q-cap">Original - @Fmt.Size(i.SizeBytes), @Fmt.Duration(i.DurationSeconds)@(i.OriginalDeleted ? " - deleted" : "")</div>
-                                    <div class="q-strip @(i.OriginalDeleted ? "gone" : "")">
-                                        <div class="enc-strip">@for (int n = 1; n <= 3; n++) { <img loading="lazy" src="shots/@(i.VideoId)_@(n).png" alt="" onerror="this.style.visibility='hidden'" /> }</div>
+                                    <div class="q-strip">
+                                        <div class="enc-strip @(i.OriginalDeleted ? "gone" : "")">@for (int n = 1; n <= 3; n++) { <img loading="lazy" src="shots/@(i.VideoId)_@(n).png" alt="" onerror="this.style.visibility='hidden'" /> }</div>
                                         <div class="q-icons">
+                                            @if (i.OriginalDeleted) { <span class="q-deleted">Deleted</span> }
                                             @if (!i.OriginalDeleted) { <button class="icon" @onclick="() => PlayOriginal(i)" title="Play the original" aria-label="Play the original @i.FileName">@VideoPlayer.Icon</button> }
                                             @if (i.CanDeleteOriginal) { <button class="icon del" @onclick="() => AskDeleteOriginal(i)" title="Delete the original (to the Recycle Bin, asks first). Only possible because the new file checked out" aria-label="Delete the original of @i.FileName">@Trash</button> }
                                         </div>
@@ -199,11 +202,12 @@
                                 </div>
                                 <div class="q-side">
                                     <div class="q-cap">New file - @Fmt.Size(i.OutputBytes)@(i.NewDeleted ? " - deleted" : "")</div>
-                                    <div class="q-strip @(i.NewDeleted ? "gone" : "")">
-                                        <div class="enc-strip">
+                                    <div class="q-strip">
+                                        <div class="enc-strip @(i.NewDeleted ? "gone" : "")">
                                             @if (i.HasCheckShots) { @for (int n = 1; n <= 3; n++) { <img loading="lazy" src="encodecheck/@(i.Id)_@(n).png" alt="" onerror="this.style.visibility='hidden'" /> } }
                                         </div>
                                         <div class="q-icons">
+                                            @if (i.NewDeleted) { <span class="q-deleted">Deleted</span> }
                                             @if (!i.NewDeleted) { <button class="icon" @onclick="() => PlayNew(i)" title="Play the new file" aria-label="Play the new file of @i.FileName">@VideoPlayer.Icon</button> }
                                             @if (i.CanDeleteNew) { <button class="icon del" @onclick="() => AskDeleteNew(i)" title="Delete the new file (to the Recycle Bin, asks first). The original is kept" aria-label="Delete the new file of @i.FileName">@Trash</button> }
                                         </div>
