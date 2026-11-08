@@ -214,7 +214,15 @@ public partial class EncodeQueueViewModel : ObservableObject
         Ask(() => Report(app.ReplaceIncomplete(row.Id)));
     }
 
-    private void Ask(Action yes) { confirmed = yes; ConfirmVisible = true; }
+    /// <summary>"Confirm before deleting" (on by default). When off, deleting and replacing happen at once, also where nothing can be restored.</summary>
+    [ObservableProperty] private bool confirmDeletes = true;
+
+    private void Ask(Action yes)
+    {
+        if (!ConfirmDeletes) { yes(); return; }
+        confirmed = yes;
+        ConfirmVisible = true;
+    }
 
     private void Report(AppController.EncodeActionResult result) => ShowToast(result.Ok ? result.Message : result.Error, result.Ok ? 6000 : 12000);
 

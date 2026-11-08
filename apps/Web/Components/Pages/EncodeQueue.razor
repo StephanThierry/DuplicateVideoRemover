@@ -54,7 +54,7 @@
             </div>
             <dl class="stats">
                 <div><dt>Time so far</dt><dd>@Fmt.Time(p.Elapsed)</dd></div>
-                @if (p.DoneCount > 0)
+                @if (p.DoneOriginalBytes > 0)
                 {
                     <div><dt>Encoded</dt><dd>@Fmt.Size(p.DoneOriginalBytes) became @Fmt.Size(p.DoneNewBytes)</dd></div>
                     <div><dt>Saved</dt><dd class="saved">@Fmt.Size(p.SavedBytes) (@EncodeText.Percent(p.DoneOriginalBytes, p.DoneNewBytes))</dd></div>
@@ -233,10 +233,14 @@
             }
         </section>
 
+        <div class="q-bottom">
         <details class="panel q-log">
             <summary style="cursor:pointer;font-weight:600">Log</summary>
             <pre class="command" style="max-height:260px;overflow:auto">@string.Join("\n", p.Log)</pre>
         </details>
+        @* Off: deleting needs no confirmation, not even where the file cannot be restored *@
+        <label class="inline q-confirm" title="When this is off, files are deleted at once without asking, also on a network share where they cannot be restored"><input type="checkbox" @bind="confirmDeletes" /> Confirm before deleting</label>
+        </div>
     }
 </div>
 
@@ -264,6 +268,7 @@
 @code {
     private EncodeProgress p = new();
     private int waitShown = 100, doneShown = 100;
+    private bool confirmDeletes = true;            // off: deleting needs no confirmation, not even where nothing can be restored
     private bool compact;                          // a table without pictures
     private bool waitOpen = true, doneOpen = true; // the lists can be collapsed to their header
 
@@ -300,7 +305,7 @@
     private void AskDeleteOriginal(EncodeItemInfo i)
     {
         bool recoverable = App.CanRecover(i.Path);
-        confirm = new Confirmation(
+        Ask(new Confirmation(
             i.NewDeleted ? (recoverable ? "Move the last copy to the Recycle Bin?" : "Delete the last copy permanently?")
                 : recoverable ? "Move the original to the Recycle Bin?" : "Delete the original permanently?",
             $"{i.FileName}\n{i.Folder}\n\n"
@@ -308,13 +313,13 @@
                                 : $"Original: {Fmt.Size(i.SizeBytes)}. New file: {Fmt.Size(i.OutputBytes)}, checked: {i.Check}.\n")
                 + (recoverable ? "You can restore the original from the Recycle Bin (trash)." : "This location has no Recycle Bin (a network share, for example), so this can't be undone."),
             recoverable ? "Move to Recycle Bin" : "Delete permanently",
-            () => App.DeleteOriginalAfterEncode(i.Id));
+            () => App.DeleteOriginalAfterEncode(i.Id)));
     }
 
     private void AskDeleteNew(EncodeItemInfo i)
     {
         bool recoverable = App.CanRecover(i.OutputPath);
-        confirm = new Confirmation(
+        Ask(new Confirmation(
             i.OriginalDeleted ? (recoverable ? "Move the last copy to the Recycle Bin?" : "Delete the last copy permanently?")
                 : recoverable ? "Move the new file to the Recycle Bin?" : "Delete the new file permanently?",
             $"{System.IO.Path.GetFileName(i.OutputPath)} ({Fmt.Size(i.OutputBytes)})\n{i.Folder}\n\n"
@@ -323,19 +328,25 @@
                                      : $"The original ({Fmt.Size(i.SizeBytes)}) is kept, and the video can be planned for re-encoding again.\n")
                 + (recoverable ? "You can restore the new file from the Recycle Bin (trash)." : "This location has no Recycle Bin (a network share, for example), so this can't be undone."),
             recoverable ? "Move to Recycle Bin" : "Delete permanently",
-            () => App.DeleteNewFile(i.Id));
+            () => App.DeleteNewFile(i.Id)));
     }
 
     private void AskReplace(EncodeItemInfo i)
     {
         bool recoverable = App.CanRecover(i.OutputPath);
-        confirm = new Confirmation(
+        Ask(new Confirmation(
             "Replace the incomplete new file?",
             $"{System.IO.Path.GetFileName(i.OutputPath)} ({Fmt.Size(i.OutputBytes)}) is incomplete: {i.Message}.\n\nIt will be "
                 + (recoverable ? "moved to the Recycle Bin" : "deleted permanently (this location has no Recycle Bin)")
                 + " and the video encoded again. The original is not touched.",
             "Replace and encode again",
-            () => App.ReplaceIncomplete(i.Id));
+            () => App.ReplaceIncomplete(i.Id)));
+    }
+
+    private void Ask(Confirmation c)
+    {
+        confirm = c;
+        if (!confirmDeletes) ConfirmYes();
     }
 
     private void ConfirmYes()

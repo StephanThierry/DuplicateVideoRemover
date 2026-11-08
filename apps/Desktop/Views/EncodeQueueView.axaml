@@ -354,13 +354,18 @@
     </Grid>
 
     <!-- What FFmpeg said -->
-    <Expander Grid.Row="5" Header="Log" Margin="0,10,0,0" IsVisible="{Binding !IsEmpty}">
+    <Grid Grid.Row="5" ColumnDefinitions="*,Auto" Margin="0,10,0,0" IsVisible="{Binding !IsEmpty}">
+    <Expander Header="Log">
       <Border Background="{DynamicResource Table}" CornerRadius="4" Padding="10,8" Height="170">
         <ScrollViewer>
           <SelectableTextBlock Text="{Binding Log}" FontFamily="Consolas, Menlo, monospace" FontSize="12" TextWrapping="Wrap"/>
         </ScrollViewer>
       </Border>
     </Expander>
+    <!-- Off: deleting needs no confirmation, not even where the file cannot be restored -->
+    <CheckBox Grid.Column="1" Content="Confirm before deleting" IsChecked="{Binding ConfirmDeletes}" VerticalAlignment="Top" Margin="12,6,0,0"
+              ToolTip.Tip="When this is off, files are deleted at once without asking, also on a network share where they cannot be restored"/>
+    </Grid>
 
     <!-- Toast -->
     <Border Grid.Row="4" Grid.RowSpan="2" IsVisible="{Binding Toast, Converter={x:Static ObjectConverters.IsNotNull}}"

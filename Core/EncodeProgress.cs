@@ -222,6 +222,6 @@ namespace deepduplicates
         }
 
         public static string Saved(EncodeProgress p) =>
-            p.DoneCount == 0 ? "" : $"{Fmt.Size(p.DoneOriginalBytes)} became {Fmt.Size(p.DoneNewBytes)} - saved {Fmt.Size(p.SavedBytes)} ({Percent(p.DoneOriginalBytes, p.DoneNewBytes)})";
+            p.DoneOriginalBytes == 0 ? "" : $"{Fmt.Size(p.DoneOriginalBytes)} became {Fmt.Size(p.DoneNewBytes)} - saved {Fmt.Size(p.SavedBytes)} ({Percent(p.DoneOriginalBytes, p.DoneNewBytes)})";
     }
 }

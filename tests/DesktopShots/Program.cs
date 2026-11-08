@@ -148,6 +148,17 @@ if (Environment.GetEnvironmentVariable("SHOT_QUEUE") == "1")
         q.ConfirmYesCommand.Execute(null); Pump(1500);
         Console.WriteLine($"after deleting the last copy: toast '{q.Toast}', row still listed: {q.Finished.Contains(originalGone)}, can delete original {originalGone.CanDeleteOriginal}, can delete new {originalGone.CanDeleteNew}, both greyed: {originalGone.OriginalDeleted && originalGone.NewDeleted}");
         Shot("c_both_gone");
+        // "Confirm before deleting" off: no dialog, the file goes at once
+        Console.WriteLine($"confirm before deleting is on by default: {q.ConfirmDeletes}");
+        q.ConfirmDeletes = false; Pump(300); Shot("c_confirm_option_off");
+        var quick = q.Finished.First(r => r.CanDeleteNew);
+        quick.AskDeleteNewCommand.Execute(null); Pump(1500);
+        Console.WriteLine($"with confirmation off: dialog shown {q.ConfirmVisible}, new file gone {!File.Exists(quick.NewPath)}, toast '{q.Toast}'");
+        q.ConfirmDeletes = true;
+        var again = q.Finished.First(r => r.CanDeleteNew);
+        again.AskDeleteNewCommand.Execute(null); Pump(300);
+        Console.WriteLine($"with confirmation on again: dialog shown {q.ConfirmVisible}");
+        q.ConfirmNoCommand.Execute(null);
         foreach (var i in controller.Encoder.Current.Items) Console.WriteLine($"  final {i.FileName}: {EncodeText.Status(i)}");
         vm.SelectedTab = MainViewModel.EncodeTab; Pump(800); Shot("c_picker_after");
         Console.WriteLine($"picker rows after deleting an original: {vm.Encode.Rows.Count}");

@@ -107,3 +107,8 @@ button.icon.sm svg { width: 11px; height: 11px; }
 
 /* A copy that has been deleted: greyed out */
 .q-strip.gone, .cfile.gone { opacity: .35; }
+
+/* Log, with the "Confirm before deleting" switch to its right */
+.q-bottom { display: flex; gap: 16px; align-items: flex-start; margin-top: 16px; }
+.q-bottom details { flex: 1; margin-top: 0; }
+.q-bottom .q-confirm { white-space: nowrap; padding-top: 20px; }
