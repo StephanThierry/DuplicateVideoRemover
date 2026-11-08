@@ -245,6 +245,7 @@ public partial class EncodeQueueRow : ObservableObject
     // The check of the new file (length and pictures, like the scan): shown with the original's pictures
     [ObservableProperty] private bool hasCheck;
     [ObservableProperty] private bool checkOk;
+    [ObservableProperty] private bool checkPending;
     [ObservableProperty] private string checkText = "";
     [ObservableProperty] private string newSize = "";
     [ObservableProperty] private bool canDeleteOriginal;
@@ -261,7 +262,7 @@ public partial class EncodeQueueRow : ObservableObject
     private string? newShotsKey;
 
     public bool IsProblem => IsFailed || IsIncomplete;
-    public bool CheckFailed => HasCheck && !CheckOk;
+    public bool CheckFailed => HasCheck && !CheckOk && !CheckPending;
     public bool NoCheck => !HasCheck;
 
     // The original's pictures from the scan
@@ -303,7 +304,8 @@ public partial class EncodeQueueRow : ObservableObject
         WhenText = i.FinishedUtc is DateTime t ? Fmt.When(t) : "";
         HasCheck = i.HasCheck;
         CheckOk = i.CheckOk;
-        CheckText = i.Status == EncodeItemStatus.Incomplete ? i.Message : i.Check;
+        CheckPending = i.CheckPending;
+        CheckText = i.Status == EncodeItemStatus.Incomplete && i.Message.Length > 0 ? i.Message : i.CheckPending ? "Waiting to be checked..." : i.Check;
         NewSize = Fmt.Size(i.OutputBytes);
         CanDeleteOriginal = i.CanDeleteOriginal;
         CanDeleteNew = i.CanDeleteNew;
@@ -322,7 +324,8 @@ public partial class EncodeQueueRow : ObservableObject
     private void LoadNewShots(EncodeItemInfo i)
     {
         string key = i.HasCheckShots ? i.Id + "|" + i.FinishedUtc?.Ticks : "";
-        if (key == newShotsKey) return;
+        // Same check and the pictures are on screen: nothing to do. (Pictures that were not there yet, or were made again, are looked for again.)
+        if (key == newShotsKey && (key.Length == 0 || NewShot1 != null)) return;
         newShotsKey = key;
         Bitmap? Load(int n)
         {

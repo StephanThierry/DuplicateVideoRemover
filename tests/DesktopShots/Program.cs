@@ -205,6 +205,18 @@ if (Environment.GetEnvironmentVariable("SHOT_QUEUE") == "1")
     controller.Encoder.Shutdown();
     return;
 }
+// SHOT_LEGACY=1: opens the Re-encode queue on a copy of real data and waits until the finished videos from before the check are checked
+if (Environment.GetEnvironmentVariable("SHOT_LEGACY") == "1")
+{
+    vm.SelectedTab = MainViewModel.QueueTab;
+    var begun = DateTime.UtcNow;
+    Pump(800); Shot("l_before");
+    while (controller.Encoder.Current.Items.Any(i => i.CheckPending) && DateTime.UtcNow - begun < TimeSpan.FromMinutes(4)) Pump(300);
+    Pump(1500); Shot("l_after");
+    foreach (var i in controller.Encoder.Current.Items) Console.WriteLine($"  {i.FileName}: {i.Status} | {EncodeText.Status(i)} | check: {i.Check}{i.Message} | delete original {i.CanDeleteOriginal}");
+    controller.Encoder.Shutdown();
+    return;
+}
 // SHOT_PLANNING=1: opens Re-encode planning on the given data (use a copy) and waits for the list - for finding crashes there
 if (Environment.GetEnvironmentVariable("SHOT_PLANNING") == "1")
 {

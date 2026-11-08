@@ -37,8 +37,13 @@ namespace deepduplicates
         public bool CanDeleteNew => Status is EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded or EncodeItemStatus.Incomplete && !OriginalDeleted;
         /// <summary>The new file that was there already is not complete: it can be replaced by encoding again.</summary>
         public bool CanReplace => Status == EncodeItemStatus.Incomplete;
-        /// <summary>True when the new file has been checked, so there is something to show next to the original.</summary>
-        public bool HasCheck => Status is EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded or EncodeItemStatus.Incomplete && (CheckOk || Message.Length > 0 || HasCheckShots);
+        /// <summary>
+        /// A new file exists for this video, so it is shown with the original next to it (the check's pictures and result).
+        /// Items from before the check existed get theirs in the background: until then <see cref="CheckPending"/> is true.
+        /// </summary>
+        public bool HasCheck => Status is EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded or EncodeItemStatus.Incomplete;
+        /// <summary>The new file has not been checked yet.</summary>
+        public bool CheckPending => HasCheck && !CheckOk && Check.Length == 0 && Message.Length == 0;
 
         /// <summary>Time left for the running video, from the encoder's speed (null when not known yet).</summary>
         public TimeSpan? Remaining =>

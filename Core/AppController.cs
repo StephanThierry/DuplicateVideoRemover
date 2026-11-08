@@ -57,6 +57,12 @@ namespace deepduplicates
             catch (Exception e) { Console.WriteLine("Could not update the rules to the main names: " + e.Message); }
             Session = new ResultSession(ResultSet.LoadSaved());
             Encoder = new EncodeEngine(Path.Combine(FileHandler.AppFolder, "output", "encodequeue.json"), PrepareFFmpeg);
+            // Finished videos from before new files were checked get their check now, in the background
+            _ = System.Threading.Tasks.Task.Run(async () =>
+            {
+                try { await Encoder.CheckUncheckedAsync(); }
+                catch (Exception e) { Console.WriteLine("Could not check earlier results: " + e.Message); }
+            });
             Scanner.Completed += results =>
             {
                 InvalidateCache();

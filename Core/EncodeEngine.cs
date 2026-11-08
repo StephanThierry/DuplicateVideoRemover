@@ -286,6 +286,55 @@ namespace deepduplicates
 
         private void Forget(EncodeItem item) => EncodeChecker.DeleteShots(checksFolder, item.Id);
 
+        // Finished videos with a new file that was never checked: made before checks existed (a Done item, or one that was
+        // only "skipped: already exists")
+        // - and ones whose pictures have gone missing (cleaned up, or a data folder copied without them)
+        private bool NeedsCheck(EncodeItem i) =>
+            !i.OriginalDeleted && (
+                !i.CheckOk && i.Check.Length == 0
+                && (i.Status is EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded
+                    || i.Status == EncodeItemStatus.Incomplete && i.Message.Length == 0
+                    || i.Status == EncodeItemStatus.Skipped && i.Message.Contains("already exists"))
+                || i.HasCheckShots && i.Status is EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded or EncodeItemStatus.Incomplete
+                   && !File.Exists(EncodeChecker.ShotPath(checksFolder, i.Id, 1)));
+
+        /// <summary>
+        /// Checks the new files of finished videos that were never checked (see EncodeChecker), so they show like the others:
+        /// the original's and the new file's pictures side by side, the saving, and the delete icons. A skipped "already exists"
+        /// becomes Already encoded or Incomplete; a Done one whose file turns out incomplete becomes Incomplete. One at a time, in the
+        /// background (it only reads), and the finish time of each stays as it was.
+        /// </summary>
+        public async Task CheckUncheckedAsync(CancellationToken ct = default)
+        {
+            List<string> ids;
+            lock (sync) ids = items.Where(NeedsCheck).Select(i => i.Id).ToList();
+            if (ids.Count == 0) return;
+            string ffmpeg = await prepareFfmpeg();
+            foreach (var id in ids)
+            {
+                if (ct.IsCancellationRequested) return;
+                EncodeItem? item;
+                lock (sync) item = items.FirstOrDefault(i => i.Id == id && NeedsCheck(i));
+                if (item == null) continue;
+                if (!File.Exists(item.OutputPath))
+                {
+                    lock (sync) { item.Check = "The new file is not there any more"; item.CheckOk = false; item.HasCheckShots = false; Save(); }
+                    Publish();
+                    continue;
+                }
+                var result = await TryCheckAsync(item, ffmpeg, ct);
+                if (result == null) continue;   // could not be run (logged); tried again at the next start
+                lock (sync)
+                {
+                    item.OutputBytes = new FileInfo(item.OutputPath).Length;
+                    if (!result.Valid) { item.Status = EncodeItemStatus.Incomplete; item.Message = result.Problem; }
+                    else if (item.Status != EncodeItemStatus.Done) { item.Status = EncodeItemStatus.AlreadyEncoded; item.Message = "the new file was there already and checks out"; }
+                    Save();
+                }
+                AddLog($"{Path.GetFileName(item.Path)}: the new file from an earlier run was checked - " + (result.Valid ? "it checks out" : "it is incomplete: " + result.Problem));
+            }
+        }
+
         /// <summary>Stops and waits for the running FFmpeg to be killed and its partial file deleted (when the program closes).</summary>
         public void Shutdown()
         {

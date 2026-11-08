@@ -156,7 +156,7 @@
                                             @if (i.CanDeleteNew) { <button class="icon del" @onclick="() => AskDeleteNew(i)" title="Delete the new file (to the Recycle Bin, asks first). The original is kept" aria-label="Delete the new file of @i.FileName">@Trash</button> }
                                         </div>
                                     </div>
-                                    <div class="q-checktext @(i.CheckOk ? "ok" : "bad")">@(i.Status == EncodeItemStatus.Incomplete ? i.Message : i.Check)</div>
+                                    <div class="q-checktext @(i.CheckOk ? "ok" : i.CheckPending ? "" : "bad")">@(i.Status == EncodeItemStatus.Incomplete && i.Message.Length > 0 ? i.Message : i.CheckPending ? "Waiting to be checked..." : i.Check)</div>
                                 </div>
                                 @if (i.Status is EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded)
                                 {

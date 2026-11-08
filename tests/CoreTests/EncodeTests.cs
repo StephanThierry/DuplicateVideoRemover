@@ -427,6 +427,77 @@ public class EncodeEngineTests : IDisposable
         Assert.Equal(2, engine.Current.Items.Count);
     }
 
+    // A queue file as the program wrote it before the check existed: no Check, no pictures
+    private void WriteLegacyQueue(params (string path, string output, EncodeItemStatus status, string message, long bytes)[] items)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(state)!);
+        var list = items.Select((x, n) => new EncodeItem
+        {
+            VideoId = n + 1, Path = x.path, SizeBytes = 4000, DurationSeconds = 100, OutputPath = x.output,
+            Status = x.status, Message = x.message, OutputBytes = x.bytes, FinishedUtc = DateTime.UtcNow.AddDays(-1),
+        }).ToList();
+        File.WriteAllText(state, System.Text.Json.JsonSerializer.Serialize(new { Items = list }));
+    }
+
+    [Fact]
+    public async Task FinishedItemsFromBeforeTheCheckGetCheckedAndShowLikeTheOthers()
+    {
+        var settings = EncodeSettings.CreateDefault();
+        var good = Video("good.mp4", 1); var skipped = Video("skipped.mp4", 2); var gone = Video("gone.mp4", 3);
+        string goodOut = EncodePlanner.OutputPath(good.Path, settings), skippedOut = EncodePlanner.OutputPath(skipped.Path, settings), goneOut = EncodePlanner.OutputPath(gone.Path, settings);
+        File.WriteAllText(goodOut, "encoded earlier"); File.WriteAllText(skippedOut, "made by an old script");
+        WriteLegacyQueue(
+            (good.Path, goodOut, EncodeItemStatus.Done, "", 15),
+            (skipped.Path, skippedOut, EncodeItemStatus.Skipped, "the new file already exists", 0),
+            (gone.Path, goneOut, EncodeItemStatus.Done, "", 99));
+
+        var engine = NewEngine(new FakeRunner());
+        Assert.All(engine.Current.Items, i => Assert.True(i.CheckPending || i.Status == EncodeItemStatus.Skipped));   // layout is side by side from the start
+        var finishedBefore = engine.Current.Items.Select(i => i.FinishedUtc).ToList();
+        await engine.CheckUncheckedAsync();
+
+        var items = engine.Current.Items;
+        Assert.Equal(EncodeItemStatus.Done, items[0].Status);
+        Assert.True(items[0].CheckOk && items[0].HasCheckShots && items[0].CanDeleteOriginal);
+        Assert.Equal(EncodeItemStatus.AlreadyEncoded, items[1].Status);          // "skipped: already exists" is now a proper result
+        Assert.Equal("made by an old script".Length, items[1].OutputBytes);
+        Assert.True(items[1].CheckOk && items[1].HasCheck);
+        Assert.Equal(EncodeItemStatus.Done, items[2].Status);                    // its new file is gone: said so, not checked again
+        Assert.Equal("The new file is not there any more", items[2].Check);
+        Assert.False(items[2].CheckPending);
+        for (int n = 1; n <= 3; n++) Assert.True(File.Exists(engine.CheckShotPath(items[0].Id, n)));
+        Assert.Equal(finishedBefore, items.Select(i => i.FinishedUtc).ToList());   // the list keeps its order
+
+        // Pictures that have gone missing are made again
+        File.Delete(engine.CheckShotPath(items[0].Id, 1));
+        await engine.CheckUncheckedAsync();
+        Assert.True(File.Exists(engine.CheckShotPath(items[0].Id, 1)));
+        Assert.Equal(EncodeItemStatus.Done, engine.Current.Items[0].Status);
+
+        // and it is not done again
+        var runner = new FakeRunner();
+        var again = NewEngine(runner);
+        await again.CheckUncheckedAsync();
+        Assert.Empty(runner.PictureSeconds);
+    }
+
+    [Fact]
+    public async Task AnOldDoneItemWhoseNewFileIsIncompleteBecomesIncomplete()
+    {
+        var settings = EncodeSettings.CreateDefault();
+        var a = Video("a.mp4", 1);
+        string output = EncodePlanner.OutputPath(a.Path, settings);
+        File.WriteAllText(output, "cut off");
+        WriteLegacyQueue((a.Path, output, EncodeItemStatus.Done, "", 7));
+        var engine = NewEngine(new FakeRunner { ProbeSeconds = 5 });
+        await engine.CheckUncheckedAsync();
+        var item = engine.Current.Items.Single();
+        Assert.Equal(EncodeItemStatus.Incomplete, item.Status);
+        Assert.Contains("0:05 long", item.Message);
+        Assert.True(item.CanReplace);
+        Assert.False(item.CanDeleteOriginal);
+    }
+
     [Fact]
     public void RecycleBinSaysWhenThereIsNone()
     {

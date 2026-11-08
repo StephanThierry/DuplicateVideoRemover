@@ -81,6 +81,7 @@ second from a background thread - screens coalesce it onto their UI thread).
   drives, `gio trash` / `trash-put` on Linux. A network path or USB drive has none, and the shell would delete there
   without saying so, so `IsRecoverable` is asked first and the confirmation says "permanently" when it is false.
   Deleting the original also removes its database row and screenshots, like the other delete in Re-encode.
+- **Items from before the check existed** (a Done item, or a skipped "already exists") are checked in the background when the program starts (EncodeEngine.CheckUncheckedAsync, started by AppController), and so are items whose pictures have gone missing. They then show like the others: side by side, with the saving and the delete icons. A skipped one becomes Already encoded or Incomplete; their finish times and order stay as they were.
 - **Per video settings.** `EncodeSettings` are cloned into each queue item, so later changes do not alter what waits.
 - **`encode.lock`** (next to `encodequeue.json`; the `ScanLock` mechanism with a heartbeat) stops two programs that
   share a data folder from working the same queue. The encoder does not touch the database.
