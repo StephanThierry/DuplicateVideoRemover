@@ -393,6 +393,41 @@ public class EncodeEngineTests : IDisposable
     }
 
     [Fact]
+    public void ANewFileCanBeDeletedUnlessTheOriginalIsGone_AndTheItemLeavesTheList()
+    {
+        var engine = NewEngine(new FakeRunner());
+        var a = Video("a.mp4"); var b = Video("b.mp4", 2);
+        engine.Enqueue(new[] { a, b }, EncodeSettings.CreateDefault());
+        WaitFor(() => engine.Current.DoneCount == 2 && !engine.Current.Running, "done");
+        var first = engine.Current.Items[0]; var second = engine.Current.Items[1];
+        Assert.True(first.CanDeleteNew && first.CanDeleteOriginal);
+
+        // Once the original is deleted, the new file is the only copy: it may not be deleted too
+        Assert.True(engine.MarkOriginalDeleted(second.Id));
+        Assert.False(engine.Find(second.Id)!.CanDeleteNew);
+
+        // Deleting the new file takes the video out of the list (and its pictures), so it can be planned again
+        Assert.True(engine.Dismiss(first.Id));
+        Assert.Null(engine.Find(first.Id));
+        Assert.False(File.Exists(engine.CheckShotPath(first.Id, 1)));
+        Assert.False(engine.Current.StatusByPath().ContainsKey(a.Path));
+        Assert.False(engine.Dismiss(first.Id));
+        Assert.Single(engine.Current.Items);
+    }
+
+    [Fact]
+    public void DismissLeavesWaitingVideosAlone()
+    {
+        var runner = new FakeRunner { Behavior = FakeRunner.Hang };
+        var engine = NewEngine(runner);
+        engine.Enqueue(new[] { Video("a.mp4"), Video("b.mp4", 2) }, EncodeSettings.CreateDefault());
+        WaitFor(() => engine.Current.Current != null, "running");
+        Assert.False(engine.Dismiss(engine.Current.Items.First(i => i.Status == EncodeItemStatus.Queued).Id));
+        Assert.False(engine.Dismiss(engine.Current.Current!.Id));
+        Assert.Equal(2, engine.Current.Items.Count);
+    }
+
+    [Fact]
     public void RecycleBinSaysWhenThereIsNone()
     {
         if (!OperatingSystem.IsWindows()) return;

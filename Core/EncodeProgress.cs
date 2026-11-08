@@ -30,6 +30,11 @@ namespace deepduplicates
 
         /// <summary>The new file was checked (length and pictures) and is good: the original can be deleted after a look.</summary>
         public bool CanDeleteOriginal => Status is EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded && CheckOk && !OriginalDeleted;
+        /// <summary>
+        /// The new file can be deleted (to the Recycle Bin): not once the original is gone, because then it is the only copy.
+        /// The file's existence is checked when it is deleted.
+        /// </summary>
+        public bool CanDeleteNew => Status is EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded or EncodeItemStatus.Incomplete && !OriginalDeleted;
         /// <summary>The new file that was there already is not complete: it can be replaced by encoding again.</summary>
         public bool CanReplace => Status == EncodeItemStatus.Incomplete;
         /// <summary>True when the new file has been checked, so there is something to show next to the original.</summary>

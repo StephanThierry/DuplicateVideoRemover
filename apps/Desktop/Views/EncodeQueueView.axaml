@@ -14,6 +14,9 @@
     <Style Selector="TextBlock.ok"><Setter Property="Foreground" Value="{DynamicResource Keep}"/></Style>
     <Style Selector="TextBlock.bad"><Setter Property="Foreground" Value="{DynamicResource Grease}"/></Style>
     <Style Selector="TextBlock.skip"><Setter Property="Foreground" Value="{DynamicResource Warn}"/></Style>
+    <!-- A delete icon next to a set of pictures: red -->
+    <Style Selector="Button.icon.del"><Setter Property="Foreground" Value="{DynamicResource Grease}"/></Style>
+    <Style Selector="Button.icon.del:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Foreground" Value="{DynamicResource GreaseHover}"/><Setter Property="Background" Value="{DynamicResource GreaseWash}"/></Style>
     <Style Selector="Image.qshot"><Setter Property="Width" Value="96"/><Setter Property="Height" Value="64"/></Style>
   </UserControl.Styles>
 
@@ -160,7 +163,7 @@
                     </Grid>
 
                     <!-- The check: the original's pictures from the scan, and the new file's pictures made the same way -->
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="16" IsVisible="{Binding HasCheck}">
+                    <Grid ColumnDefinitions="*,*,150" ColumnSpacing="16" IsVisible="{Binding HasCheck}">
                       <StackPanel Spacing="4">
                         <TextBlock Classes="muted small" FontWeight="SemiBold"><Run Text="Original - "/><Run Text="{Binding Size}"/><Run Text=", "/><Run Text="{Binding Length}"/></TextBlock>
                         <StackPanel Orientation="Horizontal" Spacing="10">
@@ -172,9 +175,15 @@
                             </StackPanel>
                           </Border>
                           <!-- Play: opens the default player, like in the Re-encode planning list -->
-                          <Button Classes="icon" Command="{Binding PlayOriginalCommand}" ToolTip.Tip="Play the original (opens the default player)" VerticalAlignment="Center">
-                            <Path Data="M3,1.5 L3,12.5 L12,7 Z" Fill="{Binding $parent[Button].Foreground}" Width="14" Height="14"/>
-                          </Button>
+                          <StackPanel VerticalAlignment="Center" Spacing="6">
+                            <Button Classes="icon" Command="{Binding PlayOriginalCommand}" ToolTip.Tip="Play the original (opens the default player)">
+                              <Path Data="M3,1.5 L3,12.5 L12,7 Z" Fill="{Binding $parent[Button].Foreground}" Width="14" Height="14"/>
+                            </Button>
+                            <Button Classes="icon del" Command="{Binding AskDeleteOriginalCommand}" IsVisible="{Binding CanDeleteOriginal}"
+                                    ToolTip.Tip="Delete the original (to the Recycle Bin, asks first). Only possible because the new file checked out">
+                              <Path Data="M6,19 C6,20.1 6.9,21 8,21 L16,21 C17.1,21 18,20.1 18,19 L18,7 L6,7 Z M19,4 L15.5,4 L14.5,3 L9.5,3 L8.5,4 L5,4 L5,6 L19,6 Z" Fill="{Binding $parent[Button].Foreground}" Width="16" Height="16" Stretch="Uniform"/>
+                            </Button>
+                          </StackPanel>
                         </StackPanel>
                       </StackPanel>
                       <StackPanel Grid.Column="1" Spacing="4">
@@ -187,16 +196,25 @@
                               <Image Classes="qshot" Source="{Binding NewShot3}" Stretch="UniformToFill"/>
                             </StackPanel>
                           </Border>
-                          <Button Classes="icon" Command="{Binding PlayNewCommand}" ToolTip.Tip="Play the new file (opens the default player)" VerticalAlignment="Center">
-                            <Path Data="M3,1.5 L3,12.5 L12,7 Z" Fill="{Binding $parent[Button].Foreground}" Width="14" Height="14"/>
-                          </Button>
+                          <StackPanel VerticalAlignment="Center" Spacing="6">
+                            <Button Classes="icon" Command="{Binding PlayNewCommand}" ToolTip.Tip="Play the new file (opens the default player)">
+                              <Path Data="M3,1.5 L3,12.5 L12,7 Z" Fill="{Binding $parent[Button].Foreground}" Width="14" Height="14"/>
+                            </Button>
+                            <Button Classes="icon del" Command="{Binding AskDeleteNewCommand}" IsVisible="{Binding CanDeleteNew}"
+                                    ToolTip.Tip="Delete the new file (to the Recycle Bin, asks first). The original is kept">
+                              <Path Data="M6,19 C6,20.1 6.9,21 8,21 L16,21 C17.1,21 18,20.1 18,19 L18,7 L6,7 Z M19,4 L15.5,4 L14.5,3 L9.5,3 L8.5,4 L5,4 L5,6 L19,6 Z" Fill="{Binding $parent[Button].Foreground}" Width="16" Height="16" Stretch="Uniform"/>
+                            </Button>
+                          </StackPanel>
                         </StackPanel>
                         <TextBlock Text="{Binding CheckText}" TextWrapping="Wrap" FontSize="12" Classes.ok="{Binding CheckOk}" Classes.bad="{Binding CheckFailed}"/>
                       </StackPanel>
+                      <!-- What this job saved -->
+                      <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Spacing="2" MinWidth="130" IsVisible="{Binding HasSaving}">
+                        <TextBlock Text="{Binding SavingText}" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Right" Classes.ok="{Binding SavingIsGood}"/>
+                        <TextBlock Text="{Binding SavingDetail}" Classes="muted" HorizontalAlignment="Right"/>
+                      </StackPanel>
                     </Grid>
-                    <WrapPanel IsVisible="{Binding HasCheck}">
-                      <Button Classes="small dangerOutline" Content="Delete original..." Command="{Binding AskDeleteOriginalCommand}" IsVisible="{Binding CanDeleteOriginal}"
-                              ToolTip.Tip="Moves the original to the Recycle Bin (asks first). Only possible because the new file checked out"/>
+                    <WrapPanel IsVisible="{Binding CanReplace}">
                       <Button Classes="small dangerOutline" Content="Replace and encode again..." Command="{Binding AskReplaceCommand}" IsVisible="{Binding CanReplace}"
                               ToolTip.Tip="Moves the incomplete new file out of the way and puts the video in the queue again (asks first)"/>
                     </WrapPanel>

@@ -317,6 +317,29 @@ namespace deepduplicates
         }
 
         /// <summary>
+        /// Deletes the new file of a finished video (Recycle Bin, or for good on a network share - the interface says which first)
+        /// and takes the video out of the list, so it can be planned again. Never when the original is gone: then the new file is the
+        /// only copy. Only ever touches the new file the queue item records.
+        /// </summary>
+        public EncodeActionResult DeleteNewFile(string itemId)
+        {
+            var item = Encoder.Find(itemId);
+            if (item == null) return new("This video is not in the list any more.", "");
+            if (!item.CanDeleteNew) return new("The original has been deleted, so the new file is the only copy and is kept.", "");
+            try
+            {
+                if (!File.Exists(item.Path))
+                    return new("The original is not there any more, so the new file is the only copy and is kept.", "");
+                bool recoverable = File.Exists(item.OutputPath) ? RecycleBin.Delete(item.OutputPath) : true;
+                Encoder.Dismiss(item.Id);
+                return new("", recoverable
+                    ? $"Moved {Path.GetFileName(item.OutputPath)} to the Recycle Bin ({Fmt.Size(item.OutputBytes)}). The original is kept."
+                    : $"Deleted {Path.GetFileName(item.OutputPath)} ({Fmt.Size(item.OutputBytes)}) permanently: this location has no Recycle Bin. The original is kept.", recoverable);
+            }
+            catch (Exception e) { return new($"Could not delete {Path.GetFileName(item.OutputPath)}: {e.Message}", ""); }
+        }
+
+        /// <summary>
         /// For a video whose new file is incomplete (an earlier run was cut off): moves that file out of the way and puts the
         /// video in the queue again. Only ever touches the new file recorded for that video.
         /// </summary>

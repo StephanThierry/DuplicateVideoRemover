@@ -156,6 +156,18 @@ public partial class EncodeQueueViewModel : ObservableObject
         Ask(() => Report(app.DeleteOriginalAfterEncode(row.Id)));
     }
 
+    internal void AskDeleteNew(EncodeQueueRow row)
+    {
+        bool recoverable = app.CanRecover(row.NewPath);
+        ConfirmTitle = recoverable ? "Move the new file to the Recycle Bin?" : "Delete the new file permanently?";
+        ConfirmText = $"{row.NewFileName} ({row.NewSize})\n{row.Folder}\n\n"
+                    + (row.CheckOk ? $"Checked: {row.CheckText}.\n" : $"It is incomplete: {row.CheckText}.\n")
+                    + $"The original ({row.Size}) is kept, and the video can be planned for re-encoding again.\n"
+                    + (recoverable ? "You can restore the new file from the Recycle Bin." : "This location has no Recycle Bin (a network share, for example), so this can't be undone.");
+        ConfirmButton = recoverable ? "Move to Recycle Bin" : "Delete permanently";
+        Ask(() => Report(app.DeleteNewFile(row.Id)));
+    }
+
     internal void AskReplace(EncodeQueueRow row)
     {
         bool recoverable = app.CanRecover(row.NewPath);
@@ -236,7 +248,13 @@ public partial class EncodeQueueRow : ObservableObject
     [ObservableProperty] private string checkText = "";
     [ObservableProperty] private string newSize = "";
     [ObservableProperty] private bool canDeleteOriginal;
+    [ObservableProperty] private bool canDeleteNew;
     [ObservableProperty] private bool canReplace;
+    // What this job saved (shown right of the pictures)
+    [ObservableProperty] private bool hasSaving;
+    [ObservableProperty] private bool savingIsGood;
+    [ObservableProperty] private string savingText = "";
+    [ObservableProperty] private string savingDetail = "";
     [ObservableProperty] private Bitmap? newShot1;
     [ObservableProperty] private Bitmap? newShot2;
     [ObservableProperty] private Bitmap? newShot3;
@@ -288,7 +306,12 @@ public partial class EncodeQueueRow : ObservableObject
         CheckText = i.Status == EncodeItemStatus.Incomplete ? i.Message : i.Check;
         NewSize = Fmt.Size(i.OutputBytes);
         CanDeleteOriginal = i.CanDeleteOriginal;
+        CanDeleteNew = i.CanDeleteNew;
         CanReplace = i.CanReplace;
+        HasSaving = i.Status is EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded;
+        SavingIsGood = i.Saved >= 0;
+        SavingText = i.Saved >= 0 ? (i.OriginalDeleted ? "Saved " : "Saves ") + Fmt.Size(i.Saved) : Fmt.Size(-i.Saved) + " bigger";
+        SavingDetail = i.Saved >= 0 ? EncodeText.Percent(i.SizeBytes, i.OutputBytes) + " smaller" : "no saving";
         LoadNewShots(i);
         OnPropertyChanged(nameof(IsProblem));
         OnPropertyChanged(nameof(CheckFailed));
@@ -317,6 +340,7 @@ public partial class EncodeQueueRow : ObservableObject
     }
 
     [RelayCommand] private void AskDeleteOriginal() => owner.AskDeleteOriginal(this);
+    [RelayCommand] private void AskDeleteNew() => owner.AskDeleteNew(this);
     [RelayCommand] private void AskReplace() => owner.AskReplace(this);
     [RelayCommand] private void PlayOriginal() => owner.Play(OriginalPath);
     [RelayCommand] private void PlayNew() => owner.Play(NewPath);

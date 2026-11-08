@@ -130,6 +130,16 @@ if (Environment.GetEnvironmentVariable("SHOT_QUEUE") == "1")
             while (controller.Encoder.Current.PendingCount > 0 || controller.Encoder.IsRunning) { Pump(100); if (DateTime.UtcNow - wait > TimeSpan.FromMinutes(2)) break; }
             Pump(800); Shot("c_after_replace");
         }
+        // Delete the NEW file of another video (the original is kept); the row whose original was deleted must not offer it
+        var originalGone = q.Finished.First(r => r.StatusText.Contains("original has been deleted"));
+        Console.WriteLine($"row whose original was deleted offers delete-new: {originalGone.CanDeleteNew}");
+        var other = q.Finished.First(r => r.CanDeleteNew && r.CanDeleteOriginal);
+        Console.WriteLine($"saving shown for {other.FileName}: {other.SavingText} / {other.SavingDetail}");
+        other.AskDeleteNewCommand.Execute(null); Pump(300); Shot("c_confirm_delete_new");
+        Console.WriteLine("confirm: " + q.ConfirmTitle + " | " + q.ConfirmText.Replace("\n", " / "));
+        q.ConfirmYesCommand.Execute(null); Pump(1500);
+        Console.WriteLine($"after delete new: toast '{q.Toast}', new file there: {File.Exists(other.NewPath)}, original there: {File.Exists(other.OriginalPath)}, still listed: {q.Finished.Contains(other)}");
+        Shot("c_after_delete_new");
         foreach (var i in controller.Encoder.Current.Items) Console.WriteLine($"  final {i.FileName}: {EncodeText.Status(i)}");
         vm.SelectedTab = MainViewModel.EncodeTab; Pump(800); Shot("c_picker_after");
         Console.WriteLine($"picker rows after deleting an original: {vm.Encode.Rows.Count}");

@@ -255,6 +255,21 @@ namespace deepduplicates
             lock (sync) return items.Where(i => i.Id == id).Select(ToInfo).FirstOrDefault();
         }
 
+        /// <summary>Takes one finished video out of the list (its new file was deleted): the Re-encode planning list shows it normally again.</summary>
+        public bool Dismiss(string id)
+        {
+            lock (sync)
+            {
+                var item = items.FirstOrDefault(i => i.Id == id && i.IsFinishedStatus());
+                if (item == null) return false;
+                items.Remove(item);
+                Forget(item);
+                Save();
+            }
+            Publish();
+            return true;
+        }
+
         /// <summary>Notes that the original of a finished, checked video has been deleted.</summary>
         public bool MarkOriginalDeleted(string id)
         {

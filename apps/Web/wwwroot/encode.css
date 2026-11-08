@@ -73,3 +73,13 @@ button.danger-outline:hover:not(:disabled) { background: var(--grease-wash); bor
 @media (max-width: 900px) { .q-row .q-check { grid-template-columns: 1fr; } }
 
 .q-strip { display: flex; align-items: center; gap: 10px; }
+
+/* Play and delete icons beside a set of pictures; what the job saved to the right of them */
+.q-icons { display: flex; flex-direction: column; gap: 6px; }
+button.icon.del { color: var(--grease); }
+button.icon.del:hover:not(:disabled) { background: var(--grease-wash); color: var(--grease-hover); }
+.q-row .q-check { grid-template-columns: 1fr 1fr 150px; }
+.q-saving { text-align: right; align-self: center; min-width: 130px; }
+.q-saved { font-size: 1.15rem; font-weight: 650; }
+.q-saved.ok { color: var(--keep); }
+@media (max-width: 900px) { .q-row .q-check { grid-template-columns: 1fr; } .q-saving { text-align: left; } }
