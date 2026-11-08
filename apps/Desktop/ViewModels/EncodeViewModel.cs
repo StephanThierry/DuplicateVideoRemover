@@ -11,7 +11,7 @@ using deepduplicates;
 
 namespace DuplicateVideoRemover.Desktop.ViewModels;
 
-/// <summary>The Re-encode screen: videos by bitrate, pick some, create the encoding script.</summary>
+/// <summary>The Re-encode planning screen: videos by bitrate, pick some, create the encoding script.</summary>
 public partial class EncodeViewModel : ObservableObject
 {
     private readonly AppController app;
@@ -205,7 +205,7 @@ public partial class EncodeViewModel : ObservableObject
         var parts = new List<string> { $"Added {Fmt.Plural(result.Added, "video", "videos")} to the queue." };
         if (result.AlreadyThere > 0) parts.Add($"{Fmt.Plural(result.AlreadyThere, "was", "were")} in it already.");
         if (result.Missing.Count > 0) parts.Add($"{Fmt.Plural(result.Missing.Count, "file was", "files were")} not found any more and left out.");
-        if (app.Encoder.Current.Halted && app.Encoder.Current.QueuedCount > 0) parts.Add("The queue is stopped: press Start on the Encoding screen.");
+        if (app.Encoder.Current.Halted && app.Encoder.Current.QueuedCount > 0) parts.Add("The queue is stopped: press Start on the Re-encode queue screen.");
         ShowToast(string.Join(" ", parts), result.Missing.Count > 0 ? 10000 : 5000);
     }
 

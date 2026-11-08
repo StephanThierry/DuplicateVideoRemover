@@ -28,9 +28,9 @@
                 ToolTip.Tip="Stops encoding. The video being encoded goes back in the queue, and everything keeps waiting until you press Start"/>
       </StackPanel>
       <StackPanel>
-        <TextBlock Classes="h1" Text="Encoding"/>
+        <TextBlock Classes="h1" Text="Re-encode queue"/>
         <TextBlock Classes="muted" Margin="0,4,0,0" TextWrapping="Wrap"
-                   Text="Videos you add on the Re-encode screen wait here and are encoded one at a time. The queue is kept if you close the program."/>
+                   Text="Videos you add on the Re-encode planning screen wait here and are encoded one at a time. The queue is kept if you close the program."/>
       </StackPanel>
     </DockPanel>
 
@@ -38,8 +38,8 @@
     <Border Grid.Row="1" Grid.RowSpan="5" Classes="panel" Padding="40" VerticalAlignment="Top" IsVisible="{Binding IsEmpty}">
       <StackPanel HorizontalAlignment="Center" Spacing="10">
         <TextBlock Classes="h2" Text="Nothing in the queue" HorizontalAlignment="Center"/>
-        <TextBlock Classes="muted" Text="Pick videos on the Re-encode screen and add them to the queue. They are encoded here, with progress." HorizontalAlignment="Center"/>
-        <Button Classes="primary" Content="Go to Re-encode" Command="{Binding GoToEncodeCommand}" HorizontalAlignment="Center"/>
+        <TextBlock Classes="muted" Text="Pick videos on the Re-encode planning screen and add them to the queue. They are encoded here, with progress." HorizontalAlignment="Center"/>
+        <Button Classes="primary" Content="Go to Re-encode planning" Command="{Binding GoToEncodeCommand}" HorizontalAlignment="Center"/>
       </StackPanel>
     </Border>
 
@@ -98,7 +98,7 @@
               <TextBlock Text="{Binding WaitingTitle}" FontWeight="SemiBold" VerticalAlignment="Center"/>
             </DockPanel>
           </Border>
-          <TextBlock DockPanel.Dock="Top" Classes="muted" Text="Nothing is waiting. Add more on the Re-encode screen." Margin="14,12" IsVisible="{Binding !HasWaiting}"/>
+          <TextBlock DockPanel.Dock="Top" Classes="muted" Text="Nothing is waiting. Add more on the Re-encode planning screen." Margin="14,12" IsVisible="{Binding !HasWaiting}"/>
           <ListBox Classes="rows" ItemsSource="{Binding Waiting}" Background="Transparent" IsVisible="{Binding HasWaiting}">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:EncodeQueueRow">
@@ -130,7 +130,7 @@
           <Border DockPanel.Dock="Top" Background="{DynamicResource Table}" Padding="12,6,12,6">
             <DockPanel>
               <Button DockPanel.Dock="Right" Classes="small" Content="Clear finished" Command="{Binding ClearFinishedCommand}" IsVisible="{Binding HasFinished}"
-                      ToolTip.Tip="Takes the finished videos out of this list. They can be picked again on the Re-encode screen"/>
+                      ToolTip.Tip="Takes the finished videos out of this list. They can be picked again on the Re-encode planning screen"/>
               <TextBlock Text="{Binding FinishedTitle}" FontWeight="SemiBold" VerticalAlignment="Center"/>
             </DockPanel>
           </Border>

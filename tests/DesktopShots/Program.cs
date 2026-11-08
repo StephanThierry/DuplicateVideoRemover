@@ -42,7 +42,7 @@ void Shot(string name)
 }
 
 // SHOT_QUEUE=1 (with SHOT_FFMPEG=<folder with ffmpeg and ffprobe>, and an empty data folder): the whole encode queue for real -
-// makes a few clips, scans them, adds some to the queue in the Re-encode screen, then adds more while it runs
+// makes a few clips, scans them, adds some to the queue in the Re-encode planning screen, then adds more while it runs
 if (Environment.GetEnvironmentVariable("SHOT_QUEUE") == "1")
 {
     string ffSource = Environment.GetEnvironmentVariable("SHOT_FFMPEG")!;

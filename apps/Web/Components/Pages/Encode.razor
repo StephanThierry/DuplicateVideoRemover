@@ -3,12 +3,12 @@
 @inject AppController App
 @inject NavigationManager Nav
 
-<PageTitle>Re-encode</PageTitle>
+<PageTitle>Re-encode planning</PageTitle>
 
 <div class="page">
     <div class="page-head">
         <div>
-            <h1>Re-encode</h1>
+            <h1>Re-encode planning</h1>
             <p>Videos with the highest bitrate first - they usually shrink the most. Click a video to pick it, Shift-click to pick everything in between, then add them to the encode queue (or create a script).</p>
         </div>
     </div>
@@ -25,7 +25,7 @@
         {
             <div class="enc-summary" style="margin-top:8px">
                 <span>@QueueSummary()</span>
-                <button class="link" @onclick='() => Nav.NavigateTo("encoding")'>Open Encoding</button>
+                <button class="link" @onclick='() => Nav.NavigateTo("encoding")'>Open Re-encode queue</button>
             </div>
         }
     </div>
@@ -160,7 +160,7 @@
 
 @if (toast != null)
 {
-    <div class="toast" role="status">@toast @if (toastQueueLink) { <button class="link" @onclick='() => Nav.NavigateTo("encoding")'>Open Encoding</button> }</div>
+    <div class="toast" role="status">@toast @if (toastQueueLink) { <button class="link" @onclick='() => Nav.NavigateTo("encoding")'>Open Re-encode queue</button> }</div>
 }
 
 @code {
@@ -347,7 +347,7 @@
         var parts = new List<string> { $"Added {Fmt.Plural(result.Added, "video", "videos")} to the queue." };
         if (result.AlreadyThere > 0) parts.Add($"{Fmt.Plural(result.AlreadyThere, "was", "were")} in it already.");
         if (result.Missing.Count > 0) parts.Add($"{Fmt.Plural(result.Missing.Count, "file was", "files were")} not found any more and left out.");
-        if (App.Encoder.Current.Halted && App.Encoder.Current.QueuedCount > 0) parts.Add("The queue is stopped: press Start on the Encoding page.");
+        if (App.Encoder.Current.Halted && App.Encoder.Current.QueuedCount > 0) parts.Add("The queue is stopped: press Start on the Re-encode queue page.");
         ShowToast(string.Join(" ", parts), result.Missing.Count > 0 ? 10000 : 6000, queueLink: true);
     }
 

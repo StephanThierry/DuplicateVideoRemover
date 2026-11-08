@@ -10,8 +10,8 @@
     <nav class="tabs">
         <NavLink href="scan">Scan @if (App.Scanner.IsRunning) { <span class="live" title="Scanning"></span> }</NavLink>
         <NavLink href="" Match="NavLinkMatch.All">Review <span class="count num">@App.Session.Results.DuplicateCount.ToString("N0")</span></NavLink>
-        <NavLink href="encode">Re-encode</NavLink>
-        <NavLink href="encoding">Encoding @if (pending > 0) { <span class="count num" title="Videos waiting or being encoded">@pending.ToString("N0")</span> } @if (App.Encoder.IsRunning) { <span class="live" title="Encoding"></span> }</NavLink>
+        <NavLink href="encode">Re-encode planning</NavLink>
+        <NavLink href="encoding">Re-encode queue @if (pending > 0) { <span class="count num" title="Videos waiting or being encoded">@pending.ToString("N0")</span> } @if (App.Encoder.IsRunning) { <span class="live" title="Encoding"></span> }</NavLink>
         <NavLink href="files">All files</NavLink>
         <NavLink href="settings">Settings</NavLink>
     </nav>

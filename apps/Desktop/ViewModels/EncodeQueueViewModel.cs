@@ -13,7 +13,7 @@ using deepduplicates;
 
 namespace DuplicateVideoRemover.Desktop.ViewModels;
 
-/// <summary>The Encoding screen: the encode queue with the video being encoded, the ones waiting and the finished ones.</summary>
+/// <summary>The Re-encode queue screen: the encode queue with the video being encoded, the ones waiting and the finished ones.</summary>
 public partial class EncodeQueueViewModel : ObservableObject
 {
     private readonly AppController app;

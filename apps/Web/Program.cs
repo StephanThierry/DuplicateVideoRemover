@@ -119,7 +119,7 @@ app.MapGet("/encodecheck/{name}", (string name) =>
     return File.Exists(path) ? Results.File(path, "image/png", enableRangeProcessing: false) : Results.NotFound();
 });
 
-// A new (re-encoded) file from the Encoding page, for the player: /encodevideo/<queue item id>. Only the new file of a queue item.
+// A new (re-encoded) file from the Re-encode queue page, for the player: /encodevideo/<queue item id>. Only the new file of a queue item.
 app.MapGet("/encodevideo/{id}", (string id) =>
 {
     var item = controller.Encoder.Find(id);
@@ -129,7 +129,7 @@ app.MapGet("/encodevideo/{id}", (string id) =>
     return Results.File(item.OutputPath, type, enableRangeProcessing: true);
 });
 
-// The encoding script made on the Re-encode page: /output/encode_selected.sh or .ps1
+// The encoding script made on the Re-encode planning page: /output/encode_selected.sh or .ps1
 app.MapGet("/output/{name}", (string name) =>
 {
     if (name != AppController.EncodeScriptName + ScriptFile.Extension) return Results.NotFound();

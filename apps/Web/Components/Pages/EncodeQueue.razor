@@ -3,13 +3,13 @@
 @inject AppController App
 @inject NavigationManager Nav
 
-<PageTitle>Encoding</PageTitle>
+<PageTitle>Re-encode queue</PageTitle>
 
 <div class="page">
     <div class="page-head">
         <div>
-            <h1>Encoding</h1>
-            <p>Videos you add on the Re-encode page wait here and are encoded one at a time, on the computer that runs this program. The queue is kept if the program restarts.</p>
+            <h1>Re-encode queue</h1>
+            <p>Videos you add on the Re-encode planning page wait here and are encoded one at a time, on the computer that runs this program. The queue is kept if the program restarts.</p>
         </div>
         <div class="inline">
             @if (!p.Running && p.QueuedCount > 0)
@@ -31,8 +31,8 @@
     {
         <div class="empty">
             <h2>Nothing in the queue</h2>
-            <p>Pick videos on the Re-encode page and add them to the queue. They are encoded here, with progress.</p>
-            <button class="primary big" @onclick='() => Nav.NavigateTo("encode")'>Go to Re-encode</button>
+            <p>Pick videos on the Re-encode planning page and add them to the queue. They are encoded here, with progress.</p>
+            <button class="primary big" @onclick='() => Nav.NavigateTo("encode")'>Go to Re-encode planning</button>
         </div>
     }
     else
@@ -86,7 +86,7 @@
             </div>
             @if (p.QueuedCount == 0)
             {
-                <p class="muted">Nothing is waiting. Add more on the Re-encode page.</p>
+                <p class="muted">Nothing is waiting. Add more on the Re-encode planning page.</p>
             }
             else
             {
@@ -110,7 +110,7 @@
         <section class="panel q-list">
             <div class="q-head">
                 <h2>Finished (@p.FinishedCount.ToString("N0"))</h2>
-                @if (p.FinishedCount > 0) { <button class="small" @onclick="() => App.Encoder.ClearFinished()" title="Takes the finished videos out of this list. They can be picked again on the Re-encode page">Clear finished</button> }
+                @if (p.FinishedCount > 0) { <button class="small" @onclick="() => App.Encoder.ClearFinished()" title="Takes the finished videos out of this list. They can be picked again on the Re-encode planning page">Clear finished</button> }
             </div>
             @if (p.FinishedCount == 0)
             {

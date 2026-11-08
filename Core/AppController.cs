@@ -34,7 +34,7 @@ namespace deepduplicates
         /// <summary>True when settings.json did not exist and was created with defaults.</summary>
         public bool IsFirstRun { get; }
         public ScanEngine Scanner { get; } = new();
-        /// <summary>The encode queue (Re-encode adds videos, the Encoding screen shows it).</summary>
+        /// <summary>The encode queue (Re-encode adds videos, the Re-encode queue screen shows it).</summary>
         public EncodeEngine Encoder { get; }
         public ResultSession Session { get; private set; }
 

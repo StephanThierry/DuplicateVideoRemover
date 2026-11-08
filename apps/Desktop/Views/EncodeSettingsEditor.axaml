@@ -10,7 +10,7 @@
       <ComboBox ItemsSource="{Binding RunModes}" SelectedItem="{Binding RunMode}" MinWidth="320">
         <ComboBox.ItemTemplate><DataTemplate x:DataType="core:ChoiceOption"><TextBlock Text="{Binding Label}"/></DataTemplate></ComboBox.ItemTemplate>
       </ComboBox>
-      <TextBlock Classes="muted small" TextWrapping="Wrap" Text="Encoding here adds the videos to a queue (the Encoding screen) and runs FFmpeg for you, one video at a time, with progress. Or create a script to run yourself on any computer. You can also switch on the Re-encode screen for one batch."/>
+      <TextBlock Classes="muted small" TextWrapping="Wrap" Text="Encoding here adds the videos to a queue (the Re-encode queue screen) and runs FFmpeg for you, one video at a time, with progress. Or create a script to run yourself on any computer. You can also switch on the Re-encode planning screen for one batch."/>
     </StackPanel>
 
     <StackPanel Spacing="4">

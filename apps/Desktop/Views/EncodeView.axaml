@@ -25,7 +25,7 @@
 
   <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto" Margin="12,16,12,0">
     <StackPanel Grid.Row="0" Margin="0,0,0,12">
-      <TextBlock Classes="h1" Text="Re-encode"/>
+      <TextBlock Classes="h1" Text="Re-encode planning"/>
       <TextBlock Classes="muted" TextWrapping="Wrap" Margin="0,4,0,0"
                  Text="Videos with the highest bitrate first - they usually shrink the most. Click a video to pick it, Shift-click to pick everything in between, then add them to the encode queue (or create a script)."/>
     </StackPanel>
@@ -40,7 +40,7 @@
         <!-- What is in the encode queue right now -->
         <WrapPanel IsVisible="{Binding HasQueueSummary}">
           <TextBlock Text="{Binding QueueSummary}" Margin="0,0,14,0" VerticalAlignment="Center"/>
-          <Button Classes="link" Content="Open Encoding" Command="{Binding OpenQueueCommand}"/>
+          <Button Classes="link" Content="Open Re-encode queue" Command="{Binding OpenQueueCommand}"/>
         </WrapPanel>
       </StackPanel>
     </Border>

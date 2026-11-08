@@ -40,7 +40,7 @@
 @code {
     [Parameter] public VideoEntry? Video { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
-    /// <summary>Where the video is streamed from, when not /video/{id} (a new file on the Encoding page: video id 0, its own address).</summary>
+    /// <summary>Where the video is streamed from, when not /video/{id} (a new file on the Re-encode queue page: video id 0, its own address).</summary>
     [Parameter] public string? Src { get; set; }
 
     private string Source => Src ?? $"video/{Video!.Id}";
