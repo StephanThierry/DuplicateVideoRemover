@@ -69,6 +69,12 @@ namespace deepduplicates
         public DateTime QueuedUtc { get; set; } = DateTime.UtcNow;
         public DateTime? StartedUtc { get; set; }
         public DateTime? FinishedUtc { get; set; }
+        /// <summary>What the check of the new file found (see EncodeChecker); its pictures are kept in encode_checks next to the queue.</summary>
+        public string Check { get; set; } = "";
+        public bool CheckOk { get; set; }
+        public bool HasCheckShots { get; set; }
+        /// <summary>The original was deleted after the new file checked out.</summary>
+        public bool OriginalDeleted { get; set; }
 
         // While running (not saved)
         [System.Text.Json.Serialization.JsonIgnore] public double Fraction { get; set; }
@@ -95,6 +101,8 @@ namespace deepduplicates
         private readonly string stateFile;
         private readonly IEncodeRunner runner;
         private readonly Func<Task<string>> prepareFfmpeg;
+        private readonly EncodeChecker checker;
+        private readonly string checksFolder;
         private CancellationTokenSource? workerCts, itemCts;
         private Task? worker;
         private bool halted, running;
@@ -121,6 +129,8 @@ namespace deepduplicates
             this.stateFile = stateFile;
             this.prepareFfmpeg = prepareFfmpeg;
             this.runner = runner ?? new ProcessEncodeRunner();
+            checker = new EncodeChecker(this.runner);
+            checksFolder = Path.Combine(Path.GetDirectoryName(stateFile)!, "encode_checks");
             Load();
             Current = Snapshot();
         }
@@ -129,7 +139,8 @@ namespace deepduplicates
 
         /// <summary>
         /// Adds videos to the end of the queue and starts encoding, unless the queue was stopped. A video that is
-        /// already waiting, running or done is not added again; one that failed or was skipped is queued afresh.
+        /// already waiting, running, done or encoded before is not added again; one that failed, was skipped or has an
+        /// incomplete new file is queued afresh.
         /// </summary>
         public EnqueueResult Enqueue(IEnumerable<EncodeCandidate> videos, EncodeSettings settings)
         {
@@ -139,8 +150,8 @@ namespace deepduplicates
                 foreach (var c in videos)
                 {
                     var existing = items.FirstOrDefault(i => EncodeProgress.PathComparer.Equals(i.Path, c.Path));
-                    if (existing != null && existing.Status is EncodeItemStatus.Queued or EncodeItemStatus.Running or EncodeItemStatus.Done) { there++; continue; }
-                    if (existing != null) items.Remove(existing);
+                    if (existing != null && existing.Status is EncodeItemStatus.Queued or EncodeItemStatus.Running or EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded) { there++; continue; }
+                    if (existing != null) { items.Remove(existing); Forget(existing); }
                     var s = settings.Clone();
                     items.Add(new EncodeItem
                     {
@@ -191,15 +202,20 @@ namespace deepduplicates
             return true;
         }
 
-        /// <summary>Puts a failed or skipped video at the end of the queue again.</summary>
+        /// <summary>
+        /// Puts a failed or skipped video at the end of the queue again. Also one with an incomplete new file - but then
+        /// the incomplete file must be gone first (see AppController.ReplaceIncomplete), or it would be skipped again.
+        /// </summary>
         public bool Retry(string id)
         {
             lock (sync)
             {
-                var item = items.FirstOrDefault(i => i.Id == id && i.Status is EncodeItemStatus.Failed or EncodeItemStatus.Skipped);
+                var item = items.FirstOrDefault(i => i.Id == id && i.Status is EncodeItemStatus.Failed or EncodeItemStatus.Skipped or EncodeItemStatus.Incomplete);
                 if (item == null) return false;
                 items.Remove(item);
+                Forget(item);
                 item.Status = EncodeItemStatus.Queued; item.Message = ""; item.FinishedUtc = null; item.StartedUtc = null; item.OutputBytes = 0;
+                item.Check = ""; item.CheckOk = false; item.HasCheckShots = false;
                 item.QueuedUtc = DateTime.UtcNow;
                 items.Add(item);
                 Save();
@@ -218,14 +234,42 @@ namespace deepduplicates
             return n;
         }
 
-        /// <summary>Takes the finished videos (done, failed, skipped) out of the list; the Re-encode list shows them normally again.</summary>
+        /// <summary>Takes the finished videos (done, failed, skipped, already encoded, incomplete) out of the list; the Re-encode list shows them normally again.</summary>
         public int ClearFinished()
         {
             int n;
-            lock (sync) { n = items.RemoveAll(i => i.Status is EncodeItemStatus.Done or EncodeItemStatus.Failed or EncodeItemStatus.Skipped); if (n > 0) Save(); }
+            lock (sync)
+            {
+                var finished = items.Where(i => i.IsFinishedStatus()).ToList();
+                foreach (var i in finished) Forget(i);
+                n = items.RemoveAll(i => i.IsFinishedStatus());
+                if (n > 0) Save();
+            }
             Publish();
             return n;
         }
+
+        /// <summary>One video of the queue (null when it is not there any more).</summary>
+        public EncodeItemInfo? Find(string id)
+        {
+            lock (sync) return items.Where(i => i.Id == id).Select(ToInfo).FirstOrDefault();
+        }
+
+        /// <summary>Notes that the original of a finished, checked video has been deleted.</summary>
+        public bool MarkOriginalDeleted(string id)
+        {
+            lock (sync)
+            {
+                var item = items.FirstOrDefault(i => i.Id == id);
+                if (item == null) return false;
+                item.OriginalDeleted = true;
+                Save();
+            }
+            Publish();
+            return true;
+        }
+
+        private void Forget(EncodeItem item) => EncodeChecker.DeleteShots(checksFolder, item.Id);
 
         /// <summary>Stops and waits for the running FFmpeg to be killed and its partial file deleted (when the program closes).</summary>
         public void Shutdown()
@@ -309,7 +353,7 @@ namespace deepduplicates
             try
             {
                 if (!File.Exists(item.Path)) { Finish(item, EncodeItemStatus.Skipped, "the video is not there any more"); return; }
-                if (s.neverOverwrite && File.Exists(output)) { Finish(item, EncodeItemStatus.Skipped, "the new file already exists"); return; }
+                if (s.neverOverwrite && File.Exists(output)) { await CheckExistingAsync(item, ffmpeg, itemToken); return; }
                 if (FreeSpaceProblem(item) is string problem) { Finish(item, EncodeItemStatus.Failed, problem); return; }
                 TryDelete(part);
 
@@ -349,7 +393,11 @@ namespace deepduplicates
                     item.Fraction = 1;
                     encodedMediaSeconds += item.DurationSeconds;
                 }
-                Finish(item, EncodeItemStatus.Done, "");
+                // The new file gets the same check as one that was there already: pictures like the scan's, shown in the interface
+                AddLog($"Checking the new file of {Path.GetFileName(item.Path)}");
+                var check = await TryCheckAsync(item, ffmpeg, itemToken);
+                if (check is { Valid: false }) Finish(item, EncodeItemStatus.Incomplete, check.Problem);
+                else Finish(item, EncodeItemStatus.Done, "");
             }
             catch (OperationCanceledException)
             {
@@ -373,21 +421,51 @@ namespace deepduplicates
             }
         }
 
+        // The new file was there before this run: is it a finished result of an earlier run, or an incomplete one?
+        private async Task CheckExistingAsync(EncodeItem item, string ffmpeg, CancellationToken ct)
+        {
+            string name = Path.GetFileName(item.Path);
+            AddLog($"{name}: the new file exists already, checking it");
+            var check = await TryCheckAsync(item, ffmpeg, ct);
+            if (check == null) { Finish(item, EncodeItemStatus.Skipped, "the new file already exists (it could not be checked)"); return; }
+            lock (sync) item.OutputBytes = new FileInfo(item.OutputPath).Length;
+            Finish(item, check.Valid ? EncodeItemStatus.AlreadyEncoded : EncodeItemStatus.Incomplete, check.Valid ? "the new file was there already and checks out" : check.Problem);
+        }
+
+        // Runs the check and keeps what it found on the item. Null when it could not be run at all (the caller decides what that means).
+        private async Task<EncodeCheckResult?> TryCheckAsync(EncodeItem item, string ffmpeg, CancellationToken ct)
+        {
+            try
+            {
+                var r = await checker.CheckAsync(ffmpeg, item.OutputPath, item.DurationSeconds, checksFolder, item.Id, ct);
+                lock (sync) { item.Check = r.Valid ? r.Summary : r.Problem; item.CheckOk = r.Valid; item.HasCheckShots = r.Pictures > 0; }
+                return r;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception e)
+            {
+                AddLog($"Could not check {Path.GetFileName(item.OutputPath)}: {e.Message}");
+                return null;
+            }
+        }
+
         private void Finish(EncodeItem item, EncodeItemStatus status, string message)
         {
             lock (sync)
             {
                 item.Status = status; item.Message = message; item.FinishedUtc = DateTime.UtcNow;
-                if (status != EncodeItemStatus.Done) item.OutputBytes = 0;
+                if (status is not (EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded or EncodeItemStatus.Incomplete)) item.OutputBytes = 0;
                 // Keep the list of finished videos from growing for ever
                 var finished = items.Where(i => i.IsFinishedStatus()).OrderBy(i => i.FinishedUtc).ToList();
-                foreach (var old in finished.Take(Math.Max(finished.Count - KeepFinished, 0))) items.Remove(old);
+                foreach (var old in finished.Take(Math.Max(finished.Count - KeepFinished, 0))) { items.Remove(old); Forget(old); }
                 Save();
             }
             string name = Path.GetFileName(item.Path);
             AddLog(status switch
             {
-                EncodeItemStatus.Done => $"Finished {name}: {Fmt.Size(item.SizeBytes)} became {Fmt.Size(item.OutputBytes)}",
+                EncodeItemStatus.Done => $"Finished {name}: {Fmt.Size(item.SizeBytes)} became {Fmt.Size(item.OutputBytes)}" + (item.CheckOk ? ", checked" : ""),
+                EncodeItemStatus.AlreadyEncoded => $"{name}: already encoded earlier, {Fmt.Size(item.SizeBytes)} became {Fmt.Size(item.OutputBytes)}, the new file checks out",
+                EncodeItemStatus.Incomplete => $"{name}: the new file is incomplete: {message}",
                 EncodeItemStatus.Skipped => $"Skipped {name}: {message}",
                 _ => $"Failed {name}: {message}",
             });
@@ -441,9 +519,7 @@ namespace deepduplicates
         {
             lock (sync)
             {
-                var infos = items.Select(i => new EncodeItemInfo(i.Id, i.VideoId, i.Path, i.SizeBytes, i.DurationSeconds,
-                    EncodeText.Summary(i.Settings), i.OutputPath, i.Status, i.Message, i.OutputBytes, i.Fraction, i.Fps, i.Speed,
-                    i.QueuedUtc, i.StartedUtc, i.FinishedUtc)).ToList();
+                var infos = items.Select(ToInfo).ToList();
                 
                 // This run: what waits or runs, plus what finished since it started
                 var inRun = items.Where(i => !i.IsFinishedStatus() || i.FinishedUtc >= runStartUtc).ToList();
@@ -468,6 +544,13 @@ namespace deepduplicates
                 };
             }
         }
+
+        private static EncodeItemInfo ToInfo(EncodeItem i) => new(i.Id, i.VideoId, i.Path, i.SizeBytes, i.DurationSeconds,
+            EncodeText.Summary(i.Settings), i.OutputPath, i.Status, i.Message, i.OutputBytes, i.Fraction, i.Fps, i.Speed,
+            i.QueuedUtc, i.StartedUtc, i.FinishedUtc, i.Check, i.CheckOk, i.HasCheckShots, i.OriginalDeleted);
+
+        /// <summary>The kept pictures of the checked new file of a video, for the interfaces.</summary>
+        public string CheckShotPath(string itemId, int n) => EncodeChecker.ShotPath(checksFolder, itemId, n);
 
         private sealed class State { public List<EncodeItem> Items { get; set; } = new(); }
 
@@ -512,6 +595,7 @@ namespace deepduplicates
 
     internal static class EncodeItemExtensions
     {
-        public static bool IsFinishedStatus(this EncodeItem i) => i.Status is EncodeItemStatus.Done or EncodeItemStatus.Failed or EncodeItemStatus.Skipped;
+        public static bool IsFinishedStatus(this EncodeItem i) => i.Status is EncodeItemStatus.Done or EncodeItemStatus.Failed or EncodeItemStatus.Skipped
+            or EncodeItemStatus.AlreadyEncoded or EncodeItemStatus.Incomplete;
     }
 }

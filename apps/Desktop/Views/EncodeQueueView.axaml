@@ -139,24 +139,59 @@
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:EncodeQueueRow">
                 <Border Classes="qrow">
-                  <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
-                    <Border Background="{DynamicResource Frame}" CornerRadius="3" Padding="3" VerticalAlignment="Center">
-                      <Image Classes="qshot" Source="{Binding Shot}" Stretch="UniformToFill"/>
-                    </Border>
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
-                      <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                      <TextBlock Text="{Binding Folder}" Classes="muted small" TextTrimming="CharacterEllipsis"/>
-                      <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" FontSize="13" Classes.ok="{Binding IsDone}" Classes.bad="{Binding IsFailed}" Classes.skip="{Binding IsSkipped}"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Spacing="4">
-                      <TextBlock Text="{Binding ResultText}" HorizontalAlignment="Right" IsVisible="{Binding IsDone}"/>
-                      <TextBlock Text="{Binding WhenText}" Classes="muted small" HorizontalAlignment="Right"/>
-                      <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
-                        <Button Classes="small" Content="Try again" Command="{Binding RetryCommand}" IsVisible="{Binding CanRetry}"/>
-                        <Button Classes="small" Content="Open folder" Command="{Binding ShowFolderCommand}"/>
+                  <StackPanel Spacing="10">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+                      <!-- One picture while there is no check to show (failed or skipped) -->
+                      <Border Background="{DynamicResource Frame}" CornerRadius="3" Padding="3" VerticalAlignment="Center" IsVisible="{Binding NoCheck}">
+                        <Image Classes="qshot" Source="{Binding Shot2}" Stretch="UniformToFill"/>
+                      </Border>
+                      <StackPanel Grid.Column="1" Grid.ColumnSpan="1" VerticalAlignment="Center" Spacing="2">
+                        <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding Folder}" Classes="muted small" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" FontSize="13" Classes.ok="{Binding IsDone}" Classes.bad="{Binding IsProblem}" Classes.skip="{Binding IsSkipped}"/>
                       </StackPanel>
-                    </StackPanel>
-                  </Grid>
+                      <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Spacing="4">
+                        <TextBlock Text="{Binding WhenText}" Classes="muted small" HorizontalAlignment="Right"/>
+                        <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+                          <Button Classes="small" Content="Try again" Command="{Binding RetryCommand}" IsVisible="{Binding CanRetry}"/>
+                          <Button Classes="small" Content="Open folder" Command="{Binding ShowFolderCommand}"/>
+                        </StackPanel>
+                      </StackPanel>
+                    </Grid>
+
+                    <!-- The check: the original's pictures from the scan, and the new file's pictures made the same way -->
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="16" IsVisible="{Binding HasCheck}">
+                      <StackPanel Spacing="4">
+                        <TextBlock Classes="muted small" FontWeight="SemiBold"><Run Text="Original - "/><Run Text="{Binding Size}"/><Run Text=", "/><Run Text="{Binding Length}"/></TextBlock>
+                        <Border Background="{DynamicResource Frame}" CornerRadius="3" Padding="4" HorizontalAlignment="Left">
+                          <StackPanel Orientation="Horizontal" Spacing="3">
+                            <Image Classes="qshot" Source="{Binding Shot1}" Stretch="UniformToFill"/>
+                            <Image Classes="qshot" Source="{Binding Shot2}" Stretch="UniformToFill"/>
+                            <Image Classes="qshot" Source="{Binding Shot3}" Stretch="UniformToFill"/>
+                          </StackPanel>
+                        </Border>
+                      </StackPanel>
+                      <StackPanel Grid.Column="1" Spacing="4">
+                        <TextBlock Classes="muted small" FontWeight="SemiBold"><Run Text="New file - "/><Run Text="{Binding NewSize}"/></TextBlock>
+                        <Border Background="{DynamicResource Frame}" CornerRadius="3" Padding="4" HorizontalAlignment="Left">
+                          <StackPanel Orientation="Horizontal" Spacing="3">
+                            <Image Classes="qshot" Source="{Binding NewShot1}" Stretch="UniformToFill"/>
+                            <Image Classes="qshot" Source="{Binding NewShot2}" Stretch="UniformToFill"/>
+                            <Image Classes="qshot" Source="{Binding NewShot3}" Stretch="UniformToFill"/>
+                          </StackPanel>
+                        </Border>
+                        <TextBlock Text="{Binding CheckText}" TextWrapping="Wrap" FontSize="12" Classes.ok="{Binding CheckOk}" Classes.bad="{Binding CheckFailed}"/>
+                      </StackPanel>
+                    </Grid>
+                    <WrapPanel IsVisible="{Binding HasCheck}">
+                      <Button Classes="small" Content="Play original" Command="{Binding PlayOriginalCommand}" Margin="0,0,6,0"/>
+                      <Button Classes="small" Content="Play new file" Command="{Binding PlayNewCommand}" Margin="0,0,6,0"/>
+                      <Button Classes="small dangerOutline" Content="Delete original..." Command="{Binding AskDeleteOriginalCommand}" IsVisible="{Binding CanDeleteOriginal}"
+                              ToolTip.Tip="Moves the original to the Recycle Bin (asks first). Only possible because the new file checked out"/>
+                      <Button Classes="small dangerOutline" Content="Replace and encode again..." Command="{Binding AskReplaceCommand}" IsVisible="{Binding CanReplace}"
+                              ToolTip.Tip="Moves the incomplete new file out of the way and puts the video in the queue again (asks first)"/>
+                    </WrapPanel>
+                  </StackPanel>
                 </Border>
               </DataTemplate>
             </ListBox.ItemTemplate>
@@ -173,5 +208,26 @@
         </ScrollViewer>
       </Border>
     </Expander>
+
+    <!-- Toast -->
+    <Border Grid.Row="4" Grid.RowSpan="2" IsVisible="{Binding Toast, Converter={x:Static ObjectConverters.IsNotNull}}"
+            Background="{DynamicResource Ink}" CornerRadius="4" Padding="14,10" Margin="0,0,0,40"
+            HorizontalAlignment="Center" VerticalAlignment="Bottom" MaxWidth="680">
+      <TextBlock Text="{Binding Toast}" Foreground="{DynamicResource Sheet}" TextWrapping="Wrap"/>
+    </Border>
+
+    <!-- Confirmation before deleting an original or replacing an incomplete new file -->
+    <Grid Grid.RowSpan="6" Margin="-12,-16,-12,-12" Background="#80000000" IsVisible="{Binding ConfirmVisible}">
+      <Border Classes="panel" Width="580" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
+        <StackPanel Spacing="12">
+          <TextBlock Classes="h2" Text="{Binding ConfirmTitle}" TextWrapping="Wrap"/>
+          <TextBlock Classes="muted" Text="{Binding ConfirmText}" TextWrapping="Wrap"/>
+          <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="Cancel" Command="{Binding ConfirmNoCommand}"/>
+            <Button Classes="danger" Content="{Binding ConfirmButton}" Command="{Binding ConfirmYesCommand}"/>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Grid>
   </Grid>
 </UserControl>

@@ -81,6 +81,59 @@ if (Environment.GetEnvironmentVariable("SHOT_QUEUE") == "1")
     while ((controller.Scanner.IsRunning || controller.Scanner.Current.Phase == ScanPhase.Idle) && DateTime.UtcNow - scanStart < TimeSpan.FromMinutes(3)) Pump(200);
     Console.WriteLine("scan: " + controller.Scanner.Current.Phase + " " + controller.Scanner.Current.Message);
 
+    // SHOT_CHECK=1: earlier results are there already - two good ones, one cut off - plus a video that is encoded now.
+    // The new files are checked (length, pictures like the scan's), then the original of a good one is deleted and the cut-off one replaced.
+    if (Environment.GetEnvironmentVariable("SHOT_CHECK") == "1")
+    {
+        var cands = controller.EncodeCandidates();
+        var es = settings.EncodeOrDefault();
+        for (int n = 0; n < 3; n++)
+        {
+            string target = EncodePlanner.OutputPath(cands[n].Path, es);
+            var made = Task.Run(() => gen.RunAsync(FileHandler.FFmpegPath, EncodePlanner.Arguments(cands[n].Path, es, target), _ => { }, _ => { }, CancellationToken.None)).GetAwaiter().GetResult();
+            Console.WriteLine($"earlier result {n}: ffmpeg {made}, {new FileInfo(target).Length:N0} bytes");
+        }
+        string cutOff = EncodePlanner.OutputPath(cands[2].Path, es);
+        var all = File.ReadAllBytes(cutOff);
+        File.WriteAllBytes(cutOff, all[..(all.Length * 6 / 10)]);
+        foreach (var f in Directory.GetFiles(videos, "*_720p_x264.mp4")) File.SetLastWriteTime(f, DateTime.Now.AddHours(-2));
+
+        vm.SelectedTab = MainViewModel.EncodeTab; Pump(500);
+        var waitLoad = DateTime.UtcNow;
+        while ((vm.Encode.Loading || vm.Encode.Rows.Count == 0) && DateTime.UtcNow - waitLoad < TimeSpan.FromMinutes(1)) Pump(200);
+        vm.Encode.MinMb = 0; vm.Encode.MinKbps = 0; Pump(300);
+        vm.Encode.RowClicked(vm.Encode.Rows[0], false); vm.Encode.RowClicked(vm.Encode.Rows[3], true); Pump(300);
+        vm.Encode.PrimaryCommand.Execute(null);
+        var wait = DateTime.UtcNow;
+        while (controller.Encoder.Current.PendingCount > 0 && DateTime.UtcNow - wait < TimeSpan.FromMinutes(3)) Pump(100);
+        Pump(800);
+        vm.SelectedTab = MainViewModel.QueueTab; Pump(500); Shot("c_finished");
+        foreach (var i in controller.Encoder.Current.Items) Console.WriteLine($"  {i.FileName}: {EncodeText.Status(i)} | check: {i.Check}");
+
+        var q = vm.EncodeQueue;
+        var good = q.Finished.First(r => r.CanDeleteOriginal);
+        good.AskDeleteOriginalCommand.Execute(null); Pump(300); Shot("c_confirm_delete");
+        Console.WriteLine("confirm: " + q.ConfirmTitle + " | " + q.ConfirmText.Replace("\n", " / ") + " | button " + q.ConfirmButton);
+        q.ConfirmYesCommand.Execute(null); Pump(1500);
+        Console.WriteLine($"after delete: toast '{q.Toast}', original still there: {File.Exists(good.OriginalPath)}, new file there: {File.Exists(good.NewPath)}");
+        Shot("c_after_delete");
+
+        var incomplete = q.Finished.FirstOrDefault(r => r.CanReplace);
+        Console.WriteLine("incomplete row found: " + (incomplete != null));
+        if (incomplete != null)
+        {
+            incomplete.AskReplaceCommand.Execute(null); Pump(300); Shot("c_confirm_replace");
+            q.ConfirmYesCommand.Execute(null);
+            wait = DateTime.UtcNow;
+            while (controller.Encoder.Current.PendingCount > 0 || controller.Encoder.IsRunning) { Pump(100); if (DateTime.UtcNow - wait > TimeSpan.FromMinutes(2)) break; }
+            Pump(800); Shot("c_after_replace");
+        }
+        foreach (var i in controller.Encoder.Current.Items) Console.WriteLine($"  final {i.FileName}: {EncodeText.Status(i)}");
+        vm.SelectedTab = MainViewModel.EncodeTab; Pump(800); Shot("c_picker_after");
+        Console.WriteLine($"picker rows after deleting an original: {vm.Encode.Rows.Count}");
+        controller.Encoder.Shutdown();
+        return;
+    }
     vm.SelectedTab = MainViewModel.QueueTab; Pump(500); Shot("q_empty");
     vm.SelectedTab = MainViewModel.EncodeTab; Pump(500);
     var loadWait = DateTime.UtcNow;

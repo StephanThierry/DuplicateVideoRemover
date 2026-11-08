@@ -121,19 +121,39 @@
                 var finished = p.Items.Where(i => i.IsFinished).OrderByDescending(i => i.FinishedUtc).ToList();
                 @foreach (var i in finished.Take(doneShown))
                 {
-                    <div class="q-row" @key="i.Id">
-                        <img src="shots/@(i.VideoId)_2.png" alt="" loading="lazy" onerror="this.style.visibility='hidden'" />
+                    <div class="q-row q-done @(i.HasCheck ? "has-check" : "")" @key="i.Id">
+                        @if (!i.HasCheck) { <img src="shots/@(i.VideoId)_2.png" alt="" loading="lazy" onerror="this.style.visibility='hidden'" /> }
                         <div class="info">
                             <div class="name">@i.FileName</div>
                             <div class="muted" style="font-size:.85rem;word-break:break-all">@i.Folder</div>
                             <div class="q-status @Css(i)">@EncodeText.Status(i)</div>
-                            @if (i.Status == EncodeItemStatus.Done) { <div class="muted" style="font-size:.85rem;word-break:break-all">Saved as @System.IO.Path.GetFileName(i.OutputPath)</div> }
                         </div>
-                        <div class="num">
-                            @if (i.Status == EncodeItemStatus.Done) { <span>@Fmt.Size(i.SizeBytes) became @Fmt.Size(i.OutputBytes)</span><br /> }
-                            <small class="muted">@(i.FinishedUtc is DateTime t ? Fmt.When(t) : "")</small>
-                        </div>
-                        @if (i.Status != EncodeItemStatus.Done) { <button class="small" @onclick="() => App.Encoder.Retry(i.Id)">Try again</button> } else { <span></span> }
+                        <div class="num"><small class="muted">@(i.FinishedUtc is DateTime t ? Fmt.When(t) : "")</small></div>
+                        @if (i.Status is EncodeItemStatus.Failed or EncodeItemStatus.Skipped) { <button class="small" @onclick="() => App.Encoder.Retry(i.Id)">Try again</button> } else { <span></span> }
+
+                        @if (i.HasCheck)
+                        {
+                            @* The check: the original's pictures from the scan, and the new file's pictures made the same way *@
+                            <div class="q-check">
+                                <div class="q-side">
+                                    <div class="q-cap">Original - @Fmt.Size(i.SizeBytes), @Fmt.Duration(i.DurationSeconds)</div>
+                                    <div class="enc-strip">@for (int n = 1; n <= 3; n++) { <img loading="lazy" src="shots/@(i.VideoId)_@(n).png" alt="" onerror="this.style.visibility='hidden'" /> }</div>
+                                </div>
+                                <div class="q-side">
+                                    <div class="q-cap">New file - @Fmt.Size(i.OutputBytes)</div>
+                                    <div class="enc-strip">
+                                        @if (i.HasCheckShots) { @for (int n = 1; n <= 3; n++) { <img loading="lazy" src="encodecheck/@(i.Id)_@(n).png" alt="" onerror="this.style.visibility='hidden'" /> } }
+                                    </div>
+                                    <div class="q-checktext @(i.CheckOk ? "ok" : "bad")">@(i.Status == EncodeItemStatus.Incomplete ? i.Message : i.Check)</div>
+                                </div>
+                            </div>
+                            <div class="q-actions">
+                                <button class="small" @onclick="() => PlayOriginal(i)">Play original</button>
+                                <button class="small" @onclick="() => PlayNew(i)">Play new file</button>
+                                @if (i.CanDeleteOriginal) { <button class="small danger-outline" @onclick="() => AskDeleteOriginal(i)" title="Moves the original to the Recycle Bin (asks first). Only possible because the new file checked out">Delete original...</button> }
+                                @if (i.CanReplace) { <button class="small danger-outline" @onclick="() => AskReplace(i)" title="Moves the incomplete new file out of the way and puts the video in the queue again (asks first)">Replace and encode again...</button> }
+                            </div>
+                        }
                     </div>
                 }
                 @if (finished.Count > doneShown)
@@ -150,9 +170,92 @@
     }
 </div>
 
+@if (confirm != null)
+{
+    <div class="dialog-backdrop" @onclick="() => confirm = null">
+        <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="q-confirm" @onclick:stopPropagation="true">
+            <h2 id="q-confirm">@confirm.Title</h2>
+            <p style="white-space:pre-line">@confirm.Text</p>
+            <div class="buttons">
+                <button @onclick="() => confirm = null">Cancel</button>
+                <button class="danger" @onclick="ConfirmYes">@confirm.Button</button>
+            </div>
+        </div>
+    </div>
+}
+
+<VideoPlayer Video="playing" Src="playingSrc" OnClose="() => playing = null" />
+
+@if (toast != null)
+{
+    <div class="toast" role="status">@toast</div>
+}
+
 @code {
     private EncodeProgress p = new();
     private int waitShown = 100, doneShown = 100;
+    private VideoEntry? playing;
+    private string? playingSrc;
+    private string? toast;
+    private CancellationTokenSource? toastTimer;
+    private Confirmation? confirm;
+
+    private sealed record Confirmation(string Title, string Text, string Button, Func<AppController.EncodeActionResult> Action);
+
+    // The original: streamed from /video/{id} like in Review; the new file: its own address
+    private void PlayOriginal(EncodeItemInfo i)
+    {
+        playingSrc = null;
+        playing = new VideoEntry { Id = i.VideoId, Path = i.Path, SizeBytes = i.SizeBytes, DurationSeconds = i.DurationSeconds };
+    }
+
+    private void PlayNew(EncodeItemInfo i)
+    {
+        playingSrc = "encodevideo/" + i.Id;
+        playing = new VideoEntry { Id = 0, Path = i.OutputPath, SizeBytes = i.OutputBytes, DurationSeconds = i.DurationSeconds };
+    }
+
+    // Deleting the original and replacing an incomplete file are always asked first, saying what will happen to the file
+    private void AskDeleteOriginal(EncodeItemInfo i)
+    {
+        bool recoverable = App.CanRecover(i.Path);
+        confirm = new Confirmation(
+            recoverable ? "Move the original to the Recycle Bin?" : "Delete the original permanently?",
+            $"{i.FileName}\n{i.Folder}\n\nOriginal: {Fmt.Size(i.SizeBytes)}. New file: {Fmt.Size(i.OutputBytes)}, checked: {i.Check}.\n"
+                + (recoverable ? "You can restore the original from the Recycle Bin (trash)." : "This location has no Recycle Bin (a network share, for example), so this can't be undone."),
+            recoverable ? "Move to Recycle Bin" : "Delete permanently",
+            () => App.DeleteOriginalAfterEncode(i.Id));
+    }
+
+    private void AskReplace(EncodeItemInfo i)
+    {
+        bool recoverable = App.CanRecover(i.OutputPath);
+        confirm = new Confirmation(
+            "Replace the incomplete new file?",
+            $"{System.IO.Path.GetFileName(i.OutputPath)} ({Fmt.Size(i.OutputBytes)}) is incomplete: {i.Message}.\n\nIt will be "
+                + (recoverable ? "moved to the Recycle Bin" : "deleted permanently (this location has no Recycle Bin)")
+                + " and the video encoded again. The original is not touched.",
+            "Replace and encode again",
+            () => App.ReplaceIncomplete(i.Id));
+    }
+
+    private void ConfirmYes()
+    {
+        var c = confirm;
+        confirm = null;
+        if (c == null) return;
+        var result = c.Action();
+        ShowToast(result.Ok ? result.Message : result.Error, result.Ok ? 6000 : 12000);
+    }
+
+    private void ShowToast(string text, int ms)
+    {
+        toast = text;
+        toastTimer?.Cancel();
+        toastTimer = new CancellationTokenSource();
+        var token = toastTimer.Token;
+        _ = Task.Delay(ms, token).ContinueWith(t => { if (t.IsCanceled) return; toast = null; InvokeAsync(StateHasChanged); });
+    }
 
     protected override void OnInitialized()
     {
@@ -170,5 +273,9 @@
 
     private static string Css(EncodeItemInfo i) => i.Status switch { EncodeItemStatus.Done => "ok", EncodeItemStatus.Failed => "bad", _ => "skip" };
 
-    public void Dispose() => App.Encoder.ProgressChanged -= OnProgress;
+    public void Dispose()
+    {
+        App.Encoder.ProgressChanged -= OnProgress;
+        toastTimer?.Cancel();
+    }
 }

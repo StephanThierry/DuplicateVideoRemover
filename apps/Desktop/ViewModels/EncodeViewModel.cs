@@ -94,16 +94,19 @@ public partial class EncodeViewModel : ObservableObject
     private void RefreshQueue(bool force = false)
     {
         var p = app.Encoder.Current;
-        string signature = $"{p.Items.Count}|{p.QueuedCount}|{p.Current?.Id}|{p.DoneCount}";
+        string signature = $"{p.Items.Count}|{p.QueuedCount}|{p.Current?.Id}|{p.DoneCount}|{p.AlreadyEncodedCount}|{p.Items.Count(i => i.OriginalDeleted)}";
         if (!force && signature == queueSignature) return;
         queueSignature = signature;
         var map = p.StatusByPath();
         bool changed = false;
+        // An original that was deleted (after its new file checked out) is no longer a video to re-encode
+        var deleted = p.Items.Where(i => i.OriginalDeleted).Select(i => i.Path).ToHashSet(EncodeProgress.PathComparer);
+        bool removed = deleted.Count > 0 && all.RemoveAll(r => deleted.Contains(r.Candidate.Path)) > 0;
         foreach (var r in all) changed |= r.SetQueueState(map.TryGetValue(r.Candidate.Path, out var st) ? st : null);
         int waiting = p.QueuedCount, running = p.Current != null ? 1 : 0, done = p.DoneCount;
         HasQueueSummary = waiting + running + done > 0;
         QueueSummary = "Encode queue: " + string.Join(", ", new[] { running > 0 ? "1 encoding" : null, waiting > 0 ? $"{waiting:N0} waiting" : null, done > 0 ? $"{done:N0} done" : null }.Where(x => x != null)) + ".";
-        if (changed && HideQueued) Filter(); else if (changed) UpdatePicked();
+        if (removed || (changed && HideQueued)) Filter(); else if (changed) UpdatePicked();
     }
 
     partial void OnScriptPathChanged(string? value) => OnPropertyChanged(nameof(HasResult));

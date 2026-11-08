@@ -16,8 +16,11 @@ namespace DuplicateVideoRemover.Desktop.ViewModels;
 /// <summary>The Encoding screen: the encode queue with the video being encoded, the ones waiting and the finished ones.</summary>
 public partial class EncodeQueueViewModel : ObservableObject
 {
+    private readonly AppController app;
     private readonly EncodeEngine engine;
     private readonly MainViewModel main;
+    private Action? confirmed;                       // what "yes" does in the open confirmation
+    private CancellationTokenSource? toastTimer;
     private readonly Dictionary<string, EncodeQueueRow> rows = new();
     private int applyQueued;
     private string logKey = "";
@@ -57,11 +60,17 @@ public partial class EncodeQueueViewModel : ObservableObject
     partial void OnCurrentChanged(EncodeQueueRow? value) => OnPropertyChanged(nameof(HasCurrent));
     partial void OnErrorChanged(string value) => OnPropertyChanged(nameof(HasError));
 
-    public EncodeQueueViewModel(AppController app, MainViewModel main) : this(app.Encoder, main) { }
+    // A confirmation before deleting the original or replacing an incomplete new file
+    [ObservableProperty] private bool confirmVisible;
+    [ObservableProperty] private string confirmTitle = "";
+    [ObservableProperty] private string confirmText = "";
+    [ObservableProperty] private string confirmButton = "";
+    [ObservableProperty] private string? toast;
 
-    public EncodeQueueViewModel(EncodeEngine engine, MainViewModel main)
+    public EncodeQueueViewModel(AppController app, MainViewModel main)
     {
-        this.engine = engine;
+        this.app = app;
+        engine = app.Encoder;
         this.main = main;
         // Progress arrives a few times a second from a background thread: show only the latest, once per UI turn
         engine.ProgressChanged += _ =>
@@ -135,6 +144,58 @@ public partial class EncodeQueueViewModel : ObservableObject
     [RelayCommand] private void ClearFinished() => engine.ClearFinished();
     [RelayCommand] private void GoToEncode() => main.ShowEncode();
 
+    // --- Delete the original (new file checked) / replace an incomplete new file: always asked first ---
+
+    internal void AskDeleteOriginal(EncodeQueueRow row)
+    {
+        bool recoverable = app.CanRecover(row.OriginalPath);
+        ConfirmTitle = recoverable ? "Move the original to the Recycle Bin?" : "Delete the original permanently?";
+        ConfirmText = $"{row.FileName}\n{row.Folder}\n\nOriginal: {row.Size}. New file: {row.NewSize}, checked: {row.CheckText}.\n"
+                    + (recoverable ? "You can restore the original from the Recycle Bin." : "This location has no Recycle Bin (a network share, for example), so this can't be undone.");
+        ConfirmButton = recoverable ? "Move to Recycle Bin" : "Delete permanently";
+        Ask(() => Report(app.DeleteOriginalAfterEncode(row.Id)));
+    }
+
+    internal void AskReplace(EncodeQueueRow row)
+    {
+        bool recoverable = app.CanRecover(row.NewPath);
+        ConfirmTitle = "Replace the incomplete new file?";
+        ConfirmText = $"{row.NewFileName} ({row.NewSize}) is incomplete: {row.CheckText}.\n\nIt will be "
+                    + (recoverable ? "moved to the Recycle Bin" : "deleted permanently (this location has no Recycle Bin)")
+                    + " and the video encoded again. The original is not touched.";
+        ConfirmButton = "Replace and encode again";
+        Ask(() => Report(app.ReplaceIncomplete(row.Id)));
+    }
+
+    private void Ask(Action yes) { confirmed = yes; ConfirmVisible = true; }
+
+    private void Report(AppController.EncodeActionResult result) => ShowToast(result.Ok ? result.Message : result.Error, result.Ok ? 6000 : 12000);
+
+    [RelayCommand] private void ConfirmYes() { var yes = confirmed; ConfirmVisible = false; confirmed = null; yes?.Invoke(); }
+    [RelayCommand] private void ConfirmNo() { ConfirmVisible = false; confirmed = null; }
+
+    private void ShowToast(string text, int ms)
+    {
+        Toast = text;
+        toastTimer?.Cancel();
+        toastTimer = new CancellationTokenSource();
+        var token = toastTimer.Token;
+        Task.Delay(ms, token).ContinueWith(t => { if (!t.IsCanceled) Dispatcher.UIThread.Post(() => Toast = null); });
+    }
+
+    /// <summary>Opens a video in the program the system uses for it.</summary>
+    internal void Play(string path)
+    {
+        try
+        {
+            if (!System.IO.File.Exists(path)) { ShowToast("The file is not there: " + path, 6000); return; }
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception e) { ShowToast("Could not open the video: " + e.Message, 6000); }
+    }
+
+    internal string NewShotPath(string id, int n) => engine.CheckShotPath(id, n);
+
     internal void Remove(EncodeQueueRow row) => engine.Remove(row.Id);
     internal void Retry(EncodeQueueRow row) => engine.Retry(row.Id);
     internal async Task ShowFolder(string folder) { if (OpenFolder != null) await OpenFolder(folder); }
@@ -151,6 +212,9 @@ public partial class EncodeQueueRow : ObservableObject
     public int VideoId { get; }
     public string FileName { get; }
     public string Folder { get; }
+    public string OriginalPath { get; }
+    public string NewPath { get; }
+    public string NewFileName { get; }
     public string Size { get; }
     public string Length { get; }
     public string Summary { get; }
@@ -162,11 +226,30 @@ public partial class EncodeQueueRow : ObservableObject
     [ObservableProperty] private bool isRunning;
     [ObservableProperty] private bool isDone;
     [ObservableProperty] private bool isFailed;
+    [ObservableProperty] private bool isIncomplete;
     [ObservableProperty] private bool isSkipped;
     [ObservableProperty] private bool canRetry;
     [ObservableProperty] private string whenText = "";
+    // The check of the new file (length and pictures, like the scan): shown with the original's pictures
+    [ObservableProperty] private bool hasCheck;
+    [ObservableProperty] private bool checkOk;
+    [ObservableProperty] private string checkText = "";
+    [ObservableProperty] private string newSize = "";
+    [ObservableProperty] private bool canDeleteOriginal;
+    [ObservableProperty] private bool canReplace;
+    [ObservableProperty] private Bitmap? newShot1;
+    [ObservableProperty] private Bitmap? newShot2;
+    [ObservableProperty] private Bitmap? newShot3;
+    private string? newShotsKey;
 
-    public bool IsProblem => IsFailed;
+    public bool IsProblem => IsFailed || IsIncomplete;
+    public bool CheckFailed => HasCheck && !CheckOk;
+    public bool NoCheck => !HasCheck;
+
+    // The original's pictures from the scan
+    public Bitmap? Shot1 => Shots.Get(VideoId, 1);
+    public Bitmap? Shot2 => Shots.Get(VideoId, 2);
+    public Bitmap? Shot3 => Shots.Get(VideoId, 3);
 
     /// <summary>A screenshot from the middle of the video (loaded when first shown).</summary>
     public Bitmap? Shot
@@ -183,6 +266,7 @@ public partial class EncodeQueueRow : ObservableObject
         this.owner = owner;
         Id = i.Id; VideoId = i.VideoId;
         FileName = i.FileName; Folder = i.Folder;
+        OriginalPath = i.Path; NewPath = i.OutputPath; NewFileName = System.IO.Path.GetFileName(i.OutputPath);
         Size = Fmt.Size(i.SizeBytes); Length = Fmt.Duration(i.DurationSeconds); Summary = i.Summary;
     }
 
@@ -192,15 +276,50 @@ public partial class EncodeQueueRow : ObservableObject
         Detail = i.Status == EncodeItemStatus.Running ? EncodeText.CurrentDetail(i) : "";
         Percent = i.Fraction * 100;
         IsRunning = i.Status == EncodeItemStatus.Running;
-        IsDone = i.Status == EncodeItemStatus.Done;
+        IsDone = i.Status is EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded;
+        IsIncomplete = i.Status == EncodeItemStatus.Incomplete;
         IsFailed = i.Status == EncodeItemStatus.Failed;
         IsSkipped = i.Status == EncodeItemStatus.Skipped;
         CanRetry = IsFailed || IsSkipped;
         ResultText = IsDone ? $"{Size} became {Fmt.Size(i.OutputBytes)}" : "";
         WhenText = i.FinishedUtc is DateTime t ? Fmt.When(t) : "";
+        HasCheck = i.HasCheck;
+        CheckOk = i.CheckOk;
+        CheckText = i.Status == EncodeItemStatus.Incomplete ? i.Message : i.Check;
+        NewSize = Fmt.Size(i.OutputBytes);
+        CanDeleteOriginal = i.CanDeleteOriginal;
+        CanReplace = i.CanReplace;
+        LoadNewShots(i);
         OnPropertyChanged(nameof(IsProblem));
+        OnPropertyChanged(nameof(CheckFailed));
+        OnPropertyChanged(nameof(NoCheck));
     }
 
+    // The new file's pictures were made when the check ran: load them again only when it ran again
+    private void LoadNewShots(EncodeItemInfo i)
+    {
+        string key = i.HasCheckShots ? i.Id + "|" + i.FinishedUtc?.Ticks : "";
+        if (key == newShotsKey) return;
+        newShotsKey = key;
+        Bitmap? Load(int n)
+        {
+            if (key.Length == 0) return null;
+            try
+            {
+                string path = owner.NewShotPath(Id, n);
+                if (!System.IO.File.Exists(path)) return null;
+                using var stream = System.IO.File.OpenRead(path);
+                return Bitmap.DecodeToWidth(stream, 240);
+            }
+            catch { return null; }
+        }
+        NewShot1 = Load(1); NewShot2 = Load(2); NewShot3 = Load(3);
+    }
+
+    [RelayCommand] private void AskDeleteOriginal() => owner.AskDeleteOriginal(this);
+    [RelayCommand] private void AskReplace() => owner.AskReplace(this);
+    [RelayCommand] private void PlayOriginal() => owner.Play(OriginalPath);
+    [RelayCommand] private void PlayNew() => owner.Play(NewPath);
     [RelayCommand] private void Remove() => owner.Remove(this);
     [RelayCommand] private void Retry() => owner.Retry(this);
     [RelayCommand] private Task ShowFolder() => owner.ShowFolder(Folder);

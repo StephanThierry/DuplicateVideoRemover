@@ -60,3 +60,14 @@ button.danger-outline:hover:not(:disabled) { background: var(--grease-wash); bor
     .q-row .num { display: none; }
     .q-row img { width: 72px; height: 48px; }
 }
+
+/* The check of a new file: the original's pictures next to the new file's */
+.q-row.has-check { grid-template-columns: 1fr 150px auto; }
+.q-row .q-check { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.q-row .q-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+.q-side .q-cap { font-size: .8rem; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+.q-side .enc-strip { display: inline-flex; min-height: 72px; min-width: 72px; }
+.q-checktext { font-size: .85rem; margin-top: 4px; word-break: break-word; }
+.q-checktext.ok { color: var(--keep); }
+.q-checktext.bad { color: var(--grease); font-weight: 600; }
+@media (max-width: 900px) { .q-row .q-check { grid-template-columns: 1fr; } }

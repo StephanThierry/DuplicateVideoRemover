@@ -276,6 +276,65 @@ namespace deepduplicates
             return new EncodeQueueResult(added.Added, added.AlreadyThere, missing);
         }
 
+        /// <summary>The result of an action on a finished video in the encode queue: an error, or what was done.</summary>
+        public sealed record EncodeActionResult(string Error, string Message, bool Recoverable = false)
+        {
+            public bool Ok => Error.Length == 0;
+        }
+
+        /// <summary>True when deleting this file puts it in the Recycle Bin (trash) - for the confirmation text.</summary>
+        public bool CanRecover(string path) => RecycleBin.IsRecoverable(path);
+
+        /// <summary>
+        /// Deletes the original of a video whose new file has been checked (length and pictures, see EncodeChecker): to the
+        /// Recycle Bin, or for good where there is none (a network share) - the interface says which before asking.
+        /// Refuses unless the check passed and the new file is still the one that was checked.
+        /// </summary>
+        public EncodeActionResult DeleteOriginalAfterEncode(string itemId)
+        {
+            var item = Encoder.Find(itemId);
+            if (item == null) return new("This video is not in the list any more.", "");
+            if (!item.CanDeleteOriginal) return new("The new file has not been checked, so the original is kept.", "");
+            try
+            {
+                var created = new FileInfo(item.OutputPath);
+                if (!created.Exists || created.Length != item.OutputBytes)
+                    return new("The new file is not there or has changed since it was checked. The original is kept.", "");
+                if (!File.Exists(item.Path))
+                {
+                    RemoveDeletedVideo(item.VideoId, item.Path);
+                    Encoder.MarkOriginalDeleted(item.Id);
+                    return new("", "The original was already gone.");
+                }
+                bool recoverable = RecycleBin.Delete(item.Path);
+                RemoveDeletedVideo(item.VideoId, item.Path);
+                Encoder.MarkOriginalDeleted(item.Id);
+                return new("", recoverable
+                    ? $"Moved {Path.GetFileName(item.Path)} to the Recycle Bin ({Fmt.Size(item.SizeBytes)})."
+                    : $"Deleted {Path.GetFileName(item.Path)} ({Fmt.Size(item.SizeBytes)}) permanently: this location has no Recycle Bin.", recoverable);
+            }
+            catch (Exception e) { return new($"Could not delete {Path.GetFileName(item.Path)}: {e.Message}", ""); }
+        }
+
+        /// <summary>
+        /// For a video whose new file is incomplete (an earlier run was cut off): moves that file out of the way and puts the
+        /// video in the queue again. Only ever touches the new file recorded for that video.
+        /// </summary>
+        public EncodeActionResult ReplaceIncomplete(string itemId)
+        {
+            var item = Encoder.Find(itemId);
+            if (item == null) return new("This video is not in the list any more.", "");
+            if (!item.CanReplace) return new("The new file is not marked as incomplete, so it is kept.", "");
+            try
+            {
+                bool recoverable = RecycleBin.Delete(item.OutputPath);
+                Encoder.Retry(item.Id);
+                return new("", $"Removed the incomplete {Path.GetFileName(item.OutputPath)} ({Fmt.Size(item.OutputBytes)}"
+                    + (recoverable ? ", in the Recycle Bin" : ", deleted for good") + ") and queued the video again.", recoverable);
+            }
+            catch (Exception e) { return new($"Could not remove {Path.GetFileName(item.OutputPath)}: {e.Message}", ""); }
+        }
+
         // The program's own ffmpeg is used when it is there; only a missing one is fetched (works offline afterwards)
         private static async System.Threading.Tasks.Task<string> PrepareFFmpeg()
         {
@@ -343,10 +402,16 @@ namespace deepduplicates
                 VideoFile.Delete(path);
             }
             catch (Exception e) { return e.Message; }
+            RemoveDeletedVideo(id, path);
+            return null;
+        }
+
+        // A video file is gone: out of the database (with its screenshots), the scan list and the caches
+        private void RemoveDeletedVideo(int id, string path)
+        {
             ResultSession.RemoveFromDatabase(new List<VideoEntry> { new VideoEntry { Id = id, Path = path } }, CreateFileHandler());
             LastScan.Remove(path);
             InvalidateCache();
-            return null;
         }
 
         private void InvalidateCache()

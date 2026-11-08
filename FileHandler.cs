@@ -268,7 +268,7 @@ namespace deepduplicates
             return true;
         }
 
-        private static string FindOnPath(string executable)
+        internal static string FindOnPath(string executable)
         {
             foreach (string dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator))
             {

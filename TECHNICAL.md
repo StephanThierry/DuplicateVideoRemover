@@ -64,6 +64,22 @@ second from a background thread - screens coalesce it onto their UI thread).
   Queued again and nothing starts by itself (`Halted`); the web app calls `Start()` when it has started, because a
   server has nobody to press the button. The saved state does not remember a deliberate Stop, so a restart after
   a Stop carries on in the web app. At most 300 finished videos are kept.
+- **The new file is checked** (`EncodeChecker`, Core/EncodeCheck.cs), both when it was there already and right after an
+  encode. `ffprobe` gives the length (within 1% / 2 s of the original's, from the database) and a video stream; then
+  `ffmpeg -ss <t> -frames:v 1 -vf scale=240:160` makes pictures at the scan's points (length/4, /2, 3/4 - the same code
+  as `VideoHandler.generateOneSetOfScreenshotsAsync`) and `ImageHandler.imageChecksum` proves they decode. A fourth
+  picture from the last second is made and thrown away: an mp4 cut off at 60% still has its header (and so its length)
+  and still gives pictures at 25% and 50%, only the end gives it away (a test covers this with real FFmpeg).
+  Results: Done / **AlreadyEncoded** (good) or **Incomplete** (bad); the three pictures are kept as
+  `output/encode_checks/<item id>_<n>.png` for the screens and removed with the item. Statuses are saved as numbers:
+  only ever add new ones at the end of `EncodeItemStatus`. Nothing is ever deleted by the engine itself.
+- **Deleting an original / replacing an incomplete file** are `AppController.DeleteOriginalAfterEncode` and
+  `ReplaceIncomplete`, one video at a time and only for what the queue item records: the original only when the check
+  passed and the new file is still the size that was checked; the replace only for the new file of an Incomplete item.
+  Both use `RecycleBin` (Core/RecycleBin.cs): the Windows Recycle Bin (through `Microsoft.VisualBasic.FileIO`) for fixed
+  drives, `gio trash` / `trash-put` on Linux. A network path or USB drive has none, and the shell would delete there
+  without saying so, so `IsRecoverable` is asked first and the confirmation says "permanently" when it is false.
+  Deleting the original also removes its database row and screenshots, like the other delete in Re-encode.
 - **Per video settings.** `EncodeSettings` are cloned into each queue item, so later changes do not alter what waits.
 - **`encode.lock`** (next to `encodequeue.json`; the `ScanLock` mechanism with a heartbeat) stops two programs that
   share a data folder from working the same queue. The encoder does not touch the database.

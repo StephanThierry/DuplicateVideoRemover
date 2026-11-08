@@ -210,13 +210,16 @@
         InvokeAsync(() => { RefreshQueue(); StateHasChanged(); });
     }
 
-    private static string QueueSignature(EncodeProgress p) => $"{p.Items.Count}|{p.QueuedCount}|{p.Current?.Id}|{p.DoneCount}";
+    private static string QueueSignature(EncodeProgress p) => $"{p.Items.Count}|{p.QueuedCount}|{p.Current?.Id}|{p.DoneCount}|{p.AlreadyEncodedCount}|{p.Items.Count(i => i.OriginalDeleted)}";
 
     private void RefreshQueue()
     {
         var p = App.Encoder.Current;
         queueSig = QueueSignature(p);
         queueMap = p.StatusByPath();
+        // An original that was deleted (after its new file checked out) is no longer a video to re-encode
+        var deleted = p.Items.Where(i => i.OriginalDeleted).Select(i => i.Path).ToHashSet(EncodeProgress.PathComparer);
+        if (deleted.Count > 0) candidates?.RemoveAll(c => deleted.Contains(c.Path));
         if (candidates != null) picked.ExceptWith(candidates.Where(c => queueMap.ContainsKey(c.Path)).Select(c => c.Id));
     }
 
