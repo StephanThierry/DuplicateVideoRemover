@@ -19,7 +19,7 @@ namespace deepduplicates
         string Summary, string OutputPath, EncodeItemStatus Status, string Message,
         long OutputBytes, double Fraction, double Fps, double Speed,
         DateTime QueuedUtc, DateTime? StartedUtc, DateTime? FinishedUtc,
-        string Check = "", bool CheckOk = false, bool HasCheckShots = false, bool OriginalDeleted = false)
+        string Check = "", bool CheckOk = false, bool HasCheckShots = false, bool OriginalDeleted = false, bool NewDeleted = false)
     {
         public string FileName => System.IO.Path.GetFileName(Path);
         public string Folder => System.IO.Path.GetDirectoryName(Path) ?? "";
@@ -29,12 +29,13 @@ namespace deepduplicates
         public long Saved => Status is EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded ? SizeBytes - OutputBytes : 0;
 
         /// <summary>The new file was checked (length and pictures) and is good: the original can be deleted after a look.</summary>
-        public bool CanDeleteOriginal => Status is EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded && CheckOk && !OriginalDeleted;
+        public bool CanDeleteOriginal => Status is EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded or EncodeItemStatus.Incomplete
+            && !OriginalDeleted && (CheckOk || NewDeleted);
         /// <summary>
-        /// The new file can be deleted (to the Recycle Bin): not once the original is gone, because then it is the only copy.
-        /// The file's existence is checked when it is deleted.
+        /// The new file can be deleted (to the Recycle Bin), whatever happened to the original: each copy is handled on its own,
+        /// the interface says when it is the last one. The file's existence is checked when it is deleted.
         /// </summary>
-        public bool CanDeleteNew => Status is EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded or EncodeItemStatus.Incomplete && !OriginalDeleted;
+        public bool CanDeleteNew => Status is EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded or EncodeItemStatus.Incomplete && !NewDeleted;
         /// <summary>The new file that was there already is not complete: it can be replaced by encoding again.</summary>
         public bool CanReplace => Status == EncodeItemStatus.Incomplete;
         /// <summary>
@@ -89,16 +90,17 @@ namespace deepduplicates
         public int FinishedCount => Items.Count(i => i.IsFinished);
 
         /// <summary>Size of the finished videos before and after, and what that saved.</summary>
-        public long SavedBytes => Items.Where(i => i.Status == EncodeItemStatus.Done).Sum(i => i.Saved);
-        public long DoneOriginalBytes => Items.Where(i => i.Status == EncodeItemStatus.Done).Sum(i => i.SizeBytes);
-        public long DoneNewBytes => Items.Where(i => i.Status == EncodeItemStatus.Done).Sum(i => i.OutputBytes);
+        public long SavedBytes => Items.Where(i => i.Status == EncodeItemStatus.Done && !i.NewDeleted).Sum(i => i.Saved);
+        public long DoneOriginalBytes => Items.Where(i => i.Status == EncodeItemStatus.Done && !i.NewDeleted).Sum(i => i.SizeBytes);
+        public long DoneNewBytes => Items.Where(i => i.Status == EncodeItemStatus.Done && !i.NewDeleted).Sum(i => i.OutputBytes);
 
         /// <summary>Videos that are in the queue or have a good new file, by path (to grey them out in the Re-encode list).</summary>
         public Dictionary<string, EncodeItemStatus> StatusByPath()
         {
             var map = new Dictionary<string, EncodeItemStatus>(PathComparer);
             foreach (var i in Items)
-                if (i.Status is EncodeItemStatus.Queued or EncodeItemStatus.Running or EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded) map[i.Path] = i.Status;
+                // A video whose new file was deleted is a video to plan again
+                if (i.Status is EncodeItemStatus.Queued or EncodeItemStatus.Running || i.Status is EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded && !i.NewDeleted) map[i.Path] = i.Status;
             return map;
         }
 
@@ -179,7 +181,7 @@ namespace deepduplicates
         };
 
         private static string Original(EncodeItemInfo i, string text) =>
-            i.OriginalDeleted ? text + ". The original has been deleted" : text;
+            text + (i.OriginalDeleted ? ". The original has been deleted" : "") + (i.NewDeleted ? ". The new file has been deleted" : "");
 
         /// <summary>What the encoder is doing now, in one line.</summary>
         public static string Headline(EncodeProgress p)

@@ -393,7 +393,7 @@ public class EncodeEngineTests : IDisposable
     }
 
     [Fact]
-    public void ANewFileCanBeDeletedUnlessTheOriginalIsGone_AndTheItemLeavesTheList()
+    public void TheTwoCopiesAreDeletedIndependently_EachKeepsItsButtonsWhileItExists()
     {
         var engine = NewEngine(new FakeRunner());
         var a = Video("a.mp4"); var b = Video("b.mp4", 2);
@@ -402,17 +402,27 @@ public class EncodeEngineTests : IDisposable
         var first = engine.Current.Items[0]; var second = engine.Current.Items[1];
         Assert.True(first.CanDeleteNew && first.CanDeleteOriginal);
 
-        // Once the original is deleted, the new file is the only copy: it may not be deleted too
+        // The original of the second is deleted: only that copy loses its buttons, the new file keeps its delete button
         Assert.True(engine.MarkOriginalDeleted(second.Id));
-        Assert.False(engine.Find(second.Id)!.CanDeleteNew);
+        var s2 = engine.Find(second.Id)!;
+        Assert.False(s2.CanDeleteOriginal);
+        Assert.True(s2.CanDeleteNew);
 
-        // Deleting the new file takes the video out of the list (and its pictures), so it can be planned again
-        Assert.True(engine.Dismiss(first.Id));
-        Assert.Null(engine.Find(first.Id));
-        Assert.False(File.Exists(engine.CheckShotPath(first.Id, 1)));
+        // ...and then the last copy can be deleted too: nothing is left to delete
+        Assert.True(engine.MarkNewDeleted(second.Id));
+        s2 = engine.Find(second.Id)!;
+        Assert.False(s2.CanDeleteOriginal || s2.CanDeleteNew);
+        Assert.Equal(2, engine.Current.Items.Count);                   // the rows stay, greyed out
+
+        // The new file of the first is deleted: the original keeps its delete button, and the video is planned again like any other
+        Assert.True(engine.MarkNewDeleted(first.Id));
+        var f1 = engine.Find(first.Id)!;
+        Assert.False(f1.CanDeleteNew);
+        Assert.True(f1.CanDeleteOriginal);
         Assert.False(engine.Current.StatusByPath().ContainsKey(a.Path));
-        Assert.False(engine.Dismiss(first.Id));
-        Assert.Single(engine.Current.Items);
+        Assert.Contains("The new file has been deleted", EncodeText.Status(f1));
+        Assert.Equal(0, engine.Current.SavedBytes);                    // nothing saved by files that are gone
+        Assert.Equal(1, engine.Enqueue(new[] { a }, EncodeSettings.CreateDefault()).Added);   // can be queued again (replaces the row)
     }
 
     [Fact]

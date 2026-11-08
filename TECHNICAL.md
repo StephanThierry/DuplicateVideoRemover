@@ -74,8 +74,9 @@ second from a background thread - screens coalesce it onto their UI thread).
   `output/encode_checks/<item id>_<n>.png` for the screens and removed with the item. Statuses are saved as numbers:
   only ever add new ones at the end of `EncodeItemStatus`. Nothing is ever deleted by the engine itself.
 - **Deleting an original / the new file / replacing an incomplete file** are `AppController.DeleteOriginalAfterEncode`,
-  `DeleteNewFile` (refused once the original is gone or missing: then the new file is the only copy; the item then leaves
-  the list through `EncodeEngine.Dismiss`) and `ReplaceIncomplete`, one video at a time and only for what the queue item records: the original only when the check
+  `DeleteNewFile` (the row stays: `NewDeleted` greys the new file out and the video is planned again; `OriginalDeleted` does
+  the same for the original, and each copy keeps its buttons while it exists - the dialog says when it is the last one)
+  and `ReplaceIncomplete`, one video at a time and only for what the queue item records: the original only when the check
   passed and the new file is still the size that was checked; the replace only for the new file of an Incomplete item.
   Both use `RecycleBin` (Core/RecycleBin.cs): the Windows Recycle Bin (through `Microsoft.VisualBasic.FileIO`) for fixed
   drives, `gio trash` / `trash-put` on Linux. A network path or USB drive has none, and the shell would delete there

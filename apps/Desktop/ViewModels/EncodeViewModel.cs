@@ -94,7 +94,7 @@ public partial class EncodeViewModel : ObservableObject
     private void RefreshQueue(bool force = false)
     {
         var p = app.Encoder.Current;
-        string signature = $"{p.Items.Count}|{p.QueuedCount}|{p.Current?.Id}|{p.DoneCount}|{p.AlreadyEncodedCount}|{p.Items.Count(i => i.OriginalDeleted)}";
+        string signature = $"{p.Items.Count}|{p.QueuedCount}|{p.Current?.Id}|{p.DoneCount}|{p.AlreadyEncodedCount}|{p.Items.Count(i => i.OriginalDeleted)}|{p.Items.Count(i => i.NewDeleted)}";
         if (!force && signature == queueSignature) return;
         queueSignature = signature;
         var map = p.StatusByPath();

@@ -75,6 +75,8 @@ namespace deepduplicates
         public bool HasCheckShots { get; set; }
         /// <summary>The original was deleted after the new file checked out.</summary>
         public bool OriginalDeleted { get; set; }
+        /// <summary>The new file was deleted afterwards (the video can be planned again).</summary>
+        public bool NewDeleted { get; set; }
 
         // While running (not saved)
         [System.Text.Json.Serialization.JsonIgnore] public double Fraction { get; set; }
@@ -150,7 +152,7 @@ namespace deepduplicates
                 foreach (var c in videos)
                 {
                     var existing = items.FirstOrDefault(i => EncodeProgress.PathComparer.Equals(i.Path, c.Path));
-                    if (existing != null && existing.Status is EncodeItemStatus.Queued or EncodeItemStatus.Running or EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded) { there++; continue; }
+                    if (existing != null && (existing.Status is EncodeItemStatus.Queued or EncodeItemStatus.Running || existing.Status is EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded && !existing.NewDeleted)) { there++; continue; }
                     if (existing != null) { items.Remove(existing); Forget(existing); }
                     var s = settings.Clone();
                     items.Add(new EncodeItem
@@ -215,7 +217,7 @@ namespace deepduplicates
                 items.Remove(item);
                 Forget(item);
                 item.Status = EncodeItemStatus.Queued; item.Message = ""; item.FinishedUtc = null; item.StartedUtc = null; item.OutputBytes = 0;
-                item.Check = ""; item.CheckOk = false; item.HasCheckShots = false;
+                item.Check = ""; item.CheckOk = false; item.HasCheckShots = false; item.NewDeleted = false;
                 item.QueuedUtc = DateTime.UtcNow;
                 items.Add(item);
                 Save();
@@ -270,6 +272,20 @@ namespace deepduplicates
             return true;
         }
 
+        /// <summary>Notes that the new file of a finished video has been deleted (the video is then planned again like any other).</summary>
+        public bool MarkNewDeleted(string id)
+        {
+            lock (sync)
+            {
+                var item = items.FirstOrDefault(i => i.Id == id);
+                if (item == null) return false;
+                item.NewDeleted = true;
+                Save();
+            }
+            Publish();
+            return true;
+        }
+
         /// <summary>Notes that the original of a finished, checked video has been deleted.</summary>
         public bool MarkOriginalDeleted(string id)
         {
@@ -290,7 +306,7 @@ namespace deepduplicates
         // only "skipped: already exists")
         // - and ones whose pictures have gone missing (cleaned up, or a data folder copied without them)
         private bool NeedsCheck(EncodeItem i) =>
-            !i.OriginalDeleted && (
+            !i.OriginalDeleted && !i.NewDeleted && (
                 !i.CheckOk && i.Check.Length == 0
                 && (i.Status is EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded
                     || i.Status == EncodeItemStatus.Incomplete && i.Message.Length == 0
@@ -611,7 +627,7 @@ namespace deepduplicates
 
         private static EncodeItemInfo ToInfo(EncodeItem i) => new(i.Id, i.VideoId, i.Path, i.SizeBytes, i.DurationSeconds,
             EncodeText.Summary(i.Settings), i.OutputPath, i.Status, i.Message, i.OutputBytes, i.Fraction, i.Fps, i.Speed,
-            i.QueuedUtc, i.StartedUtc, i.FinishedUtc, i.Check, i.CheckOk, i.HasCheckShots, i.OriginalDeleted);
+            i.QueuedUtc, i.StartedUtc, i.FinishedUtc, i.Check, i.CheckOk, i.HasCheckShots, i.OriginalDeleted, i.NewDeleted);
 
         /// <summary>The kept pictures of the checked new file of a video, for the interfaces.</summary>
         public string CheckShotPath(string itemId, int n) => EncodeChecker.ShotPath(checksFolder, itemId, n);

@@ -303,9 +303,14 @@ namespace deepduplicates
             if (!item.CanDeleteOriginal) return new("The new file has not been checked, so the original is kept.", "");
             try
             {
-                var created = new FileInfo(item.OutputPath);
-                if (!created.Exists || created.Length != item.OutputBytes)
-                    return new("The new file is not there or has changed since it was checked. The original is kept.", "");
+                // While the new file exists it must still be the one that was checked. (Once it has been deleted, the original is
+                // the last copy and the interface asked about exactly that.)
+                if (!item.NewDeleted)
+                {
+                    var created = new FileInfo(item.OutputPath);
+                    if (!created.Exists || created.Length != item.OutputBytes)
+                        return new("The new file is not there or has changed since it was checked. The original is kept.", "");
+                }
                 if (!File.Exists(item.Path))
                 {
                     RemoveDeletedVideo(item.VideoId, item.Path);
@@ -323,24 +328,24 @@ namespace deepduplicates
         }
 
         /// <summary>
-        /// Deletes the new file of a finished video (Recycle Bin, or for good on a network share - the interface says which first)
-        /// and takes the video out of the list, so it can be planned again. Never when the original is gone: then the new file is the
-        /// only copy. Only ever touches the new file the queue item records.
+        /// Deletes the new file of a finished video (Recycle Bin, or for good on a network share - the interface says which first).
+        /// The row stays, with the new file greyed out, and the video can be planned again. The two copies are handled on their own:
+        /// this also works when the original is gone (the interface then says it is the last copy). Only ever touches the new file
+        /// the queue item records.
         /// </summary>
         public EncodeActionResult DeleteNewFile(string itemId)
         {
             var item = Encoder.Find(itemId);
             if (item == null) return new("This video is not in the list any more.", "");
-            if (!item.CanDeleteNew) return new("The original has been deleted, so the new file is the only copy and is kept.", "");
+            if (!item.CanDeleteNew) return new("The new file has been deleted already.", "");
             try
             {
-                if (!File.Exists(item.Path))
-                    return new("The original is not there any more, so the new file is the only copy and is kept.", "");
                 bool recoverable = File.Exists(item.OutputPath) ? RecycleBin.Delete(item.OutputPath) : true;
-                Encoder.Dismiss(item.Id);
+                Encoder.MarkNewDeleted(item.Id);
+                string kept = item.OriginalDeleted ? " That was the last copy." : " The original is kept.";
                 return new("", recoverable
-                    ? $"Moved {Path.GetFileName(item.OutputPath)} to the Recycle Bin ({Fmt.Size(item.OutputBytes)}). The original is kept."
-                    : $"Deleted {Path.GetFileName(item.OutputPath)} ({Fmt.Size(item.OutputBytes)}) permanently: this location has no Recycle Bin. The original is kept.", recoverable);
+                    ? $"Moved {Path.GetFileName(item.OutputPath)} to the Recycle Bin ({Fmt.Size(item.OutputBytes)})." + kept
+                    : $"Deleted {Path.GetFileName(item.OutputPath)} ({Fmt.Size(item.OutputBytes)}) permanently: this location has no Recycle Bin." + kept, recoverable);
             }
             catch (Exception e) { return new($"Could not delete {Path.GetFileName(item.OutputPath)}: {e.Message}", ""); }
         }

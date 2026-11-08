@@ -210,7 +210,7 @@
         InvokeAsync(() => { RefreshQueue(); StateHasChanged(); });
     }
 
-    private static string QueueSignature(EncodeProgress p) => $"{p.Items.Count}|{p.QueuedCount}|{p.Current?.Id}|{p.DoneCount}|{p.AlreadyEncodedCount}|{p.Items.Count(i => i.OriginalDeleted)}";
+    private static string QueueSignature(EncodeProgress p) => $"{p.Items.Count}|{p.QueuedCount}|{p.Current?.Id}|{p.DoneCount}|{p.AlreadyEncodedCount}|{p.Items.Count(i => i.OriginalDeleted)}|{p.Items.Count(i => i.NewDeleted)}";
 
     private void RefreshQueue()
     {

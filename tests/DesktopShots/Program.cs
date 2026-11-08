@@ -140,6 +140,14 @@ if (Environment.GetEnvironmentVariable("SHOT_QUEUE") == "1")
         q.ConfirmYesCommand.Execute(null); Pump(1500);
         Console.WriteLine($"after delete new: toast '{q.Toast}', new file there: {File.Exists(other.NewPath)}, original there: {File.Exists(other.OriginalPath)}, still listed: {q.Finished.Contains(other)}");
         Shot("c_after_delete_new");
+        // The original of "originalGone" was deleted: its new file must still have play + delete. Delete that last copy too.
+        Console.WriteLine($"after deleting the original: original available {originalGone.OriginalAvailable}, can delete original {originalGone.CanDeleteOriginal}; new file available {originalGone.NewAvailable}, can delete new {originalGone.CanDeleteNew}");
+        Shot("c_one_copy_left");
+        originalGone.AskDeleteNewCommand.Execute(null); Pump(300); Shot("c_confirm_last_copy");
+        Console.WriteLine("last copy dialog: " + q.ConfirmTitle + " | button " + q.ConfirmButton);
+        q.ConfirmYesCommand.Execute(null); Pump(1500);
+        Console.WriteLine($"after deleting the last copy: toast '{q.Toast}', row still listed: {q.Finished.Contains(originalGone)}, can delete original {originalGone.CanDeleteOriginal}, can delete new {originalGone.CanDeleteNew}, both greyed: {originalGone.OriginalDeleted && originalGone.NewDeleted}");
+        Shot("c_both_gone");
         foreach (var i in controller.Encoder.Current.Items) Console.WriteLine($"  final {i.FileName}: {EncodeText.Status(i)}");
         vm.SelectedTab = MainViewModel.EncodeTab; Pump(800); Shot("c_picker_after");
         Console.WriteLine($"picker rows after deleting an original: {vm.Encode.Rows.Count}");

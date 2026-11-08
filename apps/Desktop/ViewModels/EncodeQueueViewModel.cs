@@ -179,8 +179,11 @@ public partial class EncodeQueueViewModel : ObservableObject
     internal void AskDeleteOriginal(EncodeQueueRow row)
     {
         bool recoverable = app.CanRecover(row.OriginalPath);
-        ConfirmTitle = recoverable ? "Move the original to the Recycle Bin?" : "Delete the original permanently?";
-        ConfirmText = $"{row.FileName}\n{row.Folder}\n\nOriginal: {row.Size}. New file: {row.NewSize}, checked: {row.CheckText}.\n"
+        ConfirmTitle = row.NewDeleted ? (recoverable ? "Move the last copy to the Recycle Bin?" : "Delete the last copy permanently?")
+                     : recoverable ? "Move the original to the Recycle Bin?" : "Delete the original permanently?";
+        ConfirmText = $"{row.FileName}\n{row.Folder}\n\n"
+                    + (row.NewDeleted ? $"The new file has already been deleted. This is the LAST copy of the video ({row.Size}).\n"
+                                      : $"Original: {row.Size}. New file: {row.NewSize}, checked: {row.CheckText}.\n")
                     + (recoverable ? "You can restore the original from the Recycle Bin." : "This location has no Recycle Bin (a network share, for example), so this can't be undone.");
         ConfirmButton = recoverable ? "Move to Recycle Bin" : "Delete permanently";
         Ask(() => Report(app.DeleteOriginalAfterEncode(row.Id)));
@@ -189,10 +192,12 @@ public partial class EncodeQueueViewModel : ObservableObject
     internal void AskDeleteNew(EncodeQueueRow row)
     {
         bool recoverable = app.CanRecover(row.NewPath);
-        ConfirmTitle = recoverable ? "Move the new file to the Recycle Bin?" : "Delete the new file permanently?";
+        ConfirmTitle = row.OriginalDeleted ? (recoverable ? "Move the last copy to the Recycle Bin?" : "Delete the last copy permanently?")
+                     : recoverable ? "Move the new file to the Recycle Bin?" : "Delete the new file permanently?";
         ConfirmText = $"{row.NewFileName} ({row.NewSize})\n{row.Folder}\n\n"
                     + (row.CheckOk ? $"Checked: {row.CheckText}.\n" : $"It is incomplete: {row.CheckText}.\n")
-                    + $"The original ({row.Size}) is kept, and the video can be planned for re-encoding again.\n"
+                    + (row.OriginalDeleted ? "The original has already been deleted. This is the LAST copy of the video.\n"
+                                           : $"The original ({row.Size}) is kept, and the video can be planned for re-encoding again.\n")
                     + (recoverable ? "You can restore the new file from the Recycle Bin." : "This location has no Recycle Bin (a network share, for example), so this can't be undone.");
         ConfirmButton = recoverable ? "Move to Recycle Bin" : "Delete permanently";
         Ask(() => Report(app.DeleteNewFile(row.Id)));
@@ -280,6 +285,13 @@ public partial class EncodeQueueRow : ObservableObject
     [ObservableProperty] private string newSize = "";
     [ObservableProperty] private bool canDeleteOriginal;
     [ObservableProperty] private bool canDeleteNew;
+    // Each copy on its own: a deleted one is greyed out and loses its buttons, the other keeps them
+    [ObservableProperty] private bool originalDeleted;
+    [ObservableProperty] private bool newDeleted;
+    [ObservableProperty] private bool originalAvailable = true;
+    [ObservableProperty] private bool newAvailable = true;
+    [ObservableProperty] private string originalCaption = "";
+    [ObservableProperty] private string newCaption = "";
     [ObservableProperty] private bool canReplace;
     // What this job saved (shown right of the pictures)
     [ObservableProperty] private bool hasSaving;
@@ -343,7 +355,11 @@ public partial class EncodeQueueRow : ObservableObject
         CanDeleteOriginal = i.CanDeleteOriginal;
         CanDeleteNew = i.CanDeleteNew;
         CanReplace = i.CanReplace;
-        HasSaving = i.Status is EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded;
+        OriginalDeleted = i.OriginalDeleted; NewDeleted = i.NewDeleted;
+        OriginalAvailable = !i.OriginalDeleted; NewAvailable = !i.NewDeleted;
+        OriginalCaption = $"Original - {Size}, {Length}" + (i.OriginalDeleted ? " - deleted" : "");
+        NewCaption = $"New file - {NewSize}" + (i.NewDeleted ? " - deleted" : "");
+        HasSaving = i.Status is EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded && !i.NewDeleted;
         SavingIsGood = i.Saved >= 0;
         SavingText = i.Saved >= 0 ? (i.OriginalDeleted ? "Saved " : "Saves ") + Fmt.Size(i.Saved) : Fmt.Size(-i.Saved) + " bigger";
         SavingDetail = i.Saved >= 0 ? EncodeText.Percent(i.SizeBytes, i.OutputBytes) + " smaller" : "no saving";

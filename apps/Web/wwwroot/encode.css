@@ -45,7 +45,7 @@ button.danger-outline:hover:not(:disabled) { background: var(--grease-wash); bor
 .bar.current > div { background: var(--keep); }
 .q-list .q-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
 .q-list .q-head h2 { margin: 0; }
-.q-row { display: grid; grid-template-columns: 96px 1fr 150px auto; gap: 14px; align-items: center; padding: 8px 0; }
+.q-row { display: grid; grid-template-columns: auto 1fr 150px auto; gap: 14px; align-items: center; padding: 8px 0; }
 .q-row + .q-row { border-top: 1px solid var(--rule); }
 .q-row img { width: 96px; height: 64px; object-fit: cover; display: block; background: var(--frame); border-radius: 3px; }
 .q-row .num { text-align: right; }
@@ -91,7 +91,7 @@ button.icon.del:hover:not(:disabled) { background: var(--grease-wash); color: va
 .q-list { overflow-x: auto; }
 .q-crow { display: grid; gap: 10px; align-items: center; padding: 4px 0; font-size: .88rem; }
 .q-crow + .q-crow { border-top: 1px solid var(--rule); }
-.q-cwait { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) 70px 90px 84px; }
+.q-cwait { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) 70px 90px 34px 84px; }
 .q-cdone { grid-template-columns: minmax(0, 1fr) 120px 150px 150px 110px 130px; }
 .q-crow.q-chead { font-size: .78rem; font-weight: 600; color: var(--muted); border-top: 0; border-bottom: 1px solid var(--rule); }
 .q-crow .cname { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -104,3 +104,6 @@ button.icon.del:hover:not(:disabled) { background: var(--grease-wash); color: va
 .q-crow .cact { display: flex; gap: 6px; justify-content: flex-end; }
 button.icon.sm { width: 24px; height: 24px; padding: 0; }
 button.icon.sm svg { width: 11px; height: 11px; }
+
+/* A copy that has been deleted: greyed out */
+.q-strip.gone, .cfile.gone { opacity: .35; }
