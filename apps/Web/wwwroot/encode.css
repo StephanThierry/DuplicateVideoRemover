@@ -83,3 +83,24 @@ button.icon.del:hover:not(:disabled) { background: var(--grease-wash); color: va
 .q-saved { font-size: 1.15rem; font-weight: 650; }
 .q-saved.ok { color: var(--keep); }
 @media (max-width: 900px) { .q-row .q-check { grid-template-columns: 1fr; } .q-saving { text-align: left; } }
+
+/* Collapsible lists and the compact view (a table without pictures) */
+.q-toggle { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+.q-toggle:hover { color: var(--accent); }
+.q-current.compact { grid-template-columns: 1fr; padding-top: 12px; padding-bottom: 12px; }
+.q-list { overflow-x: auto; }
+.q-crow { display: grid; gap: 10px; align-items: center; padding: 4px 0; font-size: .88rem; }
+.q-crow + .q-crow { border-top: 1px solid var(--rule); }
+.q-cwait { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) 70px 90px 84px; }
+.q-cdone { grid-template-columns: minmax(0, 1fr) 120px 150px 150px 110px 130px; }
+.q-crow.q-chead { font-size: .78rem; font-weight: 600; color: var(--muted); border-top: 0; border-bottom: 1px solid var(--rule); }
+.q-crow .cname { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.q-crow .cfolder { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.q-crow .num { text-align: right; }
+.q-crow .q-status { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.q-crow .cfile { display: flex; align-items: center; gap: 6px; }
+.q-crow .csz { width: 58px; }
+.q-crow .csaved.ok { color: var(--keep); }
+.q-crow .cact { display: flex; gap: 6px; justify-content: flex-end; }
+button.icon.sm { width: 24px; height: 24px; padding: 0; }
+button.icon.sm svg { width: 11px; height: 11px; }

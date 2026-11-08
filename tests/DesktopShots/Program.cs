@@ -171,6 +171,10 @@ if (Environment.GetEnvironmentVariable("SHOT_QUEUE") == "1")
     var run = DateTime.UtcNow;
     while (!(controller.Encoder.Current.Current?.Fraction > 0.3) && DateTime.UtcNow - run < TimeSpan.FromMinutes(2)) Pump(100);
     vm.SelectedTab = MainViewModel.QueueTab; Pump(300); Shot("q_running");
+    // Compact view (a table, no pictures; the running video keeps its progress bar), and a collapsed list
+    vm.EncodeQueue.Compact = true; Pump(400); Shot("q_running_compact");
+    vm.EncodeQueue.WaitingExpanded = false; Pump(400); Shot("q_running_collapsed");
+    vm.EncodeQueue.WaitingExpanded = true; vm.EncodeQueue.Compact = false; Pump(300);
     vm.Encode.HideQueued = true; vm.SelectedTab = MainViewModel.EncodeTab; Pump(400);
     Console.WriteLine($"hide queued: {vm.Encode.Rows.Count} rows left"); Shot("q_picker_hidden");
     vm.Encode.HideQueued = false; Pump(300); Shot("q_picker_greyed");
@@ -182,6 +186,7 @@ if (Environment.GetEnvironmentVariable("SHOT_QUEUE") == "1")
     run = DateTime.UtcNow;
     while (controller.Encoder.Current.PendingCount > 0 && DateTime.UtcNow - run < TimeSpan.FromMinutes(5)) Pump(200);
     Pump(500); Shot("q_done");
+    vm.EncodeQueue.Compact = true; Pump(500); Shot("q_done_compact"); vm.EncodeQueue.Compact = false; Pump(300);
     var final = controller.Encoder.Current;
     Console.WriteLine($"final: {EncodeText.Headline(final)} | {EncodeText.Totals(final)} | {EncodeText.Saved(final)}");
     foreach (var i in final.Items) Console.WriteLine($"  {i.FileName}: {EncodeText.Status(i)}");

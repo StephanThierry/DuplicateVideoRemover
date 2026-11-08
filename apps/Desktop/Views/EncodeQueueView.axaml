@@ -17,6 +17,9 @@
     <!-- A delete icon next to a set of pictures: red -->
     <Style Selector="Button.icon.del"><Setter Property="Foreground" Value="{DynamicResource Grease}"/></Style>
     <Style Selector="Button.icon.del:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Foreground" Value="{DynamicResource GreaseHover}"/><Setter Property="Background" Value="{DynamicResource GreaseWash}"/></Style>
+    <!-- Compact view: tight rows and small icon buttons -->
+    <Style Selector="Border.qrow.compact"><Setter Property="Padding" Value="12,3"/></Style>
+    <Style Selector="Button.icon.tiny"><Setter Property="Width" Value="24"/><Setter Property="Height" Value="24"/><Setter Property="CornerRadius" Value="12"/><Setter Property="Padding" Value="0"/></Style>
     <Style Selector="Image.qshot"><Setter Property="Width" Value="96"/><Setter Property="Height" Value="64"/></Style>
   </UserControl.Styles>
 
@@ -24,6 +27,8 @@
     <!-- Title and the controls of the run -->
     <DockPanel Grid.Row="0" Margin="0,0,0,14">
       <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+        <CheckBox Content="Compact view" IsChecked="{Binding Compact}" IsVisible="{Binding !IsEmpty}" VerticalAlignment="Center" Margin="0,0,10,0"
+                  ToolTip.Tip="A table without pictures: more videos on the screen"/>
         <Button Classes="primary" Content="Start encoding" Command="{Binding StartCommand}" IsVisible="{Binding CanStart}" FontSize="15" Padding="20,9"/>
         <Button Content="Skip this video" Command="{Binding SkipCurrentCommand}" IsVisible="{Binding HasCurrent}" FontSize="15" Padding="20,9"
                 ToolTip.Tip="Gives up on the video being encoded (it is marked as skipped) and goes on with the next"/>
@@ -70,7 +75,17 @@
     </Border>
 
     <!-- The video being encoded now -->
-    <Border Grid.Row="2" Classes="panel" Padding="16,14" Margin="0,0,0,12" IsVisible="{Binding HasCurrent}">
+    <Border Grid.Row="2" Classes="panel" Padding="14,10" Margin="0,0,0,12" IsVisible="{Binding ShowCurrentCompact}">
+      <StackPanel Spacing="5" DataContext="{Binding Current}" x:DataType="vm:EncodeQueueRow">
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Right" Classes="muted small" VerticalAlignment="Center" Margin="12,0,0,0"><Run Text="{Binding Size}"/><Run Text=", "/><Run Text="{Binding Length}"/><Run Text=" - "/><Run Text="{Binding Summary}"/></TextBlock>
+          <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+        </DockPanel>
+        <ProgressBar Classes="current" Value="{Binding Percent}" Maximum="100" Height="10" CornerRadius="5"/>
+        <TextBlock Text="{Binding Detail}" TextWrapping="Wrap" FontSize="13"/>
+      </StackPanel>
+    </Border>
+    <Border Grid.Row="2" Classes="panel" Padding="16,14" Margin="0,0,0,12" IsVisible="{Binding ShowCurrentFull}">
       <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16" DataContext="{Binding Current}" x:DataType="vm:EncodeQueueRow">
         <Border Background="{DynamicResource Frame}" CornerRadius="3" Padding="4" VerticalAlignment="Top">
           <Image Source="{Binding Shot}" Width="168" Height="112" Stretch="UniformToFill"/>
@@ -98,11 +113,20 @@
             <DockPanel>
               <Button DockPanel.Dock="Right" Classes="small" Content="Clear waiting" Command="{Binding ClearWaitingCommand}" IsVisible="{Binding HasWaiting}"
                       ToolTip.Tip="Takes every waiting video out of the queue"/>
-              <TextBlock Text="{Binding WaitingTitle}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+              <Button Classes="link" Command="{Binding ToggleWaitingCommand}" Foreground="{DynamicResource Ink}" VerticalAlignment="Center" ToolTip.Tip="Show or hide this list">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Panel Width="14" Height="14" VerticalAlignment="Center">
+                    <Path Data="M2,4 L7,10 L12,4 Z" Fill="{Binding $parent[Button].Foreground}" IsVisible="{Binding WaitingExpanded}"/>
+                    <Path Data="M4,2 L10,7 L4,12 Z" Fill="{Binding $parent[Button].Foreground}" IsVisible="{Binding !WaitingExpanded}"/>
+                  </Panel>
+                  <TextBlock Text="{Binding WaitingTitle}" FontWeight="SemiBold"/>
+                </StackPanel>
+              </Button>
             </DockPanel>
           </Border>
-          <TextBlock DockPanel.Dock="Top" Classes="muted" Text="Nothing is waiting. Add more on the Re-encode planning screen." Margin="14,12" IsVisible="{Binding !HasWaiting}"/>
-          <ListBox Classes="rows" ItemsSource="{Binding Waiting}" Background="Transparent" IsVisible="{Binding HasWaiting}">
+          <TextBlock DockPanel.Dock="Top" Classes="muted" Text="Nothing is waiting. Add more on the Re-encode planning screen." Margin="14,12" IsVisible="{Binding ShowWaitingEmpty}"/>
+          <Grid>
+          <ListBox Classes="rows" ItemsSource="{Binding Waiting}" Background="Transparent" IsVisible="{Binding ShowWaitingFull}">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:EncodeQueueRow">
                 <Border Classes="qrow">
@@ -125,6 +149,33 @@
               </DataTemplate>
             </ListBox.ItemTemplate>
           </ListBox>
+          <!-- Compact: a table, no pictures -->
+          <DockPanel IsVisible="{Binding ShowWaitingCompact}">
+            <Border DockPanel.Dock="Top" Background="{DynamicResource Table}" BorderBrush="{DynamicResource Rule}" BorderThickness="0,1,0,1" Padding="12,3">
+              <Grid ColumnDefinitions="2*,3*,70,90,84" ColumnSpacing="10">
+                <TextBlock Text="Video" Classes="muted small" FontWeight="SemiBold"/>
+                <TextBlock Grid.Column="1" Text="Folder" Classes="muted small" FontWeight="SemiBold"/>
+                <TextBlock Grid.Column="2" Text="Length" Classes="muted small" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+                <TextBlock Grid.Column="3" Text="Size" Classes="muted small" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+              </Grid>
+            </Border>
+            <ListBox Classes="rows" ItemsSource="{Binding Waiting}" Background="Transparent">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:EncodeQueueRow">
+                  <Border Classes="qrow compact">
+                    <Grid ColumnDefinitions="2*,3*,70,90,84" ColumnSpacing="10">
+                      <TextBlock Text="{Binding FileName}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip.Tip="{Binding OriginalPath}"/>
+                      <TextBlock Grid.Column="1" Text="{Binding Folder}" FontSize="12" Classes="muted" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip.Tip="{Binding Folder}"/>
+                      <TextBlock Grid.Column="2" Text="{Binding Length}" FontSize="13" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                      <TextBlock Grid.Column="3" Text="{Binding Size}" FontSize="13" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                      <Button Grid.Column="4" Classes="small" Content="Remove" Command="{Binding RemoveCommand}" HorizontalAlignment="Right" ToolTip.Tip="Take this video out of the queue"/>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </DockPanel>
+          </Grid>
         </DockPanel>
       </Border>
 
@@ -134,11 +185,20 @@
             <DockPanel>
               <Button DockPanel.Dock="Right" Classes="small" Content="Clear finished" Command="{Binding ClearFinishedCommand}" IsVisible="{Binding HasFinished}"
                       ToolTip.Tip="Takes the finished videos out of this list. They can be picked again on the Re-encode planning screen"/>
-              <TextBlock Text="{Binding FinishedTitle}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+              <Button Classes="link" Command="{Binding ToggleFinishedCommand}" Foreground="{DynamicResource Ink}" VerticalAlignment="Center" ToolTip.Tip="Show or hide this list">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Panel Width="14" Height="14" VerticalAlignment="Center">
+                    <Path Data="M2,4 L7,10 L12,4 Z" Fill="{Binding $parent[Button].Foreground}" IsVisible="{Binding FinishedExpanded}"/>
+                    <Path Data="M4,2 L10,7 L4,12 Z" Fill="{Binding $parent[Button].Foreground}" IsVisible="{Binding !FinishedExpanded}"/>
+                  </Panel>
+                  <TextBlock Text="{Binding FinishedTitle}" FontWeight="SemiBold"/>
+                </StackPanel>
+              </Button>
             </DockPanel>
           </Border>
-          <TextBlock DockPanel.Dock="Top" Classes="muted" Text="Nothing has finished yet." Margin="14,12" IsVisible="{Binding !HasFinished}"/>
-          <ListBox Classes="rows" ItemsSource="{Binding Finished}" Background="Transparent" IsVisible="{Binding HasFinished}">
+          <TextBlock DockPanel.Dock="Top" Classes="muted" Text="Nothing has finished yet." Margin="14,12" IsVisible="{Binding ShowFinishedEmpty}"/>
+          <Grid>
+          <ListBox Classes="rows" ItemsSource="{Binding Finished}" Background="Transparent" IsVisible="{Binding ShowFinishedFull}">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:EncodeQueueRow">
                 <Border Classes="qrow">
@@ -223,6 +283,63 @@
               </DataTemplate>
             </ListBox.ItemTemplate>
           </ListBox>
+          <!-- Compact: a table, no pictures. The play and delete icons sit in the column of the file they belong to. -->
+          <DockPanel IsVisible="{Binding ShowFinishedCompact}">
+            <Border DockPanel.Dock="Top" Background="{DynamicResource Table}" BorderBrush="{DynamicResource Rule}" BorderThickness="0,1,0,1" Padding="12,3">
+              <Grid ColumnDefinitions="*,120,140,140,110,76" ColumnSpacing="10">
+                <TextBlock Text="Video" Classes="muted small" FontWeight="SemiBold"/>
+                <TextBlock Grid.Column="1" Text="Status" Classes="muted small" FontWeight="SemiBold"/>
+                <TextBlock Grid.Column="2" Text="Original" Classes="muted small" FontWeight="SemiBold"/>
+                <TextBlock Grid.Column="3" Text="New file" Classes="muted small" FontWeight="SemiBold"/>
+                <TextBlock Grid.Column="4" Text="Saved" Classes="muted small" FontWeight="SemiBold"/>
+              </Grid>
+            </Border>
+            <ListBox Classes="rows" ItemsSource="{Binding Finished}" Background="Transparent">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:EncodeQueueRow">
+                  <Border Classes="qrow compact">
+                    <Grid ColumnDefinitions="*,120,140,140,110,76" ColumnSpacing="10">
+                      <TextBlock Text="{Binding FileName}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip.Tip="{Binding OriginalPath}"/>
+                      <TextBlock Grid.Column="1" Text="{Binding ShortStatus}" FontSize="13" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                 Classes.ok="{Binding IsDone}" Classes.bad="{Binding IsProblem}" Classes.skip="{Binding IsSkipped}"
+                                 ToolTip.Tip="{Binding StatusText}"/>
+                      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Size}" FontSize="13" Width="58" VerticalAlignment="Center"/>
+                        <Button Classes="icon tiny" Command="{Binding PlayOriginalCommand}" ToolTip.Tip="Play the original (opens the default player)">
+                          <Path Data="M3,1.5 L3,12.5 L12,7 Z" Fill="{Binding $parent[Button].Foreground}" Width="10" Height="10" Stretch="Uniform"/>
+                        </Button>
+                        <Button Classes="icon tiny del" Command="{Binding AskDeleteOriginalCommand}" IsVisible="{Binding CanDeleteOriginal}" ToolTip.Tip="Delete the original (to the Recycle Bin, asks first)">
+                          <Path Data="M6,19 C6,20.1 6.9,21 8,21 L16,21 C17.1,21 18,20.1 18,19 L18,7 L6,7 Z M19,4 L15.5,4 L14.5,3 L9.5,3 L8.5,4 L5,4 L5,6 L19,6 Z" Fill="{Binding $parent[Button].Foreground}" Width="12" Height="12" Stretch="Uniform"/>
+                        </Button>
+                      </StackPanel>
+                      <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" IsVisible="{Binding HasCheck}">
+                        <TextBlock Text="{Binding NewSize}" FontSize="13" Width="58" VerticalAlignment="Center"/>
+                        <Button Classes="icon tiny" Command="{Binding PlayNewCommand}" ToolTip.Tip="Play the new file (opens the default player)">
+                          <Path Data="M3,1.5 L3,12.5 L12,7 Z" Fill="{Binding $parent[Button].Foreground}" Width="10" Height="10" Stretch="Uniform"/>
+                        </Button>
+                        <Button Classes="icon tiny del" Command="{Binding AskDeleteNewCommand}" IsVisible="{Binding CanDeleteNew}" ToolTip.Tip="Delete the new file (to the Recycle Bin, asks first). The original is kept">
+                          <Path Data="M6,19 C6,20.1 6.9,21 8,21 L16,21 C17.1,21 18,20.1 18,19 L18,7 L6,7 Z M19,4 L15.5,4 L14.5,3 L9.5,3 L8.5,4 L5,4 L5,6 L19,6 Z" Fill="{Binding $parent[Button].Foreground}" Width="12" Height="12" Stretch="Uniform"/>
+                        </Button>
+                      </StackPanel>
+                      <TextBlock Grid.Column="4" Text="{Binding SavedShort}" FontSize="13" VerticalAlignment="Center" Classes.ok="{Binding SavingIsGood}"/>
+                      <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Button Classes="icon tiny" Command="{Binding RetryCommand}" IsVisible="{Binding CanRetry}" ToolTip.Tip="Try again">
+                          <Path Data="M17.65,6.35 C16.2,4.9 14.21,4 12,4 C7.58,4 4.01,7.58 4.01,12 C4.01,16.42 7.58,20 12,20 C15.73,20 18.84,17.45 19.73,14 L17.65,14 C16.83,16.33 14.61,18 12,18 C8.69,18 6,15.31 6,12 C6,8.69 8.69,6 12,6 C13.66,6 15.14,6.69 16.22,7.78 L13,11 L20,11 L20,4 Z" Fill="{Binding $parent[Button].Foreground}" Width="13" Height="13" Stretch="Uniform"/>
+                        </Button>
+                        <Button Classes="icon tiny" Command="{Binding AskReplaceCommand}" IsVisible="{Binding CanReplace}" ToolTip.Tip="Replace the incomplete new file and encode again (asks first)">
+                          <Path Data="M17.65,6.35 C16.2,4.9 14.21,4 12,4 C7.58,4 4.01,7.58 4.01,12 C4.01,16.42 7.58,20 12,20 C15.73,20 18.84,17.45 19.73,14 L17.65,14 C16.83,16.33 14.61,18 12,18 C8.69,18 6,15.31 6,12 C6,8.69 8.69,6 12,6 C13.66,6 15.14,6.69 16.22,7.78 L13,11 L20,11 L20,4 Z" Fill="{Binding $parent[Button].Foreground}" Width="13" Height="13" Stretch="Uniform"/>
+                        </Button>
+                        <Button Classes="icon tiny" Command="{Binding ShowFolderCommand}" ToolTip.Tip="Open the folder">
+                          <Path Data="M20,6 L12,6 L10,4 L4,4 C2.9,4 2.01,4.9 2.01,6 L2,18 C2,19.1 2.9,20 4,20 L20,20 C21.1,20 22,19.1 22,18 L22,8 C22,6.9 21.1,6 20,6 Z M20,18 L4,18 L4,8 L20,8 Z" Fill="{Binding $parent[Button].Foreground}" Width="13" Height="13" Stretch="Uniform"/>
+                        </Button>
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </DockPanel>
+          </Grid>
         </DockPanel>
       </Border>
     </Grid>

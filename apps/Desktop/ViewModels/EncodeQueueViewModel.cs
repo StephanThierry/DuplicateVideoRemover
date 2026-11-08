@@ -37,9 +37,41 @@ public partial class EncodeQueueViewModel : ObservableObject
     [ObservableProperty] private bool hasWaiting;
     [ObservableProperty] private bool hasFinished;
     [ObservableProperty] private bool isEmpty = true;
-    // An empty list shrinks to its header, so the other one gets the room
+    // An empty or collapsed list shrinks to its header, so the other one gets the room
     [ObservableProperty] private GridLength waitingRowHeight = GridLength.Auto;
     [ObservableProperty] private GridLength finishedRowHeight = GridLength.Auto;
+
+    // Compact view: no pictures anywhere, the lists are tables. The sections can be collapsed to their header.
+    [ObservableProperty] private bool compact;
+    [ObservableProperty] private bool waitingExpanded = true;
+    [ObservableProperty] private bool finishedExpanded = true;
+    public bool ShowCurrentFull => HasCurrent && !Compact;
+    public bool ShowCurrentCompact => HasCurrent && Compact;
+    public bool ShowWaitingFull => HasWaiting && WaitingExpanded && !Compact;
+    public bool ShowWaitingCompact => HasWaiting && WaitingExpanded && Compact;
+    public bool ShowWaitingEmpty => !HasWaiting && WaitingExpanded;
+    public bool ShowFinishedFull => HasFinished && FinishedExpanded && !Compact;
+    public bool ShowFinishedCompact => HasFinished && FinishedExpanded && Compact;
+    public bool ShowFinishedEmpty => !HasFinished && FinishedExpanded;
+
+    partial void OnCompactChanged(bool value) => ViewChanged();
+    partial void OnWaitingExpandedChanged(bool value) => ViewChanged();
+    partial void OnFinishedExpandedChanged(bool value) => ViewChanged();
+    partial void OnHasWaitingChanged(bool value) => ViewChanged();
+    partial void OnHasFinishedChanged(bool value) => ViewChanged();
+
+    // Which parts are shown follows these few switches
+    private void ViewChanged()
+    {
+        foreach (var name in new[] { nameof(ShowCurrentFull), nameof(ShowCurrentCompact), nameof(ShowWaitingFull), nameof(ShowWaitingCompact),
+                                     nameof(ShowWaitingEmpty), nameof(ShowFinishedFull), nameof(ShowFinishedCompact), nameof(ShowFinishedEmpty) })
+            OnPropertyChanged(name);
+        WaitingRowHeight = HasWaiting && WaitingExpanded ? new GridLength(1, GridUnitType.Star) : GridLength.Auto;
+        FinishedRowHeight = HasFinished && FinishedExpanded ? new GridLength(1, GridUnitType.Star) : GridLength.Auto;
+    }
+
+    [RelayCommand] private void ToggleWaiting() => WaitingExpanded = !WaitingExpanded;
+    [RelayCommand] private void ToggleFinished() => FinishedExpanded = !FinishedExpanded;
     [ObservableProperty] private string headline = "Nothing in the queue";
     [ObservableProperty] private string left = "";
     [ObservableProperty] private string totals = "";
@@ -57,7 +89,7 @@ public partial class EncodeQueueViewModel : ObservableObject
 
     public bool HasCurrent => Current != null;
     public bool HasError => Error.Length > 0;
-    partial void OnCurrentChanged(EncodeQueueRow? value) => OnPropertyChanged(nameof(HasCurrent));
+    partial void OnCurrentChanged(EncodeQueueRow? value) { OnPropertyChanged(nameof(HasCurrent)); ViewChanged(); }
     partial void OnErrorChanged(string value) => OnPropertyChanged(nameof(HasError));
 
     // A confirmation before deleting the original or replacing an incomplete new file
@@ -102,8 +134,6 @@ public partial class EncodeQueueViewModel : ObservableObject
         CanStart = !p.Running && p.QueuedCount > 0;
         HasWaiting = p.QueuedCount > 0;
         HasFinished = p.FinishedCount > 0;
-        WaitingRowHeight = p.QueuedCount > 0 ? new GridLength(1, GridUnitType.Star) : GridLength.Auto;
-        FinishedRowHeight = p.FinishedCount > 0 ? new GridLength(1, GridUnitType.Star) : GridLength.Auto;
         IsEmpty = items.Count == 0;
         Headline = EncodeText.Headline(p);
         Left = EncodeText.Left(p);
@@ -256,6 +286,9 @@ public partial class EncodeQueueRow : ObservableObject
     [ObservableProperty] private bool savingIsGood;
     [ObservableProperty] private string savingText = "";
     [ObservableProperty] private string savingDetail = "";
+    // The compact table
+    [ObservableProperty] private string shortStatus = "";
+    [ObservableProperty] private string savedShort = "";
     [ObservableProperty] private Bitmap? newShot1;
     [ObservableProperty] private Bitmap? newShot2;
     [ObservableProperty] private Bitmap? newShot3;
@@ -314,6 +347,17 @@ public partial class EncodeQueueRow : ObservableObject
         SavingIsGood = i.Saved >= 0;
         SavingText = i.Saved >= 0 ? (i.OriginalDeleted ? "Saved " : "Saves ") + Fmt.Size(i.Saved) : Fmt.Size(-i.Saved) + " bigger";
         SavingDetail = i.Saved >= 0 ? EncodeText.Percent(i.SizeBytes, i.OutputBytes) + " smaller" : "no saving";
+        SavedShort = !HasSaving ? "" : i.Saved >= 0 ? $"{Fmt.Size(i.Saved)} ({EncodeText.Percent(i.SizeBytes, i.OutputBytes)})" : Fmt.Size(-i.Saved) + " bigger";
+        ShortStatus = i.Status switch
+        {
+            EncodeItemStatus.Done => "Done",
+            EncodeItemStatus.AlreadyEncoded => "Already encoded",
+            EncodeItemStatus.Incomplete => "Incomplete",
+            EncodeItemStatus.Failed => "Failed",
+            EncodeItemStatus.Skipped => "Skipped",
+            EncodeItemStatus.Running => "Encoding",
+            _ => "Waiting",
+        };
         LoadNewShots(i);
         OnPropertyChanged(nameof(IsProblem));
         OnPropertyChanged(nameof(CheckFailed));
