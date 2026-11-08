@@ -69,7 +69,23 @@
       <TextBox Text="{Binding Search}" PlaceholderText="Filter by file or folder name" Width="280" Margin="0,0,0,6"/>
     </WrapPanel>
 
-    <Border Grid.Row="4" Classes="panel" Padding="40" VerticalAlignment="Top" IsVisible="{Binding !HasVideos}">
+    <!-- Reading the list takes a few seconds: say so, instead of suggesting a new scan -->
+    <Border Grid.Row="4" Classes="panel" Padding="40" VerticalAlignment="Top" IsVisible="{Binding Loading}">
+      <StackPanel HorizontalAlignment="Center" Spacing="12" Width="460">
+        <TextBlock Classes="h2" Text="Loading your videos..." HorizontalAlignment="Center"/>
+        <ProgressBar IsIndeterminate="True" Height="10" CornerRadius="5"/>
+        <TextBlock Classes="muted" TextWrapping="Wrap" TextAlignment="Center"
+                   Text="Reading the videos from the last scan and checking which can be re-encoded. This takes a few seconds - no new scan is needed."/>
+      </StackPanel>
+    </Border>
+
+    <Border Grid.Row="4" Classes="panel" Padding="40" VerticalAlignment="Top">
+      <Border.IsVisible>
+        <MultiBinding Converter="{x:Static BoolConverters.And}">
+          <Binding Path="!HasVideos"/>
+          <Binding Path="!Loading"/>
+        </MultiBinding>
+      </Border.IsVisible>
       <StackPanel HorizontalAlignment="Center" Spacing="10">
         <TextBlock Classes="h2" Text="No videos to re-encode" HorizontalAlignment="Center"/>
         <TextBlock Classes="muted" Text="Scan your folders first. Duplicates, broken videos and left-out file types are not listed." HorizontalAlignment="Center"/>

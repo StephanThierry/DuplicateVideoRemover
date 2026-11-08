@@ -43,7 +43,11 @@
 
     @if (candidates == null)
     {
-        <p class="muted">Loading videos and checking that the files still exist...</p>
+        <div class="empty" role="status">
+            <h2>Loading your videos...</h2>
+            <div class="bar unknown" role="progressbar" aria-label="Loading" style="max-width:460px;margin:0 auto"><div style="width:100%"></div></div>
+            <p>Reading the videos from the last scan and checking which can be re-encoded. This takes a few seconds - no new scan is needed.</p>
+        </div>
     }
     else if (candidates.Count == 0)
     {
