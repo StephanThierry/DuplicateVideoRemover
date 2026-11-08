@@ -9,7 +9,7 @@
                 <button @onclick="Close">Close</button>
             </div>
             <div class="player-box" @ref="box" data-duration="@Video.DurationSeconds" @key="Video.Id">
-                <video src="video/@Video.Id" autoplay preload="metadata"></video>
+                <video src="@Source" autoplay preload="metadata"></video>
                 <div class="pc">
                     @* A tall seek bar in its own row: the browser's own bar is too thin to hit with the mouse *@
                     <div class="pc-seek" role="slider" tabindex="0" aria-label="Position in the video" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
@@ -29,7 +29,7 @@
             </div>
             <p class="muted">
                 @Fmt.Size(Video.SizeBytes), @Fmt.Duration(Video.DurationSeconds)
-                @if (ext is not (".mp4" or ".m4v" or ".webm" or ".mov" or ".ogv")) { <text> - browsers often can't play @ext files; if nothing shows, </text><a href="video/@Video.Id" target="_blank" rel="noopener">open it in a new tab</a><text> to download it.</text> }
+                @if (ext is not (".mp4" or ".m4v" or ".webm" or ".mov" or ".ogv")) { <text> - browsers often can't play @ext files; if nothing shows, </text><a href="@Source" target="_blank" rel="noopener">open it in a new tab</a><text> to download it.</text> }
             </p>
         </div>
     </div>
@@ -40,6 +40,10 @@
 @code {
     [Parameter] public VideoEntry? Video { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
+    /// <summary>Where the video is streamed from, when not /video/{id} (a new file on the Re-encode queue page: video id 0, its own address).</summary>
+    [Parameter] public string? Src { get; set; }
+
+    private string Source => Src ?? $"video/{Video!.Id}";
 
     private ElementReference box;
     private int? wiredId;
@@ -49,7 +53,7 @@
     {
         if (Video == null) { wiredId = null; return; }
         if (wiredId == Video.Id) return;
-        wiredId = Video.Id;
+        wiredId = Video.Id;   // (reopened after a close, so two videos with id 0 are both wired)
         try { await JS.InvokeVoidAsync("dvr.initPlayer", box); }
         catch (JSDisconnectedException) { }
     }

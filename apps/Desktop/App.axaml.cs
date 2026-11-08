@@ -19,6 +19,8 @@ public partial class App : Application
             desktop.Exit += (_, _) =>
             {
                 Program.Controller.Scanner.Cancel();
+                // Stops FFmpeg and deletes its partial file; the rest of the queue is kept for the next start
+                Program.Controller.Encoder.Shutdown();
                 deepduplicates.ScanLock.ReleaseAll();
             };
         }

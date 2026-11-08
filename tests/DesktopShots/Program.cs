@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Avalonia.VisualTree;
 using Avalonia;
 using Avalonia.Headless;
@@ -25,7 +26,9 @@ AppBuilder.Configure<App>()
     .SetupWithoutStarting();
 
 var vm = new MainViewModel(controller);
-var window = new MainWindow { DataContext = vm, Width = 1440, Height = 900 };
+// SHOT_SIZE=1320x860 sets the window size (layout bugs depend on it)
+var size = (Environment.GetEnvironmentVariable("SHOT_SIZE") ?? "1440x900").Split('x');
+var window = new MainWindow { DataContext = vm, Width = int.Parse(size[0]), Height = int.Parse(size[1]) };
 window.Show();
 
 void Pump(int ms = 300)
@@ -40,6 +43,217 @@ void Shot(string name)
     Console.WriteLine("saved " + name);
 }
 
+// SHOT_QUEUE=1 (with SHOT_FFMPEG=<folder with ffmpeg and ffprobe>, and an empty data folder): the whole encode queue for real -
+// makes a few clips, scans them, adds some to the queue in the Re-encode planning screen, then adds more while it runs
+if (Environment.GetEnvironmentVariable("SHOT_QUEUE") == "1")
+{
+    string ffSource = Environment.GetEnvironmentVariable("SHOT_FFMPEG")!;
+    string ffTarget = Path.Combine(FileHandler.AppFolder, "ffmpeg");
+    if (!File.Exists(FileHandler.FFmpegPath))
+    {
+        Directory.CreateDirectory(ffTarget);
+        foreach (var f in Directory.GetFiles(ffSource)) File.Copy(f, Path.Combine(ffTarget, Path.GetFileName(f)), true);
+    }
+    string videos = Path.Combine(FileHandler.AppFolder, "videos");
+    Directory.CreateDirectory(videos);
+    var gen = new ProcessEncodeRunner();
+    int[] lengths = { 140, 120, 100, 110, 130, 105 };
+    for (int n = 0; n < lengths.Length; n++)
+    {
+        string clip = Path.Combine(videos, $"Holiday clip {n + 1}.mp4");
+        if (File.Exists(clip)) continue;
+        int seconds = lengths[n];
+        // Off the UI thread: waiting for an async call on it would deadlock under Avalonia's synchronization context
+        Task.Run(() => gen.RunAsync(FileHandler.FFmpegPath, new[] { "-hide_banner", "-y", "-f", "lavfi", "-i", $"testsrc2=duration={seconds}:size=1280x720:rate=25",
+            "-f", "lavfi", "-i", "sine=duration=" + seconds, "-shortest", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "30", "-pix_fmt", "yuv420p", "-c:a", "aac", clip },
+            _ => { }, _ => { }, CancellationToken.None)).GetAwaiter().GetResult();
+    }
+    string bad = Path.Combine(videos, "Broken download.mp4");
+    File.WriteAllText(bad, "this is not a video");
+    // The scan leaves out files that were changed in the last minutes ("still being written")
+    foreach (var f in Directory.GetFiles(videos)) File.SetLastWriteTime(f, DateTime.Now.AddHours(-2));
+    Console.WriteLine("clips made");
+
+    var settings = controller.Settings.Clone();
+    settings.contentFolders = new[] { videos };
+    settings.encodeSettings = new EncodeSettings { codec = "x264", preset = "veryfast", resolution = 720, crf = 24, container = "mp4" };
+    controller.SaveSettings(settings, PathMapper.Mappings);
+    controller.StartScan();
+    var scanStart = DateTime.UtcNow;
+    while ((controller.Scanner.IsRunning || controller.Scanner.Current.Phase == ScanPhase.Idle) && DateTime.UtcNow - scanStart < TimeSpan.FromMinutes(3)) Pump(200);
+    Console.WriteLine("scan: " + controller.Scanner.Current.Phase + " " + controller.Scanner.Current.Message);
+
+    // SHOT_CHECK=1: earlier results are there already - two good ones, one cut off - plus a video that is encoded now.
+    // The new files are checked (length, pictures like the scan's), then the original of a good one is deleted and the cut-off one replaced.
+    if (Environment.GetEnvironmentVariable("SHOT_CHECK") == "1")
+    {
+        var cands = controller.EncodeCandidates();
+        var es = settings.EncodeOrDefault();
+        for (int n = 0; n < 3; n++)
+        {
+            string target = EncodePlanner.OutputPath(cands[n].Path, es);
+            var made = Task.Run(() => gen.RunAsync(FileHandler.FFmpegPath, EncodePlanner.Arguments(cands[n].Path, es, target), _ => { }, _ => { }, CancellationToken.None)).GetAwaiter().GetResult();
+            Console.WriteLine($"earlier result {n}: ffmpeg {made}, {new FileInfo(target).Length:N0} bytes");
+        }
+        string cutOff = EncodePlanner.OutputPath(cands[2].Path, es);
+        var all = File.ReadAllBytes(cutOff);
+        File.WriteAllBytes(cutOff, all[..(all.Length * 6 / 10)]);
+        foreach (var f in Directory.GetFiles(videos, "*_720p_x264.mp4")) File.SetLastWriteTime(f, DateTime.Now.AddHours(-2));
+
+        vm.SelectedTab = MainViewModel.EncodeTab; Pump(500);
+        var waitLoad = DateTime.UtcNow;
+        while ((vm.Encode.Loading || vm.Encode.Rows.Count == 0) && DateTime.UtcNow - waitLoad < TimeSpan.FromMinutes(1)) Pump(200);
+        vm.Encode.MinMb = 0; vm.Encode.MinKbps = 0; Pump(300);
+        vm.Encode.RowClicked(vm.Encode.Rows[0], false); vm.Encode.RowClicked(vm.Encode.Rows[3], true); Pump(300);
+        vm.Encode.PrimaryCommand.Execute(null);
+        var wait = DateTime.UtcNow;
+        while (controller.Encoder.Current.PendingCount > 0 && DateTime.UtcNow - wait < TimeSpan.FromMinutes(3)) Pump(100);
+        Pump(800);
+        vm.SelectedTab = MainViewModel.QueueTab; Pump(500); Shot("c_finished");
+        foreach (var i in controller.Encoder.Current.Items) Console.WriteLine($"  {i.FileName}: {EncodeText.Status(i)} | check: {i.Check}");
+
+        var q = vm.EncodeQueue;
+        var good = q.Finished.First(r => r.CanDeleteOriginal);
+        good.AskDeleteOriginalCommand.Execute(null); Pump(300); Shot("c_confirm_delete");
+        Console.WriteLine("confirm: " + q.ConfirmTitle + " | " + q.ConfirmText.Replace("\n", " / ") + " | button " + q.ConfirmButton);
+        q.ConfirmYesCommand.Execute(null); Pump(1500);
+        Console.WriteLine($"after delete: toast '{q.Toast}', original still there: {File.Exists(good.OriginalPath)}, new file there: {File.Exists(good.NewPath)}");
+        Shot("c_after_delete");
+
+        var incomplete = q.Finished.FirstOrDefault(r => r.CanReplace);
+        Console.WriteLine("incomplete row found: " + (incomplete != null));
+        if (incomplete != null)
+        {
+            incomplete.AskReplaceCommand.Execute(null); Pump(300); Shot("c_confirm_replace");
+            q.ConfirmYesCommand.Execute(null);
+            wait = DateTime.UtcNow;
+            while (controller.Encoder.Current.PendingCount > 0 || controller.Encoder.IsRunning) { Pump(100); if (DateTime.UtcNow - wait > TimeSpan.FromMinutes(2)) break; }
+            Pump(800); Shot("c_after_replace");
+        }
+        // Delete the NEW file of another video (the original is kept); the row whose original was deleted must not offer it
+        var originalGone = q.Finished.First(r => r.StatusText.Contains("original has been deleted"));
+        Console.WriteLine($"row whose original was deleted offers delete-new: {originalGone.CanDeleteNew}");
+        var other = q.Finished.First(r => r.CanDeleteNew && r.CanDeleteOriginal);
+        Console.WriteLine($"saving shown for {other.FileName}: {other.SavingText} / {other.SavingDetail}");
+        other.AskDeleteNewCommand.Execute(null); Pump(300); Shot("c_confirm_delete_new");
+        Console.WriteLine("confirm: " + q.ConfirmTitle + " | " + q.ConfirmText.Replace("\n", " / "));
+        q.ConfirmYesCommand.Execute(null); Pump(1500);
+        Console.WriteLine($"after delete new: toast '{q.Toast}', new file there: {File.Exists(other.NewPath)}, original there: {File.Exists(other.OriginalPath)}, still listed: {q.Finished.Contains(other)}");
+        Shot("c_after_delete_new");
+        // The original of "originalGone" was deleted: its new file must still have play + delete. Delete that last copy too.
+        Console.WriteLine($"after deleting the original: original available {originalGone.OriginalAvailable}, can delete original {originalGone.CanDeleteOriginal}; new file available {originalGone.NewAvailable}, can delete new {originalGone.CanDeleteNew}");
+        Shot("c_one_copy_left");
+        originalGone.AskDeleteNewCommand.Execute(null); Pump(300); Shot("c_confirm_last_copy");
+        Console.WriteLine("last copy dialog: " + q.ConfirmTitle + " | button " + q.ConfirmButton);
+        q.ConfirmYesCommand.Execute(null); Pump(1500);
+        Console.WriteLine($"after deleting the last copy: toast '{q.Toast}', row still listed: {q.Finished.Contains(originalGone)}, can delete original {originalGone.CanDeleteOriginal}, can delete new {originalGone.CanDeleteNew}, both greyed: {originalGone.OriginalDeleted && originalGone.NewDeleted}");
+        Shot("c_both_gone");
+        q.Compact = true; Pump(500); Shot("c_compact_deleted"); q.Compact = false; Pump(300);
+        // "Confirm before deleting" off: no dialog, the file goes at once
+        Console.WriteLine($"confirm before deleting is on by default: {q.ConfirmDeletes}");
+        q.ConfirmDeletes = false; Pump(300); Shot("c_confirm_option_off");
+        var quick = q.Finished.First(r => r.CanDeleteNew);
+        quick.AskDeleteNewCommand.Execute(null); Pump(1500);
+        Console.WriteLine($"with confirmation off: dialog shown {q.ConfirmVisible}, new file gone {!File.Exists(quick.NewPath)}, toast '{q.Toast}'");
+        q.ConfirmDeletes = true;
+        var again = q.Finished.First(r => r.CanDeleteNew);
+        again.AskDeleteNewCommand.Execute(null); Pump(300);
+        Console.WriteLine($"with confirmation on again: dialog shown {q.ConfirmVisible}");
+        q.ConfirmNoCommand.Execute(null);
+        foreach (var i in controller.Encoder.Current.Items) Console.WriteLine($"  final {i.FileName}: {EncodeText.Status(i)}");
+        vm.SelectedTab = MainViewModel.EncodeTab; Pump(800); Shot("c_picker_after");
+        Console.WriteLine($"picker rows after deleting an original: {vm.Encode.Rows.Count}");
+        controller.Encoder.Shutdown();
+        return;
+    }
+    vm.SelectedTab = MainViewModel.QueueTab; Pump(500); Shot("q_empty");
+    vm.SelectedTab = MainViewModel.EncodeTab; Pump(500);
+    var loadWait = DateTime.UtcNow;
+    while ((vm.Encode.Loading || vm.Encode.Rows.Count == 0) && DateTime.UtcNow - loadWait < TimeSpan.FromMinutes(1)) Pump(200);
+    vm.Encode.MinMb = 0; vm.Encode.MinKbps = 0; Pump(300);
+    Console.WriteLine($"picker: {vm.Encode.Rows.Count} videos, button '{vm.Encode.PrimaryText}'");
+    vm.Encode.RowClicked(vm.Encode.Rows[0], false);
+    vm.Encode.RowClicked(vm.Encode.Rows[2], true); Pump(300); Shot("q_picked");
+
+    vm.Encode.PrimaryCommand.Execute(null); Pump(400);
+    Console.WriteLine("after add: " + vm.Encode.Toast + " | " + vm.Encode.QueueSummary + " | queued rows " + vm.Encode.Rows.Count(r => r.IsQueued));
+    // A click on a queued row does nothing
+    vm.Encode.RowClicked(vm.Encode.Rows[0], false);
+    Console.WriteLine("click on queued row picks it: " + vm.Encode.Rows[0].IsPicked);
+    Shot("q_added");
+
+    // More, while the first batch runs: a video that cannot be encoded, and the rest of the list
+    controller.Encoder.Enqueue(new[] { new EncodeCandidate { Id = 99999, Path = bad, SizeBytes = 20, DurationSeconds = 30 } }, settings.EncodeOrDefault());
+    foreach (var row in vm.Encode.Rows.Where(r => !r.IsQueued)) vm.Encode.RowClicked(row, false);
+    vm.Encode.PrimaryCommand.Execute(null); Pump(400);
+    Console.WriteLine("second add: " + vm.Encode.Toast);
+
+    var run = DateTime.UtcNow;
+    while (!(controller.Encoder.Current.Current?.Fraction > 0.3) && DateTime.UtcNow - run < TimeSpan.FromMinutes(2)) Pump(100);
+    vm.SelectedTab = MainViewModel.QueueTab; Pump(300); Shot("q_running");
+    // Compact view (a table, no pictures; the running video keeps its progress bar), and a collapsed list
+    vm.EncodeQueue.Compact = true; Pump(400); Shot("q_running_compact");
+    vm.EncodeQueue.WaitingExpanded = false; Pump(400); Shot("q_running_collapsed");
+    vm.EncodeQueue.WaitingExpanded = true; vm.EncodeQueue.Compact = false; Pump(300);
+    vm.Encode.HideQueued = true; vm.SelectedTab = MainViewModel.EncodeTab; Pump(400);
+    Console.WriteLine($"hide queued: {vm.Encode.Rows.Count} rows left"); Shot("q_picker_hidden");
+    vm.Encode.HideQueued = false; Pump(300); Shot("q_picker_greyed");
+
+    run = DateTime.UtcNow;
+    while (controller.Encoder.Current.Items.Count(i => i.IsFinished) < 3 && DateTime.UtcNow - run < TimeSpan.FromMinutes(3)) Pump(200);
+    vm.SelectedTab = MainViewModel.QueueTab; Pump(300); Shot("q_midway");
+
+    run = DateTime.UtcNow;
+    while (controller.Encoder.Current.PendingCount > 0 && DateTime.UtcNow - run < TimeSpan.FromMinutes(5)) Pump(200);
+    Pump(500); Shot("q_done");
+    vm.EncodeQueue.Compact = true; Pump(500); Shot("q_done_compact"); vm.EncodeQueue.Compact = false; Pump(300);
+    var final = controller.Encoder.Current;
+    Console.WriteLine($"final: {EncodeText.Headline(final)} | {EncodeText.Totals(final)} | {EncodeText.Saved(final)}");
+    foreach (var i in final.Items) Console.WriteLine($"  {i.FileName}: {EncodeText.Status(i)}");
+    Console.WriteLine("part files left: " + Directory.GetFiles(videos, "*.part").Length);
+    // Stop in the middle: the running video goes back in the queue, nothing is left half done, Start carries on
+    controller.Encoder.ClearFinished();
+    foreach (var f in Directory.GetFiles(videos, "*_720p_x264.mp4")) File.Delete(f);
+    controller.EnqueueEncode(controller.EncodeCandidates().Take(4));
+    run = DateTime.UtcNow;
+    while (!(controller.Encoder.Current.Current?.Fraction > 0.2) && DateTime.UtcNow - run < TimeSpan.FromMinutes(2)) Pump(20);
+    controller.Encoder.Stop();
+    while (controller.Encoder.IsRunning) Pump(50);
+    Pump(500); vm.SelectedTab = MainViewModel.QueueTab; Shot("q_stopped");
+    var stopped = controller.Encoder.Current;
+    Console.WriteLine($"stopped: {EncodeText.Headline(stopped)} | halted {stopped.Halted}, waiting {stopped.QueuedCount}, part files {Directory.GetFiles(videos, "*.part").Length}");
+    vm.EncodeQueue.StartCommand.Execute(null);
+    run = DateTime.UtcNow;
+    while (controller.Encoder.Current.PendingCount > 0 && DateTime.UtcNow - run < TimeSpan.FromMinutes(3)) Pump(100);
+    Pump(500); Shot("q_after_restart");
+    Console.WriteLine($"after start: {EncodeText.Headline(controller.Encoder.Current)} | {EncodeText.Totals(controller.Encoder.Current)}");
+    controller.Encoder.Shutdown();
+    return;
+}
+// SHOT_LEGACY=1: opens the Re-encode queue on a copy of real data and waits until the finished videos from before the check are checked
+if (Environment.GetEnvironmentVariable("SHOT_LEGACY") == "1")
+{
+    vm.SelectedTab = MainViewModel.QueueTab;
+    var begun = DateTime.UtcNow;
+    Pump(800); Shot("l_before");
+    while (controller.Encoder.Current.Items.Any(i => i.CheckPending) && DateTime.UtcNow - begun < TimeSpan.FromMinutes(4)) Pump(300);
+    Pump(1500); Shot("l_after");
+    foreach (var i in controller.Encoder.Current.Items) Console.WriteLine($"  {i.FileName}: {i.Status} | {EncodeText.Status(i)} | check: {i.Check}{i.Message} | delete original {i.CanDeleteOriginal}");
+    controller.Encoder.Shutdown();
+    return;
+}
+// SHOT_PLANNING=1: opens Re-encode planning on the given data (use a copy) and waits for the list - for finding crashes there
+if (Environment.GetEnvironmentVariable("SHOT_PLANNING") == "1")
+{
+    vm.SelectedTab = MainViewModel.EncodeTab;
+    var started = DateTime.UtcNow;
+    Pump(500); Shot("p_loading");
+    while (vm.Encode.Loading && DateTime.UtcNow - started < TimeSpan.FromMinutes(3)) Pump(200);
+    Pump(1500);
+    Console.WriteLine($"planning: loading {vm.Encode.Loading}, {vm.Encode.Rows.Count} rows, has videos {vm.Encode.HasVideos}, after {(DateTime.UtcNow - started).TotalSeconds:0} s");
+    Shot("p_loaded");
+    return;
+}
 if (scan)
 {
     vm.SelectedTab = 1;

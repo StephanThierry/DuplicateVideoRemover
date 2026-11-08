@@ -8,6 +8,9 @@ namespace deepduplicates
     /// <summary>The encoding script: where it was written (null when nothing was left), how many videos, and the missing files left out.</summary>
     public sealed record EncodeScriptResult(string Path, int Videos, List<EncodeCandidate> Missing);
 
+    /// <summary>What happened when videos were added to the encode queue.</summary>
+    public sealed record EncodeQueueResult(int Added, int AlreadyThere, List<EncodeCandidate> Missing);
+
     /// <summary>A false positive with the two videos as they are in the database now (null when gone).</summary>
     public sealed record FalsePositiveDetail(FalsePositive Pair, VideoEntry NowA, VideoEntry NowB)
     {
@@ -31,6 +34,8 @@ namespace deepduplicates
         /// <summary>True when settings.json did not exist and was created with defaults.</summary>
         public bool IsFirstRun { get; }
         public ScanEngine Scanner { get; } = new();
+        /// <summary>The encode queue (Re-encode adds videos, the Re-encode queue screen shows it).</summary>
+        public EncodeEngine Encoder { get; }
         public ResultSession Session { get; private set; }
 
         /// <summary>Raised when there is a new review session (after a scan, or new results).</summary>
@@ -51,6 +56,13 @@ namespace deepduplicates
             try { if (UseMainNames(Settings)) FileHandler.SaveSettings(Settings); }
             catch (Exception e) { Console.WriteLine("Could not update the rules to the main names: " + e.Message); }
             Session = new ResultSession(ResultSet.LoadSaved());
+            Encoder = new EncodeEngine(Path.Combine(FileHandler.AppFolder, "output", "encodequeue.json"), PrepareFFmpeg);
+            // Finished videos from before new files were checked get their check now, in the background
+            _ = System.Threading.Tasks.Task.Run(async () =>
+            {
+                try { await Encoder.CheckUncheckedAsync(); }
+                catch (Exception e) { Console.WriteLine("Could not check earlier results: " + e.Message); }
+            });
             Scanner.Completed += results =>
             {
                 InvalidateCache();
@@ -257,6 +269,114 @@ namespace deepduplicates
         public const string EncodeScriptName = "encode_selected";
 
         /// <summary>
+        /// Adds videos to the encode queue (it starts by itself unless it was stopped), with the saved encode
+        /// settings. Files that no longer exist are not added and are counted in Missing.
+        /// </summary>
+        public EncodeQueueResult EnqueueEncode(IEnumerable<EncodeCandidate> videos)
+        {
+            var list = videos.ToList();
+            var exists = LastScan.Exist(list.Select(c => c.Path).ToList());
+            var present = list.Where((c, i) => exists[i]).ToList();
+            var missing = list.Where((c, i) => !exists[i]).ToList();
+            var added = present.Count == 0 ? new EnqueueResult(0, 0) : Encoder.Enqueue(present, Settings.EncodeOrDefault());
+            return new EncodeQueueResult(added.Added, added.AlreadyThere, missing);
+        }
+
+        /// <summary>The result of an action on a finished video in the encode queue: an error, or what was done.</summary>
+        public sealed record EncodeActionResult(string Error, string Message, bool Recoverable = false)
+        {
+            public bool Ok => Error.Length == 0;
+        }
+
+        /// <summary>True when deleting this file puts it in the Recycle Bin (trash) - for the confirmation text.</summary>
+        public bool CanRecover(string path) => RecycleBin.IsRecoverable(path);
+
+        /// <summary>
+        /// Deletes the original of a video whose new file has been checked (length and pictures, see EncodeChecker): to the
+        /// Recycle Bin, or for good where there is none (a network share) - the interface says which before asking.
+        /// Refuses unless the check passed and the new file is still the one that was checked.
+        /// </summary>
+        public EncodeActionResult DeleteOriginalAfterEncode(string itemId)
+        {
+            var item = Encoder.Find(itemId);
+            if (item == null) return new("This video is not in the list any more.", "");
+            if (!item.CanDeleteOriginal) return new("The new file has not been checked, so the original is kept.", "");
+            try
+            {
+                // While the new file exists it must still be the one that was checked. (Once it has been deleted, the original is
+                // the last copy and the interface asked about exactly that.)
+                if (!item.NewDeleted)
+                {
+                    var created = new FileInfo(item.OutputPath);
+                    if (!created.Exists || created.Length != item.OutputBytes)
+                        return new("The new file is not there or has changed since it was checked. The original is kept.", "");
+                }
+                if (!File.Exists(item.Path))
+                {
+                    RemoveDeletedVideo(item.VideoId, item.Path);
+                    Encoder.MarkOriginalDeleted(item.Id);
+                    return new("", "The original was already gone.");
+                }
+                bool recoverable = RecycleBin.Delete(item.Path);
+                RemoveDeletedVideo(item.VideoId, item.Path);
+                Encoder.MarkOriginalDeleted(item.Id);
+                return new("", recoverable
+                    ? $"Moved {Path.GetFileName(item.Path)} to the Recycle Bin ({Fmt.Size(item.SizeBytes)})."
+                    : $"Deleted {Path.GetFileName(item.Path)} ({Fmt.Size(item.SizeBytes)}) permanently: this location has no Recycle Bin.", recoverable);
+            }
+            catch (Exception e) { return new($"Could not delete {Path.GetFileName(item.Path)}: {e.Message}", ""); }
+        }
+
+        /// <summary>
+        /// Deletes the new file of a finished video (Recycle Bin, or for good on a network share - the interface says which first).
+        /// The row stays, with the new file greyed out, and the video can be planned again. The two copies are handled on their own:
+        /// this also works when the original is gone (the interface then says it is the last copy). Only ever touches the new file
+        /// the queue item records.
+        /// </summary>
+        public EncodeActionResult DeleteNewFile(string itemId)
+        {
+            var item = Encoder.Find(itemId);
+            if (item == null) return new("This video is not in the list any more.", "");
+            if (!item.CanDeleteNew) return new("The new file has been deleted already.", "");
+            try
+            {
+                bool recoverable = File.Exists(item.OutputPath) ? RecycleBin.Delete(item.OutputPath) : true;
+                Encoder.MarkNewDeleted(item.Id);
+                string kept = item.OriginalDeleted ? " That was the last copy." : " The original is kept.";
+                return new("", recoverable
+                    ? $"Moved {Path.GetFileName(item.OutputPath)} to the Recycle Bin ({Fmt.Size(item.OutputBytes)})." + kept
+                    : $"Deleted {Path.GetFileName(item.OutputPath)} ({Fmt.Size(item.OutputBytes)}) permanently: this location has no Recycle Bin." + kept, recoverable);
+            }
+            catch (Exception e) { return new($"Could not delete {Path.GetFileName(item.OutputPath)}: {e.Message}", ""); }
+        }
+
+        /// <summary>
+        /// For a video whose new file is incomplete (an earlier run was cut off): moves that file out of the way and puts the
+        /// video in the queue again. Only ever touches the new file recorded for that video.
+        /// </summary>
+        public EncodeActionResult ReplaceIncomplete(string itemId)
+        {
+            var item = Encoder.Find(itemId);
+            if (item == null) return new("This video is not in the list any more.", "");
+            if (!item.CanReplace) return new("The new file is not marked as incomplete, so it is kept.", "");
+            try
+            {
+                bool recoverable = RecycleBin.Delete(item.OutputPath);
+                Encoder.Retry(item.Id);
+                return new("", $"Removed the incomplete {Path.GetFileName(item.OutputPath)} ({Fmt.Size(item.OutputBytes)}"
+                    + (recoverable ? ", in the Recycle Bin" : ", deleted for good") + ") and queued the video again.", recoverable);
+            }
+            catch (Exception e) { return new($"Could not remove {Path.GetFileName(item.OutputPath)}: {e.Message}", ""); }
+        }
+
+        // The program's own ffmpeg is used when it is there; only a missing one is fetched (works offline afterwards)
+        private static async System.Threading.Tasks.Task<string> PrepareFFmpeg()
+        {
+            if (!File.Exists(FileHandler.FFmpegPath)) await FileHandler.EnsureFFmpegAsync();
+            return FileHandler.FFmpegPath;
+        }
+
+        /// <summary>
         /// Rewrites the stored paths under the synonym's alias to its main name (see SynonymTools.Update).
         /// Not while a scan is running. Compares again afterwards, so the review uses the new paths.
         /// </summary>
@@ -316,10 +436,16 @@ namespace deepduplicates
                 VideoFile.Delete(path);
             }
             catch (Exception e) { return e.Message; }
+            RemoveDeletedVideo(id, path);
+            return null;
+        }
+
+        // A video file is gone: out of the database (with its screenshots), the scan list and the caches
+        private void RemoveDeletedVideo(int id, string path)
+        {
             ResultSession.RemoveFromDatabase(new List<VideoEntry> { new VideoEntry { Id = id, Path = path } }, CreateFileHandler());
             LastScan.Remove(path);
             InvalidateCache();
-            return null;
         }
 
         private void InvalidateCache()

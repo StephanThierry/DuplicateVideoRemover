@@ -34,6 +34,7 @@ builder.WebHost.UseStaticWebAssets();
 
 var controller = AppController.Open(dataFolder, databaseFolder);
 controller.Scanner.ProgramName = "the web app";
+controller.Encoder.ProgramName = "the web app";
 builder.Services.AddSingleton(controller);
 // Keep the keys that protect forms in the data folder, so a restart (or a new container) doesn't break open pages
 builder.Services.AddDataProtection()
@@ -108,7 +109,27 @@ app.MapGet("/video/{id:int}", (int id) =>
     return Results.File(entry.Path, type, enableRangeProcessing: true);
 });
 
-// The encoding script made on the Re-encode page: /output/encode_selected.sh or .ps1
+// The pictures made when a new (re-encoded) file was checked: /encodecheck/<queue item id>_1.png
+var checkShotName = new Regex(@"^([0-9a-f]{32})_([123])\.png$");
+app.MapGet("/encodecheck/{name}", (string name) =>
+{
+    var m = checkShotName.Match(name);
+    if (!m.Success) return Results.NotFound();
+    var path = controller.Encoder.CheckShotPath(m.Groups[1].Value, int.Parse(m.Groups[2].Value));
+    return File.Exists(path) ? Results.File(path, "image/png", enableRangeProcessing: false) : Results.NotFound();
+});
+
+// A new (re-encoded) file from the Re-encode queue page, for the player: /encodevideo/<queue item id>. Only the new file of a queue item.
+app.MapGet("/encodevideo/{id}", (string id) =>
+{
+    var item = controller.Encoder.Find(id);
+    if (item == null || item.Status is not (EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded or EncodeItemStatus.Incomplete) || !File.Exists(item.OutputPath))
+        return Results.NotFound();
+    var type = videoTypes.TryGetValue(Path.GetExtension(item.OutputPath), out var t) ? t : "application/octet-stream";
+    return Results.File(item.OutputPath, type, enableRangeProcessing: true);
+});
+
+// The encoding script made on the Re-encode planning page: /output/encode_selected.sh or .ps1
 app.MapGet("/output/{name}", (string name) =>
 {
     if (name != AppController.EncodeScriptName + ScriptFile.Extension) return Results.NotFound();
@@ -120,6 +141,10 @@ app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 
 string address = urls.Split(';')[0].Replace("0.0.0.0", Dns.GetHostName()).Replace("[::]", Dns.GetHostName());
 string openUrl = token == null ? address : $"{address}/?token={token}";
+// A server has nobody to press "Start" after a restart: the saved encode queue carries on by itself
+app.Lifetime.ApplicationStarted.Register(controller.Encoder.Start);
+// Stops FFmpeg and deletes its partial file; the rest of the queue is kept for the next start
+app.Lifetime.ApplicationStopping.Register(controller.Encoder.Shutdown);
 app.Lifetime.ApplicationStarted.Register(() =>
 {
     Console.WriteLine();

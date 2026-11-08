@@ -40,6 +40,58 @@ one of those videos has to be read again. Do not run it automatically, and do no
 
 Rows are only deleted from the database when the program deletes the file itself (Review, Re-encode).
 
+## The encode queue
+
+`EncodeEngine` (Core/EncodeEngine.cs) is owned by `AppController.Encoder`, so there is one queue per process and
+the web and desktop screens only subscribe to it (`ProgressChanged`, an `EncodeProgress` snapshot, a few times a
+second from a background thread - screens coalesce it onto their UI thread).
+
+- **One video at a time.** Videos are added at any time (`Enqueue`, also while it runs) and run in order.
+  Statuses: Queued, Running, Done, Failed, Skipped. `Stop` puts the running video back as Queued and halts;
+  `Start` resumes; `SkipCurrent` marks the running one Skipped; `Remove` / `ClearQueued` / `ClearFinished` / `Retry`.
+  Adding while halted does not start it. A path that is queued, running or done is not added twice.
+- **FFmpeg is run directly**, not through a script: `EncodePlanner.Arguments(input, settings, partOutput)` is the same
+  argument list the scripts use, plus `-progress pipe:1 -nostats -nostdin`. Progress comes from the `key=value`
+  blocks on stdout (`FfmpegProgressParser`: `out_time_us`, `fps`, `speed`, `total_size`; early blocks hold `N/A`).
+  Percent is `out_time` over the duration already in the database. stderr goes to the log and the failure message.
+- **`.part` files.** The output is written to `<new name>.part` with `-f mp4|matroska` named explicitly, and renamed
+  when FFmpeg exits with 0. The `.part` extension keeps a scan that runs at the same time from picking up half a
+  video, which is why scans and encodes are not made to exclude each other. A stop, skip or failure deletes the
+  `.part` file (with retries: FFmpeg may still hold it). Stale ones left by a crash are deleted at the next start
+  and before each video is encoded.
+- **The queue is saved** to `output/encodequeue.json` (data folder, per installation, like `lastscan.json`) on
+  every status change, written to a temp file and moved into place. After a restart a video that was running is
+  Queued again and nothing starts by itself (`Halted`); the web app calls `Start()` when it has started, because a
+  server has nobody to press the button. The saved state does not remember a deliberate Stop, so a restart after
+  a Stop carries on in the web app. At most 300 finished videos are kept.
+- **The new file is checked** (`EncodeChecker`, Core/EncodeCheck.cs), both when it was there already and right after an
+  encode. `ffprobe` gives the length (within 1% / 2 s of the original's, from the database) and a video stream; then
+  `ffmpeg -ss <t> -frames:v 1 -vf scale=240:160` makes pictures at the scan's points (length/4, /2, 3/4 - the same code
+  as `VideoHandler.generateOneSetOfScreenshotsAsync`) and `ImageHandler.imageChecksum` proves they decode. A fourth
+  picture from the last second is made and thrown away: an mp4 cut off at 60% still has its header (and so its length)
+  and still gives pictures at 25% and 50%, only the end gives it away (a test covers this with real FFmpeg).
+  Results: Done / **AlreadyEncoded** (good) or **Incomplete** (bad); the three pictures are kept as
+  `output/encode_checks/<item id>_<n>.png` for the screens and removed with the item. Statuses are saved as numbers:
+  only ever add new ones at the end of `EncodeItemStatus`. Nothing is ever deleted by the engine itself.
+- **Deleting an original / the new file / replacing an incomplete file** are `AppController.DeleteOriginalAfterEncode`,
+  `DeleteNewFile` (the row stays: `NewDeleted` greys the new file out and the video is planned again; `OriginalDeleted` does
+  the same for the original, and each copy keeps its buttons while it exists - the dialog says when it is the last one)
+  and `ReplaceIncomplete`, one video at a time and only for what the queue item records: the original only when the check
+  passed and the new file is still the size that was checked; the replace only for the new file of an Incomplete item.
+  Both use `RecycleBin` (Core/RecycleBin.cs): the Windows Recycle Bin (through `Microsoft.VisualBasic.FileIO`) for fixed
+  drives, `gio trash` / `trash-put` on Linux. A network path or USB drive has none, and the shell would delete there
+  without saying so, so `IsRecoverable` is asked first and the confirmation says "permanently" when it is false.
+  Deleting the original also removes its database row and screenshots, like the other delete in Re-encode.
+- **Items from before the check existed** (a Done item, or a skipped "already exists") are checked in the background when the program starts (EncodeEngine.CheckUncheckedAsync, started by AppController), and so are items whose pictures have gone missing. They then show like the others: side by side, with the saving and the delete icons. A skipped one becomes Already encoded or Incomplete; their finish times and order stay as they were.
+- **Per video settings.** `EncodeSettings` are cloned into each queue item, so later changes do not alter what waits.
+- **`encode.lock`** (next to `encodequeue.json`; the `ScanLock` mechanism with a heartbeat) stops two programs that
+  share a data folder from working the same queue. The encoder does not touch the database.
+- **Time left** is the speed of this run so far (video seconds encoded per second of work, the running video counted as
+  far as it got) applied to the video seconds left, so long videos weigh more than short ones.
+- **Tests.** `tests/CoreTests` (`dotnet test tests/CoreTests`): the parser, the arguments, and the engine with a fake
+  runner (`IEncodeRunner`); two tests encode and stop a real clip when `ffmpeg/ffmpeg(.exe)` exists in the repo.
+  `SHOT_QUEUE=1` in `tests/DesktopShots` runs the whole thing through the desktop UI (see Program.cs).
+
 ## Recognising a video when its path changes
 
 Paths change (moves, renames, drive letters), so anything that must follow a video across moves uses a
@@ -54,6 +106,7 @@ use it. Database ids are not stable either: a moved file gets a new row and a ne
 | `settings.json`, `pathmapping.json` | data folder | settings, Windows/Linux path pairs and synonyms |
 | `output/results.json` | data folder | the last results shown in Review |
 | `output/lastscan.json` | data folder | the files the last scan found on disk |
+| `output/encodequeue.json`, `output/encode.lock` | data folder | the encode queue, and who is working it |
 | `deepdupes.db`, `_screens/` | database folder | the read cache and screenshots (named by row id) |
 | `runhistory.json` | database folder | scan timings for estimates |
 | `falsepositives.json` | database folder | pairs marked "False positive", by fingerprint |

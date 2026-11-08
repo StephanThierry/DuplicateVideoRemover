@@ -47,15 +47,18 @@ namespace deepduplicates
             heartbeat = new Timer(_ => Touch(), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
         }
 
-        public static ScanLock Acquire(string program)
+        public static ScanLock Acquire(string program) =>
+            Acquire(program, Path.Combine(DataLocation.DatabaseFolder, "scan.lock"),
+                who => $"A scan is already running ({who}). Wait for it to finish - its results show up here afterwards.");
+
+        /// <summary>The same kind of lock for something else (the encoder uses encode.lock in the output folder).</summary>
+        public static ScanLock Acquire(string program, string path, Func<string, string> busyMessage)
         {
-            string path = Path.Combine(DataLocation.DatabaseFolder, "scan.lock");
             if (File.Exists(path) && DateTime.UtcNow - File.GetLastWriteTimeUtc(path) < Stale)
             {
                 string who = "another program";
                 try { who = File.ReadAllText(path).Trim(); } catch { }
-                throw new ScanAlreadyRunningException(
-                    $"A scan is already running ({who}). Wait for it to finish - its results show up here afterwards.");
+                throw new ScanAlreadyRunningException(busyMessage(who));
             }
             string owner = $"{program} on {Environment.MachineName}, started {DateTime.Now:yyyy-MM-dd HH:mm}";
             File.WriteAllText(path, owner);

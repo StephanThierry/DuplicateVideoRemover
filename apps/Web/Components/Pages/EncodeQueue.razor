@@ -1,0 +1,399 @@
+@page "/encoding"
+@implements IDisposable
+@inject AppController App
+@inject NavigationManager Nav
+
+<PageTitle>Re-encode queue</PageTitle>
+
+<div class="page">
+    <div class="page-head">
+        <div>
+            <h1>Re-encode queue</h1>
+            <p>Videos you add on the Re-encode planning page wait here and are encoded one at a time, on the computer that runs this program. The queue is kept if the program restarts.</p>
+        </div>
+        <div class="inline">
+            @if (p.Items.Count > 0)
+            {
+                <label class="inline" title="A table without pictures: more videos on the screen"><input type="checkbox" @bind="compact" /> Compact view</label>
+            }
+            @if (!p.Running && p.QueuedCount > 0)
+            {
+                <button class="primary big" @onclick="() => App.Encoder.Start()">Start encoding</button>
+            }
+            @if (p.Current != null)
+            {
+                <button class="big" @onclick="() => App.Encoder.SkipCurrent()" title="Gives up on the video being encoded (it is marked as skipped) and goes on with the next">Skip this video</button>
+            }
+            @if (p.Running)
+            {
+                <button class="big" @onclick="() => App.Encoder.Stop()" title="Stops encoding. The video being encoded goes back in the queue, and everything keeps waiting until you press Start">Stop</button>
+            }
+        </div>
+    </div>
+
+    @if (p.Items.Count == 0)
+    {
+        <div class="empty">
+            <h2>Nothing in the queue</h2>
+            <p>Pick videos on the Re-encode planning page and add them to the queue. They are encoded here, with progress.</p>
+            <button class="primary big" @onclick='() => Nav.NavigateTo("encode")'>Go to Re-encode planning</button>
+        </div>
+    }
+    else
+    {
+        <section class="panel" aria-live="polite">
+            <div class="phase active">
+                <div class="phase-head">
+                    <span class="phase-name">@EncodeText.Headline(p)</span>
+                    <span class="phase-pct num">@EncodeText.Percent(p.Fraction)</span>
+                </div>
+                <div class="bar" role="progressbar" aria-label="All videos in the queue" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@((int)Math.Floor(p.Fraction * 100))">
+                    <div style="width:@Width(p.Fraction)%"></div>
+                </div>
+                <div class="phase-detail"><span>@EncodeText.Totals(p)</span><span class="muted">@EncodeText.Left(p)</span></div>
+            </div>
+            <dl class="stats">
+                <div><dt>Time so far</dt><dd>@Fmt.Time(p.Elapsed)</dd></div>
+                @if (p.DoneOriginalBytes > 0)
+                {
+                    <div><dt>Encoded</dt><dd>@Fmt.Size(p.DoneOriginalBytes) became @Fmt.Size(p.DoneNewBytes)</dd></div>
+                    <div><dt>Saved</dt><dd class="saved">@Fmt.Size(p.SavedBytes) (@EncodeText.Percent(p.DoneOriginalBytes, p.DoneNewBytes))</dd></div>
+                }
+            </dl>
+            @if (p.Error.Length > 0)
+            {
+                <div class="notice warn"><p><strong>Stopped:</strong> @p.Error</p></div>
+            }
+        </section>
+
+        @if (p.Current is { } now)
+        {
+            <section class="panel q-current @(compact ? "compact" : "")" aria-live="polite">
+                @if (!compact) { <img src="shots/@(now.VideoId)_2.png" alt="" onerror="this.style.visibility='hidden'" /> }
+                <div>
+                    <div class="muted" style="font-size:.85rem">Encoding now</div>
+                    <div class="name">@now.FileName</div>
+                    <div class="muted" style="font-size:.85rem;word-break:break-all">@now.Folder</div>
+                    <div class="muted" style="font-size:.85rem">@Fmt.Size(now.SizeBytes), @Fmt.Duration(now.DurationSeconds) - @now.Summary</div>
+                    <div class="bar current" role="progressbar" aria-label="@now.FileName" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@((int)Math.Floor(now.Fraction * 100))" style="margin-top:10px">
+                        <div style="width:@Width(now.Fraction)%"></div>
+                    </div>
+                    <div style="margin-top:6px">@EncodeText.CurrentDetail(now)</div>
+                </div>
+            </section>
+        }
+
+        <section class="panel q-list">
+            <div class="q-head">
+                <h2><button class="q-toggle" @onclick="() => waitOpen = !waitOpen" aria-expanded="@(waitOpen ? "true" : "false")" title="Show or hide this list"><span aria-hidden="true">@(waitOpen ? "▾" : "▸")</span> Waiting (@p.QueuedCount.ToString("N0"))</button></h2>
+                @if (p.QueuedCount > 0) { <button class="small" @onclick="() => App.Encoder.ClearQueued()" title="Takes every waiting video out of the queue">Clear waiting</button> }
+            </div>
+            @if (!waitOpen) { }
+            else if (p.QueuedCount == 0)
+            {
+                <p class="muted">Nothing is waiting. Add more on the Re-encode planning page.</p>
+            }
+            else
+            {
+                var waiting = p.Items.Where(i => i.Status == EncodeItemStatus.Queued).ToList();
+                @if (compact) { <div class="q-crow q-cwait q-chead"><div>Video</div><div>Folder</div><div class="num">Length</div><div class="num">Size</div><div></div><div></div></div> }
+                @foreach (var i in waiting.Take(waitShown))
+                {
+                    @if (compact)
+                    {
+                        <div class="q-crow q-cwait" @key='"c" + i.Id'>
+                            <div class="cname" title="@i.Path">@i.FileName</div>
+                            <div class="cfolder muted" title="@i.Folder">@i.Folder</div>
+                            <div class="num">@Fmt.Duration(i.DurationSeconds)</div>
+                            <div class="num">@Fmt.Size(i.SizeBytes)</div>
+                            <button class="icon sm" @onclick="() => PlayOriginal(i)" title="Play (opens the player)" aria-label="Play @i.FileName">@VideoPlayer.Icon</button>
+                            <button class="small" @onclick="() => App.Encoder.Remove(i.Id)" title="Take this video out of the queue">Remove</button>
+                        </div>
+                    }
+                    else
+                    {
+                    <div class="q-row" @key="i.Id">
+                        <div class="q-strip">
+                            <img src="shots/@(i.VideoId)_2.png" alt="" loading="lazy" onerror="this.style.visibility='hidden'" />
+                            <button class="icon" @onclick="() => PlayOriginal(i)" title="Play (opens the player)" aria-label="Play @i.FileName">@VideoPlayer.Icon</button>
+                        </div>
+                        <div class="info"><div class="name">@i.FileName</div><div class="muted" style="font-size:.85rem;word-break:break-all">@i.Folder</div></div>
+                        <div class="num">@Fmt.Size(i.SizeBytes)<br /><small class="muted">@Fmt.Duration(i.DurationSeconds)</small></div>
+                        <button class="small" @onclick="() => App.Encoder.Remove(i.Id)" title="Take this video out of the queue">Remove</button>
+                    </div>
+                    }
+                }
+                @if (waiting.Count > waitShown)
+                {
+                    <div class="more"><button @onclick="() => waitShown += 100">Show @Math.Min(100, waiting.Count - waitShown) more</button></div>
+                }
+            }
+        </section>
+
+        <section class="panel q-list">
+            <div class="q-head">
+                <h2><button class="q-toggle" @onclick="() => doneOpen = !doneOpen" aria-expanded="@(doneOpen ? "true" : "false")" title="Show or hide this list"><span aria-hidden="true">@(doneOpen ? "▾" : "▸")</span> Finished (@p.FinishedCount.ToString("N0"))</button></h2>
+                @if (p.FinishedCount > 0) { <button class="small" @onclick="() => App.Encoder.ClearFinished()" title="Takes the finished videos out of this list. They can be picked again on the Re-encode planning page">Clear finished</button> }
+            </div>
+            @if (!doneOpen) { }
+            else if (p.FinishedCount == 0)
+            {
+                <p class="muted">Nothing has finished yet.</p>
+            }
+            else
+            {
+                var finished = p.Items.Where(i => i.IsFinished).OrderByDescending(i => i.FinishedUtc).ToList();
+                @if (compact) { <div class="q-crow q-cdone q-chead"><div>Video</div><div>Status</div><div>Original</div><div>New file</div><div>Saved</div><div></div></div> }
+                @foreach (var i in finished.Take(doneShown))
+                {
+                    @if (compact)
+                    {
+                        <div class="q-crow q-cdone" @key='"c" + i.Id'>
+                            <div class="cname" title="@i.Path">@i.FileName</div>
+                            <div class="q-status @Css(i)" title="@EncodeText.Status(i)">@ShortStatus(i)</div>
+                            <div class="cfile">
+                                <span class="csz @(i.OriginalDeleted ? "gone" : "")">@Fmt.Size(i.SizeBytes)</span>
+                                @if (i.OriginalDeleted) { <span class="q-deleted">Deleted</span> }
+                                @if (!i.OriginalDeleted) { <button class="icon sm" @onclick="() => PlayOriginal(i)" title="Play the original" aria-label="Play the original @i.FileName">@VideoPlayer.Icon</button> }
+                                @if (i.CanDeleteOriginal) { <button class="icon sm del" @onclick="() => AskDeleteOriginal(i)" title="Delete the original (to the Recycle Bin, asks first)" aria-label="Delete the original of @i.FileName">@Trash</button> }
+                            </div>
+                            <div class="cfile">
+                                @if (i.HasCheck)
+                                {
+                                    <span class="csz @(i.NewDeleted ? "gone" : "")">@Fmt.Size(i.OutputBytes)</span>
+                                    @if (i.NewDeleted) { <span class="q-deleted">Deleted</span> }
+                                    @if (!i.NewDeleted) { <button class="icon sm" @onclick="() => PlayNew(i)" title="Play the new file" aria-label="Play the new file of @i.FileName">@VideoPlayer.Icon</button> }
+                                    @if (i.CanDeleteNew) { <button class="icon sm del" @onclick="() => AskDeleteNew(i)" title="Delete the new file (to the Recycle Bin, asks first). The original is kept" aria-label="Delete the new file of @i.FileName">@Trash</button> }
+                                }
+                            </div>
+                            <div class="csaved @(i.Saved >= 0 ? "ok" : "")">@(i.Status is EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded && !i.NewDeleted ? (i.Saved >= 0 ? $"{Fmt.Size(i.Saved)} ({EncodeText.Percent(i.SizeBytes, i.OutputBytes)})" : Fmt.Size(-i.Saved) + " bigger") : "")</div>
+                            <div class="cact">
+                                @if (i.Status is EncodeItemStatus.Failed or EncodeItemStatus.Skipped) { <button class="small" @onclick="() => App.Encoder.Retry(i.Id)">Try again</button> }
+                                @if (i.CanReplace) { <button class="small" @onclick="() => AskReplace(i)" title="Replace the incomplete new file and encode again (asks first)">Replace...</button> }
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                    <div class="q-row q-done @(i.HasCheck ? "has-check" : "")" @key="i.Id">
+                        @if (!i.HasCheck) { <img src="shots/@(i.VideoId)_2.png" alt="" loading="lazy" onerror="this.style.visibility='hidden'" /> }
+                        <div class="info">
+                            <div class="name">@i.FileName</div>
+                            <div class="muted" style="font-size:.85rem;word-break:break-all">@i.Folder</div>
+                            <div class="q-status @Css(i)">@EncodeText.Status(i)</div>
+                        </div>
+                        <div class="num"><small class="muted">@(i.FinishedUtc is DateTime t ? Fmt.When(t) : "")</small></div>
+                        @if (i.Status is EncodeItemStatus.Failed or EncodeItemStatus.Skipped) { <button class="small" @onclick="() => App.Encoder.Retry(i.Id)">Try again</button> } else { <span></span> }
+
+                        @if (i.HasCheck)
+                        {
+                            @* The check: the original's pictures from the scan, and the new file's pictures made the same way *@
+                            <div class="q-check">
+                                <div class="q-side">
+                                    <div class="q-cap">Original - @Fmt.Size(i.SizeBytes), @Fmt.Duration(i.DurationSeconds)@(i.OriginalDeleted ? " - deleted" : "")</div>
+                                    <div class="q-strip">
+                                        <div class="enc-strip @(i.OriginalDeleted ? "gone" : "")">@for (int n = 1; n <= 3; n++) { <img loading="lazy" src="shots/@(i.VideoId)_@(n).png" alt="" onerror="this.style.visibility='hidden'" /> }</div>
+                                        <div class="q-icons">
+                                            @if (i.OriginalDeleted) { <span class="q-deleted">Deleted</span> }
+                                            @if (!i.OriginalDeleted) { <button class="icon" @onclick="() => PlayOriginal(i)" title="Play the original" aria-label="Play the original @i.FileName">@VideoPlayer.Icon</button> }
+                                            @if (i.CanDeleteOriginal) { <button class="icon del" @onclick="() => AskDeleteOriginal(i)" title="Delete the original (to the Recycle Bin, asks first). Only possible because the new file checked out" aria-label="Delete the original of @i.FileName">@Trash</button> }
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="q-side">
+                                    <div class="q-cap">New file - @Fmt.Size(i.OutputBytes)@(i.NewDeleted ? " - deleted" : "")</div>
+                                    <div class="q-strip">
+                                        <div class="enc-strip @(i.NewDeleted ? "gone" : "")">
+                                            @if (i.HasCheckShots) { @for (int n = 1; n <= 3; n++) { <img loading="lazy" src="encodecheck/@(i.Id)_@(n).png" alt="" onerror="this.style.visibility='hidden'" /> } }
+                                        </div>
+                                        <div class="q-icons">
+                                            @if (i.NewDeleted) { <span class="q-deleted">Deleted</span> }
+                                            @if (!i.NewDeleted) { <button class="icon" @onclick="() => PlayNew(i)" title="Play the new file" aria-label="Play the new file of @i.FileName">@VideoPlayer.Icon</button> }
+                                            @if (i.CanDeleteNew) { <button class="icon del" @onclick="() => AskDeleteNew(i)" title="Delete the new file (to the Recycle Bin, asks first). The original is kept" aria-label="Delete the new file of @i.FileName">@Trash</button> }
+                                        </div>
+                                    </div>
+                                    <div class="q-checktext @(i.CheckOk ? "ok" : i.CheckPending ? "" : "bad")">@(i.Status == EncodeItemStatus.Incomplete && i.Message.Length > 0 ? i.Message : i.CheckPending ? "Waiting to be checked..." : i.Check)</div>
+                                </div>
+                                @if (i.Status is EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded && !i.NewDeleted)
+                                {
+                                    @* What this job saved *@
+                                    <div class="q-saving">
+                                        <div class="q-saved @(i.Saved >= 0 ? "ok" : "")">@(i.Saved >= 0 ? (i.OriginalDeleted ? "Saved " : "Saves ") + Fmt.Size(i.Saved) : Fmt.Size(-i.Saved) + " bigger")</div>
+                                        <div class="muted">@(i.Saved >= 0 ? EncodeText.Percent(i.SizeBytes, i.OutputBytes) + " smaller" : "no saving")</div>
+                                    </div>
+                                }
+                            </div>
+                            <div class="q-actions">
+                                @if (i.CanReplace) { <button class="small danger-outline" @onclick="() => AskReplace(i)" title="Moves the incomplete new file out of the way and puts the video in the queue again (asks first)">Replace and encode again...</button> }
+                            </div>
+                        }
+                    </div>
+                    }
+                }
+                @if (finished.Count > doneShown)
+                {
+                    <div class="more"><button @onclick="() => doneShown += 100">Show @Math.Min(100, finished.Count - doneShown) more</button></div>
+                }
+            }
+        </section>
+
+        <div class="q-bottom">
+        <details class="panel q-log">
+            <summary style="cursor:pointer;font-weight:600">Log</summary>
+            <pre class="command" style="max-height:260px;overflow:auto">@string.Join("\n", p.Log)</pre>
+        </details>
+        @* Off: deleting needs no confirmation, not even where the file cannot be restored *@
+        <label class="inline q-confirm" title="When this is off, files are deleted at once without asking, also on a network share where they cannot be restored"><input type="checkbox" @bind="confirmDeletes" /> Confirm before deleting</label>
+        </div>
+    }
+</div>
+
+@if (confirm != null)
+{
+    <div class="dialog-backdrop" @onclick="() => confirm = null">
+        <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="q-confirm" @onclick:stopPropagation="true">
+            <h2 id="q-confirm">@confirm.Title</h2>
+            <p style="white-space:pre-line">@confirm.Text</p>
+            <div class="buttons">
+                <button @onclick="() => confirm = null">Cancel</button>
+                <button class="danger" @onclick="ConfirmYes">@confirm.Button</button>
+            </div>
+        </div>
+    </div>
+}
+
+<VideoPlayer Video="playing" Src="playingSrc" OnClose="() => playing = null" />
+
+@if (toast != null)
+{
+    <div class="toast" role="status">@toast</div>
+}
+
+@code {
+    private EncodeProgress p = new();
+    private int waitShown = 100, doneShown = 100;
+    private bool confirmDeletes = true;            // off: deleting needs no confirmation, not even where nothing can be restored
+    private bool compact;                          // a table without pictures
+    private bool waitOpen = true, doneOpen = true; // the lists can be collapsed to their header
+
+    private static string ShortStatus(EncodeItemInfo i) => i.Status switch
+    {
+        EncodeItemStatus.Done => "Done",
+        EncodeItemStatus.AlreadyEncoded => "Already encoded",
+        EncodeItemStatus.Incomplete => "Incomplete",
+        EncodeItemStatus.Failed => "Failed",
+        _ => "Skipped",
+    };
+    private VideoEntry? playing;
+    private string? playingSrc;
+    private string? toast;
+    private CancellationTokenSource? toastTimer;
+    private Confirmation? confirm;
+
+    private sealed record Confirmation(string Title, string Text, string Button, Func<AppController.EncodeActionResult> Action);
+
+    // The original: streamed from /video/{id} like in Review; the new file: its own address
+    private void PlayOriginal(EncodeItemInfo i)
+    {
+        playingSrc = null;
+        playing = new VideoEntry { Id = i.VideoId, Path = i.Path, SizeBytes = i.SizeBytes, DurationSeconds = i.DurationSeconds };
+    }
+
+    private void PlayNew(EncodeItemInfo i)
+    {
+        playingSrc = "encodevideo/" + i.Id;
+        playing = new VideoEntry { Id = 0, Path = i.OutputPath, SizeBytes = i.OutputBytes, DurationSeconds = i.DurationSeconds };
+    }
+
+    // Deleting the original and replacing an incomplete file are always asked first, saying what will happen to the file
+    private void AskDeleteOriginal(EncodeItemInfo i)
+    {
+        bool recoverable = App.CanRecover(i.Path);
+        Ask(new Confirmation(
+            i.NewDeleted ? (recoverable ? "Move the last copy to the Recycle Bin?" : "Delete the last copy permanently?")
+                : recoverable ? "Move the original to the Recycle Bin?" : "Delete the original permanently?",
+            $"{i.FileName}\n{i.Folder}\n\n"
+                + (i.NewDeleted ? $"The new file has already been deleted. This is the LAST copy of the video ({Fmt.Size(i.SizeBytes)}).\n"
+                                : $"Original: {Fmt.Size(i.SizeBytes)}. New file: {Fmt.Size(i.OutputBytes)}, checked: {i.Check}.\n")
+                + (recoverable ? "You can restore the original from the Recycle Bin (trash)." : "This location has no Recycle Bin (a network share, for example), so this can't be undone."),
+            recoverable ? "Move to Recycle Bin" : "Delete permanently",
+            () => App.DeleteOriginalAfterEncode(i.Id)));
+    }
+
+    private void AskDeleteNew(EncodeItemInfo i)
+    {
+        bool recoverable = App.CanRecover(i.OutputPath);
+        Ask(new Confirmation(
+            i.OriginalDeleted ? (recoverable ? "Move the last copy to the Recycle Bin?" : "Delete the last copy permanently?")
+                : recoverable ? "Move the new file to the Recycle Bin?" : "Delete the new file permanently?",
+            $"{System.IO.Path.GetFileName(i.OutputPath)} ({Fmt.Size(i.OutputBytes)})\n{i.Folder}\n\n"
+                + (i.CheckOk ? $"Checked: {i.Check}.\n" : $"It is incomplete: {i.Message}.\n")
+                + (i.OriginalDeleted ? "The original has already been deleted. This is the LAST copy of the video.\n"
+                                     : $"The original ({Fmt.Size(i.SizeBytes)}) is kept, and the video can be planned for re-encoding again.\n")
+                + (recoverable ? "You can restore the new file from the Recycle Bin (trash)." : "This location has no Recycle Bin (a network share, for example), so this can't be undone."),
+            recoverable ? "Move to Recycle Bin" : "Delete permanently",
+            () => App.DeleteNewFile(i.Id)));
+    }
+
+    private void AskReplace(EncodeItemInfo i)
+    {
+        bool recoverable = App.CanRecover(i.OutputPath);
+        Ask(new Confirmation(
+            "Replace the incomplete new file?",
+            $"{System.IO.Path.GetFileName(i.OutputPath)} ({Fmt.Size(i.OutputBytes)}) is incomplete: {i.Message}.\n\nIt will be "
+                + (recoverable ? "moved to the Recycle Bin" : "deleted permanently (this location has no Recycle Bin)")
+                + " and the video encoded again. The original is not touched.",
+            "Replace and encode again",
+            () => App.ReplaceIncomplete(i.Id)));
+    }
+
+    private void Ask(Confirmation c)
+    {
+        confirm = c;
+        if (!confirmDeletes) ConfirmYes();
+    }
+
+    private void ConfirmYes()
+    {
+        var c = confirm;
+        confirm = null;
+        if (c == null) return;
+        var result = c.Action();
+        ShowToast(result.Ok ? result.Message : result.Error, result.Ok ? 6000 : 12000);
+    }
+
+    private void ShowToast(string text, int ms)
+    {
+        toast = text;
+        toastTimer?.Cancel();
+        toastTimer = new CancellationTokenSource();
+        var token = toastTimer.Token;
+        _ = Task.Delay(ms, token).ContinueWith(t => { if (t.IsCanceled) return; toast = null; InvokeAsync(StateHasChanged); });
+    }
+
+    protected override void OnInitialized()
+    {
+        p = App.Encoder.Current;
+        App.Encoder.ProgressChanged += OnProgress;
+    }
+
+    private void OnProgress(EncodeProgress progress)
+    {
+        p = progress;
+        InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>The delete icon next to a set of pictures.</summary>
+    private static readonly RenderFragment Trash =
+        @<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" fill="currentColor" /></svg>;
+
+    private static string Width(double fraction) => (fraction * 100).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static string Css(EncodeItemInfo i) => i.Status switch { EncodeItemStatus.Done => "ok", EncodeItemStatus.Failed => "bad", _ => "skip" };
+
+    public void Dispose()
+    {
+        App.Encoder.ProgressChanged -= OnProgress;
+        toastTimer?.Cancel();
+    }
+}

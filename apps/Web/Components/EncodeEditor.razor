@@ -1,6 +1,13 @@
 @* The re-encoding settings: only common, well-supported choices, each with a sensible default. *@
 @{ var codec = EncodeOptions.Codec(Value.codec); int crf = Value.crf ?? codec.RecommendedCrf; }
 <div class="field">
+    <label for="enc-mode">When you pick videos to re-encode</label>
+    <select id="enc-mode" value="@Value.runMode" @onchange="e => Set(() => Value.runMode = e.Value!.ToString())">
+        @foreach (var m in EncodeOptions.RunModes) { <option value="@m.Id">@m.Label</option> }
+    </select>
+    <div class="help" style="margin-top:4px">Encoding here adds the videos to a queue (the Re-encode queue page) and runs FFmpeg for you on the computer that runs this program, one video at a time, with progress. Or create a script to run yourself on any computer. You can also switch on the Re-encode planning page for one batch.</div>
+</div>
+<div class="field">
     <label for="enc-codec">Video format</label>
     <select id="enc-codec" value="@Value.codec" @onchange="ChangeCodec">
         @foreach (var c in EncodeOptions.Codecs) { <option value="@c.Id">@c.Label</option> }

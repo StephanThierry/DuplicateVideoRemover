@@ -10,11 +10,12 @@ public partial class MainViewModel : ObservableObject
     public ScanViewModel Scan { get; }
     public SettingsViewModel Settings { get; }
     public EncodeViewModel Encode { get; }
+    public EncodeQueueViewModel EncodeQueue { get; }
     public AllFilesViewModel Files { get; }
 
-    public const int ScanTab = 0, ReviewTab = 1, EncodeTab = 2, FilesTab = 3, SettingsTab = 4;
+    public const int ScanTab = 0, ReviewTab = 1, EncodeTab = 2, QueueTab = 3, FilesTab = 4, SettingsTab = 5;
 
-    /// <summary>0 = Scan, 1 = Review, 2 = Re-encode, 3 = All files, 4 = Settings.</summary>
+    /// <summary>0 = Scan, 1 = Review, 2 = Re-encode, 3 = Encoding (the queue), 4 = All files, 5 = Settings.</summary>
     [ObservableProperty] private int selectedTab;
 
     public MainViewModel(AppController app)
@@ -24,6 +25,7 @@ public partial class MainViewModel : ObservableObject
         Scan = new ScanViewModel(app, this);
         Settings = new SettingsViewModel(app);
         Encode = new EncodeViewModel(app, this);
+        EncodeQueue = new EncodeQueueViewModel(app, this);
         Files = new AllFilesViewModel(app, this);
         // Start where there is something to do
         SelectedTab = app.Session.Results.Groups.Count + app.Session.Results.Broken.Count > 0 ? ReviewTab : app.IsFirstRun ? SettingsTab : ScanTab;
@@ -39,6 +41,7 @@ public partial class MainViewModel : ObservableObject
     public void ShowReview() => SelectedTab = ReviewTab;
     public void ShowScan() => SelectedTab = ScanTab;
     public void ShowEncode() => SelectedTab = EncodeTab;
+    public void ShowQueue() => SelectedTab = QueueTab;
     public void ShowFiles() => SelectedTab = FilesTab;
     public void ShowSettings() => SelectedTab = SettingsTab;
 }

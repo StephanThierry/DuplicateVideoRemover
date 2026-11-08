@@ -33,3 +33,84 @@ select { cursor: pointer; }
 button.small { padding: 3px 10px; font-size: .82rem; font-weight: 500; }
 button.danger-outline { color: var(--grease); border-color: var(--grease); background: var(--sheet); }
 button.danger-outline:hover:not(:disabled) { background: var(--grease-wash); border-color: var(--grease); }
+
+/* ---------- Encoding (the queue) ---------- */
+.enc-row.is-queued, .enc-row.is-queued:hover { opacity: .45; cursor: default; background: transparent; }
+.enc-row.is-queued input[type=checkbox] { opacity: .6; }
+.q-tag { color: var(--accent); font-weight: 600; font-size: .85rem; margin-top: 2px; }
+.q-current { display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: start; }
+.q-current img { width: 168px; height: 112px; object-fit: cover; display: block; background: var(--frame); border: 4px solid var(--frame); border-radius: 3px; }
+.q-current .name, .q-row .name { font-weight: 600; word-break: break-word; }
+.q-current .name { font-size: 1.1rem; }
+.bar.current > div { background: var(--keep); }
+.q-list .q-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.q-list .q-head h2 { margin: 0; }
+.q-row { display: grid; grid-template-columns: auto 1fr 150px auto; gap: 14px; align-items: center; padding: 8px 0; }
+.q-row + .q-row { border-top: 1px solid var(--rule); }
+.q-row img { width: 96px; height: 64px; object-fit: cover; display: block; background: var(--frame); border-radius: 3px; }
+.q-row .num { text-align: right; }
+.q-status { font-size: .9rem; margin-top: 2px; word-break: break-word; }
+.q-status.ok { color: var(--keep); font-weight: 600; }
+.q-status.bad { color: var(--grease); font-weight: 600; }
+.q-status.skip { color: #8a4b00; font-weight: 600; }
+@media (prefers-color-scheme: dark) { .q-status.skip { color: #ffc46b; } }
+@media (max-width: 760px) {
+    .q-current { grid-template-columns: 1fr; }
+    .q-row { grid-template-columns: 72px 1fr auto; }
+    .q-row .num { display: none; }
+    .q-row img { width: 72px; height: 48px; }
+}
+
+/* The check of a new file: the original's pictures next to the new file's */
+.q-row.has-check { grid-template-columns: 1fr 150px auto; }
+.q-row .q-check { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.q-row .q-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+.q-side .q-cap { font-size: .8rem; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+.q-side .enc-strip { display: inline-flex; min-height: 72px; min-width: 72px; }
+.q-checktext { font-size: .85rem; margin-top: 4px; word-break: break-word; }
+.q-checktext.ok { color: var(--keep); }
+.q-checktext.bad { color: var(--grease); font-weight: 600; }
+@media (max-width: 900px) { .q-row .q-check { grid-template-columns: 1fr; } }
+
+.q-strip { display: flex; align-items: center; gap: 10px; }
+
+/* Play and delete icons beside a set of pictures; what the job saved to the right of them */
+.q-icons { display: flex; flex-direction: column; gap: 6px; }
+button.icon.del { color: var(--grease); }
+button.icon.del:hover:not(:disabled) { background: var(--grease-wash); color: var(--grease-hover); }
+.q-row .q-check { grid-template-columns: 1fr 1fr 150px; }
+.q-saving { text-align: right; align-self: center; min-width: 130px; }
+.q-saved { font-size: 1.15rem; font-weight: 650; }
+.q-saved.ok { color: var(--keep); }
+@media (max-width: 900px) { .q-row .q-check { grid-template-columns: 1fr; } .q-saving { text-align: left; } }
+
+/* Collapsible lists and the compact view (a table without pictures) */
+.q-toggle { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+.q-toggle:hover { color: var(--accent); }
+.q-current.compact { grid-template-columns: 1fr; padding-top: 12px; padding-bottom: 12px; }
+.q-list { overflow-x: auto; }
+.q-crow { display: grid; gap: 10px; align-items: center; padding: 4px 0; font-size: .88rem; }
+.q-crow + .q-crow { border-top: 1px solid var(--rule); }
+.q-cwait { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) 70px 90px 34px 84px; }
+.q-cdone { grid-template-columns: minmax(0, 1fr) 120px 150px 150px 110px 130px; }
+.q-crow.q-chead { font-size: .78rem; font-weight: 600; color: var(--muted); border-top: 0; border-bottom: 1px solid var(--rule); }
+.q-crow .cname { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.q-crow .cfolder { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.q-crow .num { text-align: right; }
+.q-crow .q-status { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.q-crow .cfile { display: flex; align-items: center; gap: 6px; }
+.q-crow .csz { width: 58px; }
+.q-crow .csaved.ok { color: var(--keep); }
+.q-crow .cact { display: flex; gap: 6px; justify-content: flex-end; }
+button.icon.sm { width: 24px; height: 24px; padding: 0; }
+button.icon.sm svg { width: 11px; height: 11px; }
+
+/* A copy that has been deleted: greyed out */
+.enc-strip.gone, .csz.gone { opacity: .35; }
+/* The "Deleted" tag where the play and delete icons were */
+.q-deleted { display: inline-block; font-size: .75rem; font-weight: 650; color: var(--grease); background: var(--grease-wash); border-radius: 10px; padding: 2px 9px; white-space: nowrap; }
+
+/* Log, with the "Confirm before deleting" switch to its right */
+.q-bottom { display: flex; gap: 16px; align-items: flex-start; margin-top: 16px; }
+.q-bottom details { flex: 1; margin-top: 0; }
+.q-bottom .q-confirm { white-space: nowrap; padding-top: 20px; }

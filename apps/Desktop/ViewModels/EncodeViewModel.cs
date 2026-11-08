@@ -11,7 +11,7 @@ using deepduplicates;
 
 namespace DuplicateVideoRemover.Desktop.ViewModels;
 
-/// <summary>The Re-encode screen: videos by bitrate, pick some, create the encoding script.</summary>
+/// <summary>The Re-encode planning screen: videos by bitrate, pick some, create the encoding script.</summary>
 public partial class EncodeViewModel : ObservableObject
 {
     private readonly AppController app;
@@ -60,11 +60,53 @@ public partial class EncodeViewModel : ObservableObject
 
     public bool HasResult => ScriptPath != null;
 
+    // What the main button does: add to the encode queue, or create a script. Starts as the saved default;
+    // a choice made here is kept until the default is changed in Settings.
+    public ChoiceOption[] RunModes { get; } = EncodeOptions.RunModes;
+    [ObservableProperty] private ChoiceOption runMode = EncodeOptions.RunModes[0];
+    private string lastDefaultMode = "";
+    public bool IsRunMode => RunMode.Id == "run";
+    public string PrimaryText => IsRunMode ? "Add to queue" : "Create encoding script";
+    partial void OnRunModeChanged(ChoiceOption value) { OnPropertyChanged(nameof(IsRunMode)); OnPropertyChanged(nameof(PrimaryText)); }
+
+    // Videos in the encode queue are greyed out here (and can be hidden)
+    [ObservableProperty] private bool hideQueued;
+    [ObservableProperty] private bool hasQueueSummary;
+    [ObservableProperty] private string queueSummary = "";
+    private string queueSignature = "";
+    private int queueRefreshQueued;
+    partial void OnHideQueuedChanged(bool value) => Filter();
+
     public EncodeViewModel(AppController app, MainViewModel main)
     {
         this.app = app;
         this.main = main;
         app.DataChanged += () => Dispatcher.UIThread.Post(() => _ = Reload());
+        // The queue changes while it runs: grey out what was added, show what finished (progress ticks change nothing here)
+        app.Encoder.ProgressChanged += _ =>
+        {
+            if (System.Threading.Interlocked.Exchange(ref queueRefreshQueued, 1) == 1) return;
+            Dispatcher.UIThread.Post(() => { System.Threading.Volatile.Write(ref queueRefreshQueued, 0); RefreshQueue(); });
+        };
+    }
+
+    /// <summary>Marks the rows that are in the queue (waiting, running or done). Only when the queue's membership changed.</summary>
+    private void RefreshQueue(bool force = false)
+    {
+        var p = app.Encoder.Current;
+        string signature = $"{p.Items.Count}|{p.QueuedCount}|{p.Current?.Id}|{p.DoneCount}|{p.AlreadyEncodedCount}|{p.Items.Count(i => i.OriginalDeleted)}|{p.Items.Count(i => i.NewDeleted)}";
+        if (!force && signature == queueSignature) return;
+        queueSignature = signature;
+        var map = p.StatusByPath();
+        bool changed = false;
+        // An original that was deleted (after its new file checked out) is no longer a video to re-encode
+        var deleted = p.Items.Where(i => i.OriginalDeleted).Select(i => i.Path).ToHashSet(EncodeProgress.PathComparer);
+        bool removed = deleted.Count > 0 && all.RemoveAll(r => deleted.Contains(r.Candidate.Path)) > 0;
+        foreach (var r in all) changed |= r.SetQueueState(map.TryGetValue(r.Candidate.Path, out var st) ? st : null);
+        int waiting = p.QueuedCount, running = p.Current != null ? 1 : 0, done = p.DoneCount;
+        HasQueueSummary = waiting + running + done > 0;
+        QueueSummary = "Encode queue: " + string.Join(", ", new[] { running > 0 ? "1 encoding" : null, waiting > 0 ? $"{waiting:N0} waiting" : null, done > 0 ? $"{done:N0} done" : null }.Where(x => x != null)) + ".";
+        if (removed || (changed && HideQueued)) Filter(); else if (changed) UpdatePicked();
     }
 
     partial void OnScriptPathChanged(string? value) => OnPropertyChanged(nameof(HasResult));
@@ -76,6 +118,7 @@ public partial class EncodeViewModel : ObservableObject
     public async Task Reload()
     {
         var e = settings = app.Settings.EncodeOrDefault();
+        if (e.runMode != lastDefaultMode) { lastDefaultMode = e.runMode; RunMode = RunModes.First(m => m.Id == e.runMode); }
         double target = EncodeEstimator.TargetKbps(e);
         SettingsSummary = $"{EncodeOptions.Codec(e.codec).Label}, {e.resolution}p, quality {e.crf}";
         QualitySummary = $"{EncodeOptions.QualityLabel(e.codec, e.crf ?? 0)}. Speed: {e.preset}, {(e.audio == "copy" ? "original sound" : "AAC sound")}, {e.container.ToUpperInvariant()}";
@@ -86,11 +129,12 @@ public partial class EncodeViewModel : ObservableObject
         anchor = null;
         HasVideos = all.Count > 0;
         Loading = false;
+        RefreshQueue(force: true);
         Filter();
     }
 
     private IEnumerable<EncodeRow> Visible() => all.Where(r =>
-        r.Candidate.AverageKbps >= (double)MinKbps && r.Candidate.SizeBytes >= (double)MinMb * 1024 * 1024 && !hidden.Contains(r.Candidate.Folder) &&
+        !(HideQueued && r.IsQueued) && r.Candidate.AverageKbps >= (double)MinKbps && r.Candidate.SizeBytes >= (double)MinMb * 1024 * 1024 && !hidden.Contains(r.Candidate.Folder) &&
         (string.IsNullOrWhiteSpace(Search) || r.Candidate.Path.Contains(Search.Trim(), StringComparison.OrdinalIgnoreCase)));
 
     private void Filter()
@@ -115,12 +159,13 @@ public partial class EncodeViewModel : ObservableObject
     /// </summary>
     public void RowClicked(EncodeRow row, bool shift)
     {
+        if (row.IsQueued) return;   // already in the queue
         if (shift && anchor != null)
         {
             int a = Rows.IndexOf(anchor), b = Rows.IndexOf(row);
             if (a >= 0 && b >= 0)
             {
-                for (int i = Math.Min(a, b); i <= Math.Max(a, b); i++) Rows[i].IsPicked = anchorState;
+                for (int i = Math.Min(a, b); i <= Math.Max(a, b); i++) if (!Rows[i].IsQueued) Rows[i].IsPicked = anchorState;
                 return;
             }
         }
@@ -129,12 +174,40 @@ public partial class EncodeViewModel : ObservableObject
         anchor = row;
     }
 
-    [RelayCommand] private void SelectAll() { foreach (var r in Visible()) r.IsPicked = true; }
-    [RelayCommand] private void SelectTop() { foreach (var r in Visible().Take(20)) r.IsPicked = true; }
-    [RelayCommand] private void SelectAllShown() { foreach (var r in Visible()) r.IsPicked = true; }
+    [RelayCommand] private void SelectAll() { foreach (var r in Visible().Where(r => !r.IsQueued)) r.IsPicked = true; }
+    [RelayCommand] private void SelectTop() { foreach (var r in Visible().Where(r => !r.IsQueued).Take(20)) r.IsPicked = true; }
+    [RelayCommand] private void SelectAllShown() { foreach (var r in Visible().Where(r => !r.IsQueued)) r.IsPicked = true; }
     [RelayCommand] private void SelectNone() { foreach (var r in all) r.IsPicked = false; }
     [RelayCommand] private void EditSettings() => main.ShowSettings();
     [RelayCommand] private void GoToScan() => main.ShowScan();
+    [RelayCommand] private void OpenQueue() => main.ShowQueue();
+
+    /// <summary>The main button: adds the picked videos to the encode queue, or asks before creating the script.</summary>
+    [RelayCommand]
+    private void Primary()
+    {
+        if (IsRunMode) AddToQueue(); else AskCreate();
+    }
+
+    private void AddToQueue()
+    {
+        var videos = all.Where(r => r.IsPicked && !r.IsQueued).Select(r => r.Candidate).ToList();   // in list order: highest bitrate first
+        if (videos.Count == 0) return;
+        var result = app.EnqueueEncode(videos);
+        // Files that are gone since the scan are not queued and leave the list
+        foreach (var gone in result.Missing.Select(m => all.FirstOrDefault(r => r.Candidate.Id == m.Id)).Where(r => r != null).ToList())
+        {
+            gone!.IsPicked = false;
+            all.Remove(gone);
+            Rows.Remove(gone);
+        }
+        RefreshQueue(force: true);   // greys out what was added (and unpicks it)
+        var parts = new List<string> { $"Added {Fmt.Plural(result.Added, "video", "videos")} to the queue." };
+        if (result.AlreadyThere > 0) parts.Add($"{Fmt.Plural(result.AlreadyThere, "was", "were")} in it already.");
+        if (result.Missing.Count > 0) parts.Add($"{Fmt.Plural(result.Missing.Count, "file was", "files were")} not found any more and left out.");
+        if (app.Encoder.Current.Halted && app.Encoder.Current.QueuedCount > 0) parts.Add("The queue is stopped: press Start on the Re-encode queue screen.");
+        ShowToast(string.Join(" ", parts), result.Missing.Count > 0 ? 10000 : 5000);
+    }
 
     [RelayCommand]
     private void AskCreate()
@@ -301,6 +374,28 @@ public partial class EncodeRow : ObservableObject
     public static string Percent(long now, long after) => now > 0 ? $" ({(now - after) * 100 / now}%)" : "";
 
     [ObservableProperty] private bool isPicked;
+
+    // In the encode queue: waiting, being encoded or done. Such a row is greyed out and cannot be picked.
+    [ObservableProperty] private EncodeItemStatus? queueState;
+    public bool IsQueued => QueueState != null;
+    public string QueueLabel => QueueState switch
+    {
+        EncodeItemStatus.Queued => "In the queue",
+        EncodeItemStatus.Running => "Encoding now",
+        EncodeItemStatus.Done => "Encoded",
+        _ => "",
+    };
+
+    /// <summary>Returns true when the state changed.</summary>
+    public bool SetQueueState(EncodeItemStatus? state)
+    {
+        if (QueueState == state) return false;
+        QueueState = state;
+        if (state != null) IsPicked = false;
+        OnPropertyChanged(nameof(IsQueued));
+        OnPropertyChanged(nameof(QueueLabel));
+        return true;
+    }
 
     private readonly EncodeViewModel owner;
 

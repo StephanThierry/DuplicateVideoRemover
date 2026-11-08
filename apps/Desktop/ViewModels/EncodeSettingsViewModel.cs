@@ -18,6 +18,7 @@ public partial class EncodeSettingsViewModel : ObservableObject
     public ChoiceOption[] Presets { get; } = EncodeOptions.Presets;
     public ChoiceOption[] AudioChoices { get; } = EncodeOptions.AudioChoices;
     public ChoiceOption[] Containers { get; } = EncodeOptions.Containers;
+    public ChoiceOption[] RunModes { get; } = EncodeOptions.RunModes;
     public ObservableCollection<SkipItem> SkipItems { get; } = new();
 
     [ObservableProperty] private CodecOption codec;
@@ -26,6 +27,7 @@ public partial class EncodeSettingsViewModel : ObservableObject
     [ObservableProperty] private ChoiceOption preset;
     [ObservableProperty] private ChoiceOption audio;
     [ObservableProperty] private ChoiceOption container;
+    [ObservableProperty] private ChoiceOption runMode;
     [ObservableProperty] private bool appleCompatible;
     [ObservableProperty] private bool neverOverwrite;
     [ObservableProperty] private string fileSuffix = "";
@@ -54,6 +56,7 @@ public partial class EncodeSettingsViewModel : ObservableObject
         preset = Presets.First(p => p.Id == e.preset);
         audio = AudioChoices.First(a => a.Id == e.audio);
         container = Containers.First(c => c.Id == e.container);
+        runMode = RunModes.First(m => m.Id == e.runMode);
         appleCompatible = e.appleCompatible;
         neverOverwrite = e.neverOverwrite;
         fileSuffix = e.fileSuffix;
@@ -74,6 +77,7 @@ public partial class EncodeSettingsViewModel : ObservableObject
             preset = Preset.Id,
             audio = Audio.Id,
             container = Container.Id,
+            runMode = RunMode.Id,
             appleCompatible = AppleCompatible,
             neverOverwrite = NeverOverwrite,
             fileSuffix = FileSuffix ?? "",
@@ -100,6 +104,7 @@ public partial class EncodeSettingsViewModel : ObservableObject
     partial void OnPresetChanged(ChoiceOption value) => Changed();
     partial void OnAudioChanged(ChoiceOption value) => Changed();
     partial void OnContainerChanged(ChoiceOption value) => Changed();
+    partial void OnRunModeChanged(ChoiceOption value) => Changed();
     partial void OnAppleCompatibleChanged(bool value) => Changed();
     partial void OnNeverOverwriteChanged(bool value) => Changed();
     partial void OnFileSuffixChanged(string value) => Changed();

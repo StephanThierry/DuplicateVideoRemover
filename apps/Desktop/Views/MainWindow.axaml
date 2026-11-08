@@ -60,12 +60,25 @@
       </TabItem>
       <TabItem>
         <TabItem.Header>
-          <StackPanel Orientation="Horizontal" Spacing="12" ToolTip.Tip="Re-encode" ToolTip.Placement="Right">
-            <PathIcon Classes="nav" Data="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/>
-            <TextBlock Classes="navlabel" Text="Re-encode" VerticalAlignment="Center"/>
+          <StackPanel Orientation="Horizontal" Spacing="12" ToolTip.Tip="Re-encode planning" ToolTip.Placement="Right">
+            <PathIcon Classes="nav" Data="M14 10H2v2h12v-2zm0-4H2v2h12V6zM2 16h8v-2H2v2zm19.5-4.5L23 13l-6.99 7-4.51-4.5L13 14l3.01 3 5.49-5.5z"/>
+            <TextBlock Classes="navlabel" Text="Re-encode planning" VerticalAlignment="Center"/>
           </StackPanel>
         </TabItem.Header>
         <v:EncodeView DataContext="{Binding Encode}"/>
+      </TabItem>
+      <TabItem>
+        <TabItem.Header>
+          <StackPanel Orientation="Horizontal" Spacing="12" ToolTip.Tip="Re-encode queue" ToolTip.Placement="Right">
+            <PathIcon Classes="nav" Data="M19 9H2v2h17V9zm0-4H2v2h17V5zM2 15h13v-2H2v2zm15-2v6l5-3-5-3z"/>
+            <TextBlock Classes="navlabel" Text="Re-encode queue" VerticalAlignment="Center"/>
+            <!-- Videos waiting or being encoded -->
+            <Border IsVisible="{Binding EncodeQueue.HasBadge}" Background="{DynamicResource Accent}" CornerRadius="9" MinWidth="18" Height="18" Padding="5,0" VerticalAlignment="Center">
+              <TextBlock Text="{Binding EncodeQueue.Badge}" Foreground="White" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+          </StackPanel>
+        </TabItem.Header>
+        <v:EncodeQueueView DataContext="{Binding EncodeQueue}"/>
       </TabItem>
       <TabItem>
         <TabItem.Header>
