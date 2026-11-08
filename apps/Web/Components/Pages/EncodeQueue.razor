@@ -137,19 +137,23 @@
                             <div class="q-check">
                                 <div class="q-side">
                                     <div class="q-cap">Original - @Fmt.Size(i.SizeBytes), @Fmt.Duration(i.DurationSeconds)</div>
-                                    <div class="enc-strip">@for (int n = 1; n <= 3; n++) { <img loading="lazy" src="shots/@(i.VideoId)_@(n).png" alt="" onerror="this.style.visibility='hidden'" /> }</div>
+                                    <div class="q-strip">
+                                        <div class="enc-strip">@for (int n = 1; n <= 3; n++) { <img loading="lazy" src="shots/@(i.VideoId)_@(n).png" alt="" onerror="this.style.visibility='hidden'" /> }</div>
+                                        <button class="icon" @onclick="() => PlayOriginal(i)" title="Play the original" aria-label="Play the original @i.FileName">@VideoPlayer.Icon</button>
+                                    </div>
                                 </div>
                                 <div class="q-side">
                                     <div class="q-cap">New file - @Fmt.Size(i.OutputBytes)</div>
-                                    <div class="enc-strip">
-                                        @if (i.HasCheckShots) { @for (int n = 1; n <= 3; n++) { <img loading="lazy" src="encodecheck/@(i.Id)_@(n).png" alt="" onerror="this.style.visibility='hidden'" /> } }
+                                    <div class="q-strip">
+                                        <div class="enc-strip">
+                                            @if (i.HasCheckShots) { @for (int n = 1; n <= 3; n++) { <img loading="lazy" src="encodecheck/@(i.Id)_@(n).png" alt="" onerror="this.style.visibility='hidden'" /> } }
+                                        </div>
+                                        <button class="icon" @onclick="() => PlayNew(i)" title="Play the new file" aria-label="Play the new file of @i.FileName">@VideoPlayer.Icon</button>
                                     </div>
                                     <div class="q-checktext @(i.CheckOk ? "ok" : "bad")">@(i.Status == EncodeItemStatus.Incomplete ? i.Message : i.Check)</div>
                                 </div>
                             </div>
                             <div class="q-actions">
-                                <button class="small" @onclick="() => PlayOriginal(i)">Play original</button>
-                                <button class="small" @onclick="() => PlayNew(i)">Play new file</button>
                                 @if (i.CanDeleteOriginal) { <button class="small danger-outline" @onclick="() => AskDeleteOriginal(i)" title="Moves the original to the Recycle Bin (asks first). Only possible because the new file checked out">Delete original...</button> }
                                 @if (i.CanReplace) { <button class="small danger-outline" @onclick="() => AskReplace(i)" title="Moves the incomplete new file out of the way and puts the video in the queue again (asks first)">Replace and encode again...</button> }
                             </div>

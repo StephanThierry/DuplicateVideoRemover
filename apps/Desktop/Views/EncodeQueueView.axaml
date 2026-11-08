@@ -163,29 +163,38 @@
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="16" IsVisible="{Binding HasCheck}">
                       <StackPanel Spacing="4">
                         <TextBlock Classes="muted small" FontWeight="SemiBold"><Run Text="Original - "/><Run Text="{Binding Size}"/><Run Text=", "/><Run Text="{Binding Length}"/></TextBlock>
-                        <Border Background="{DynamicResource Frame}" CornerRadius="3" Padding="4" HorizontalAlignment="Left">
-                          <StackPanel Orientation="Horizontal" Spacing="3">
-                            <Image Classes="qshot" Source="{Binding Shot1}" Stretch="UniformToFill"/>
-                            <Image Classes="qshot" Source="{Binding Shot2}" Stretch="UniformToFill"/>
-                            <Image Classes="qshot" Source="{Binding Shot3}" Stretch="UniformToFill"/>
-                          </StackPanel>
-                        </Border>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                          <Border Background="{DynamicResource Frame}" CornerRadius="3" Padding="4" HorizontalAlignment="Left">
+                            <StackPanel Orientation="Horizontal" Spacing="3">
+                              <Image Classes="qshot" Source="{Binding Shot1}" Stretch="UniformToFill"/>
+                              <Image Classes="qshot" Source="{Binding Shot2}" Stretch="UniformToFill"/>
+                              <Image Classes="qshot" Source="{Binding Shot3}" Stretch="UniformToFill"/>
+                            </StackPanel>
+                          </Border>
+                          <!-- Play: opens the default player, like in the Re-encode planning list -->
+                          <Button Classes="icon" Command="{Binding PlayOriginalCommand}" ToolTip.Tip="Play the original (opens the default player)" VerticalAlignment="Center">
+                            <Path Data="M3,1.5 L3,12.5 L12,7 Z" Fill="{Binding $parent[Button].Foreground}" Width="14" Height="14"/>
+                          </Button>
+                        </StackPanel>
                       </StackPanel>
                       <StackPanel Grid.Column="1" Spacing="4">
                         <TextBlock Classes="muted small" FontWeight="SemiBold"><Run Text="New file - "/><Run Text="{Binding NewSize}"/></TextBlock>
-                        <Border Background="{DynamicResource Frame}" CornerRadius="3" Padding="4" HorizontalAlignment="Left">
-                          <StackPanel Orientation="Horizontal" Spacing="3">
-                            <Image Classes="qshot" Source="{Binding NewShot1}" Stretch="UniformToFill"/>
-                            <Image Classes="qshot" Source="{Binding NewShot2}" Stretch="UniformToFill"/>
-                            <Image Classes="qshot" Source="{Binding NewShot3}" Stretch="UniformToFill"/>
-                          </StackPanel>
-                        </Border>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                          <Border Background="{DynamicResource Frame}" CornerRadius="3" Padding="4" HorizontalAlignment="Left">
+                            <StackPanel Orientation="Horizontal" Spacing="3">
+                              <Image Classes="qshot" Source="{Binding NewShot1}" Stretch="UniformToFill"/>
+                              <Image Classes="qshot" Source="{Binding NewShot2}" Stretch="UniformToFill"/>
+                              <Image Classes="qshot" Source="{Binding NewShot3}" Stretch="UniformToFill"/>
+                            </StackPanel>
+                          </Border>
+                          <Button Classes="icon" Command="{Binding PlayNewCommand}" ToolTip.Tip="Play the new file (opens the default player)" VerticalAlignment="Center">
+                            <Path Data="M3,1.5 L3,12.5 L12,7 Z" Fill="{Binding $parent[Button].Foreground}" Width="14" Height="14"/>
+                          </Button>
+                        </StackPanel>
                         <TextBlock Text="{Binding CheckText}" TextWrapping="Wrap" FontSize="12" Classes.ok="{Binding CheckOk}" Classes.bad="{Binding CheckFailed}"/>
                       </StackPanel>
                     </Grid>
                     <WrapPanel IsVisible="{Binding HasCheck}">
-                      <Button Classes="small" Content="Play original" Command="{Binding PlayOriginalCommand}" Margin="0,0,6,0"/>
-                      <Button Classes="small" Content="Play new file" Command="{Binding PlayNewCommand}" Margin="0,0,6,0"/>
                       <Button Classes="small dangerOutline" Content="Delete original..." Command="{Binding AskDeleteOriginalCommand}" IsVisible="{Binding CanDeleteOriginal}"
                               ToolTip.Tip="Moves the original to the Recycle Bin (asks first). Only possible because the new file checked out"/>
                       <Button Classes="small dangerOutline" Content="Replace and encode again..." Command="{Binding AskReplaceCommand}" IsVisible="{Binding CanReplace}"

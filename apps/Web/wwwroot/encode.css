@@ -71,3 +71,5 @@ button.danger-outline:hover:not(:disabled) { background: var(--grease-wash); bor
 .q-checktext.ok { color: var(--keep); }
 .q-checktext.bad { color: var(--grease); font-weight: 600; }
 @media (max-width: 900px) { .q-row .q-check { grid-template-columns: 1fr; } }
+
+.q-strip { display: flex; align-items: center; gap: 10px; }
