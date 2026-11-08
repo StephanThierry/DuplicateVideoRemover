@@ -26,7 +26,9 @@ AppBuilder.Configure<App>()
     .SetupWithoutStarting();
 
 var vm = new MainViewModel(controller);
-var window = new MainWindow { DataContext = vm, Width = 1440, Height = 900 };
+// SHOT_SIZE=1320x860 sets the window size (layout bugs depend on it)
+var size = (Environment.GetEnvironmentVariable("SHOT_SIZE") ?? "1440x900").Split('x');
+var window = new MainWindow { DataContext = vm, Width = int.Parse(size[0]), Height = int.Parse(size[1]) };
 window.Show();
 
 void Pump(int ms = 300)
@@ -191,6 +193,18 @@ if (Environment.GetEnvironmentVariable("SHOT_QUEUE") == "1")
     Pump(500); Shot("q_after_restart");
     Console.WriteLine($"after start: {EncodeText.Headline(controller.Encoder.Current)} | {EncodeText.Totals(controller.Encoder.Current)}");
     controller.Encoder.Shutdown();
+    return;
+}
+// SHOT_PLANNING=1: opens Re-encode planning on the given data (use a copy) and waits for the list - for finding crashes there
+if (Environment.GetEnvironmentVariable("SHOT_PLANNING") == "1")
+{
+    vm.SelectedTab = MainViewModel.EncodeTab;
+    var started = DateTime.UtcNow;
+    Pump(500); Shot("p_loading");
+    while (vm.Encode.Loading && DateTime.UtcNow - started < TimeSpan.FromMinutes(3)) Pump(200);
+    Pump(1500);
+    Console.WriteLine($"planning: loading {vm.Encode.Loading}, {vm.Encode.Rows.Count} rows, has videos {vm.Encode.HasVideos}, after {(DateTime.UtcNow - started).TotalSeconds:0} s");
+    Shot("p_loaded");
     return;
 }
 if (scan)

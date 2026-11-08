@@ -104,9 +104,9 @@
               <ColumnDefinition Width="Auto" SharedSizeGroup="strip"/>
               <ColumnDefinition Width="48"/>
               <ColumnDefinition Width="*"/>
-              <ColumnDefinition Width="Auto" MinWidth="80" SharedSizeGroup="rate"/>
-              <ColumnDefinition Width="Auto" MinWidth="80" SharedSizeGroup="size"/>
-              <ColumnDefinition Width="Auto" MinWidth="110" SharedSizeGroup="estimate"/>
+              <ColumnDefinition Width="110"/>
+              <ColumnDefinition Width="90"/>
+              <ColumnDefinition Width="150"/>
             </Grid.ColumnDefinitions>
             <TextBlock Grid.Column="3" Text="Video" Classes="muted small" FontWeight="SemiBold"/>
             <TextBlock Grid.Column="4" Text="Bitrate" Classes="muted small" FontWeight="SemiBold" HorizontalAlignment="Right"/>
@@ -125,9 +125,9 @@
                     <ColumnDefinition Width="Auto" SharedSizeGroup="strip"/>
                     <ColumnDefinition Width="48"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto" MinWidth="80" SharedSizeGroup="rate"/>
-                    <ColumnDefinition Width="Auto" MinWidth="80" SharedSizeGroup="size"/>
-                    <ColumnDefinition Width="Auto" MinWidth="110" SharedSizeGroup="estimate"/>
+                    <ColumnDefinition Width="110"/>
+                    <ColumnDefinition Width="90"/>
+                    <ColumnDefinition Width="150"/>
                   </Grid.ColumnDefinitions>
                   <CheckBox IsChecked="{Binding IsPicked}" IsEnabled="{Binding !IsQueued}" IsHitTestVisible="False" VerticalAlignment="Center"/>
                   <Border Grid.Column="1" Background="{DynamicResource Frame}" CornerRadius="3" Padding="4" HorizontalAlignment="Left">
