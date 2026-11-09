@@ -40,6 +40,18 @@ one of those videos has to be read again. Do not run it automatically, and do no
 
 Rows are only deleted from the database when the program deletes the file itself (Review, Re-encode).
 
+### A row is read again when the file at its path changes
+
+Because rows are keyed by path, a file that is *replaced* would keep the row of the old file: its duration, size and the
+three screenshots (`_screens/<row id>_<n>.png`, reused whenever they exist). The typical case is the re-encode queue: an incomplete
+`..._720p.mp4` (an interrupted run) is scanned, then deleted and encoded again under the same name - the row still says "47 seconds, 4 MB"
+and the finished 1400-second file never matches its original.
+
+So the folder listing (`FileHandler.FindFiles`) keeps each file's size (`allFileSizes`; the listing reports it for free) and the scan
+compares it with `fileSize` of the row (`VideoHandler.IsStale`). A different size means another file is there: the row is cleared,
+including its pictures (`ForgetWhatWasRead`), and read again like a new file. Rows with no size (never read, -1, 0) are read anyway.
+Stored sizes were checked against the disk for 67,000 rows: only the stale ones differed.
+
 ## The encode queue
 
 `EncodeEngine` (Core/EncodeEngine.cs) is owned by `AppController.Encoder`, so there is one queue per process and

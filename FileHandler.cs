@@ -16,6 +16,11 @@ namespace deepduplicates
         public string outputFolder { get; set; }
         public IEnumerable<string> allFiles { get; set; }
         public int allFilesCount { get; set; }
+        /// <summary>
+        /// The size of each file in <see cref="allFiles"/> as the folder listing reported it (no extra call per file). The scan compares it
+        /// with the size the database row was made from: a different size means another file is at that path now.
+        /// </summary>
+        public Dictionary<string, long> allFileSizes { get; private set; } = new(StringComparer.Ordinal);
 
         private static string appFolder = Directory.GetCurrentDirectory();
         public Settings settings = null;
@@ -149,7 +154,7 @@ namespace deepduplicates
 
             var queue = new System.Collections.Concurrent.BlockingCollection<string>();
             int pending = 0, dirsDone = 0, dirsKnown = 0, files = 0;
-            var results = new System.Collections.Concurrent.ConcurrentBag<List<string>>();
+            var results = new System.Collections.Concurrent.ConcurrentBag<List<(string Path, long Length)>>();
             string[] exclude = settings.excludePaths ?? Array.Empty<string>();
             var options = new EnumerationOptions
             {
@@ -170,7 +175,7 @@ namespace deepduplicates
 
             void Worker()
             {
-                var mine = new List<string>();
+                var mine = new List<(string Path, long Length)>();
                 results.Add(mine);
                 try
                 {
@@ -178,17 +183,17 @@ namespace deepduplicates
                     {
                         try
                         {
-                            var entries = new System.IO.Enumeration.FileSystemEnumerable<(string Path, bool IsDir)>(dir,
-                                (ref System.IO.Enumeration.FileSystemEntry e) => (e.ToFullPath(), e.IsDirectory), options)
+                            var entries = new System.IO.Enumeration.FileSystemEnumerable<(string Path, bool IsDir, long Length)>(dir,
+                                (ref System.IO.Enumeration.FileSystemEntry e) => (e.ToFullPath(), e.IsDirectory, e.IsDirectory ? 0 : e.Length), options)
                             {
                                 ShouldIncludePredicate = (ref System.IO.Enumeration.FileSystemEntry e) => e.IsDirectory || IsVideo(e.FileName)
                             };
-                            foreach (var (path, isDir) in entries)
+                            foreach (var (path, isDir, length) in entries)
                             {
                                 // A path with an excluded text in it: so is everything below it, no need to walk it
                                 if (exclude.Any(x => path.Contains(x))) continue;
                                 if (isDir) Add(path);
-                                else { mine.Add(path); Interlocked.Increment(ref files); }
+                                else { mine.Add((path, length)); Interlocked.Increment(ref files); }
                             }
                         }
                         catch { /* unreadable folder: skip it */ }
@@ -206,10 +211,13 @@ namespace deepduplicates
             ct.ThrowIfCancellationRequested();
 
             var found = results.SelectMany(r => r).ToList();
-            found.Sort(StringComparer.Ordinal); // the threads finish in any order: keep the list the same every time
+            found.Sort((a, b) => string.CompareOrdinal(a.Path, b.Path)); // the threads finish in any order: keep the list the same every time
             Console.WriteLine("Found a total of " + found.Count + " video files in " + dirsDone + " folders.");
             onProgress?.Invoke(new FindProgress(found.Count, dirsDone, dirsKnown));
-            this.allFiles = found;
+            var sizes = new Dictionary<string, long>(found.Count, StringComparer.Ordinal);
+            foreach (var (path, length) in found) sizes[path] = length;
+            this.allFileSizes = sizes;
+            this.allFiles = found.Select(f => f.Path).ToList();
             this.allFilesCount = found.Count;
             this.allDirsCount = dirsDone;
         }
