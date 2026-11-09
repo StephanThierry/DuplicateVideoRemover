@@ -39,6 +39,28 @@ namespace deepduplicates
         public async Task<List<VideoInfo>> saveVideoMetadataAndScreenshots(VideoInfoContext db)
             => await saveVideoMetadataAndScreenshots(db, null, CancellationToken.None, null);
 
+        /// <summary>
+        /// True when the file at this path is not the file the database row was made from: its size on disk is not the size that was
+        /// read. (The database is keyed by path, so a file that is replaced - an unfinished copy that was finished or encoded again - would
+        /// keep the row of the old one for ever: the duration and pictures of a few seconds of video, never matching the real file.)
+        /// </summary>
+        public static bool IsStale(VideoInfo item, long? sizeOnDisk) =>
+            item.fileSize is long was && was > 0 && sizeOnDisk is long now && now > 0 && now != was;
+
+        // Forgets everything read from the old file, so the row is read again: its pictures too (they are kept by row id and reused)
+        public void ForgetWhatWasRead(VideoInfo item)
+        {
+            for (int n = 1; n <= 3; n++)
+            {
+                try { string shot = fileHandler.screenshotPath(item, n); if (File.Exists(shot)) File.Delete(shot); }
+                catch (Exception) { /* in use: it is made again over the old one */ }
+            }
+            item.duration = -1; item.bitrate = null; item.reason = null; item.formatNotSupported = false;
+            item.image1Checksum = item.image2Checksum = item.image3Checksum = null;
+            item.image1hash_blob = item.image2hash_blob = item.image3hash_blob = null;
+            item.image1hash = item.image2hash = item.image3hash = null;
+        }
+
         /// <summary>Files that needed reading in the last run, and the seconds spent on them (for time estimates).</summary>
         public int LastNewFiles { get; private set; }
         public double LastNewSeconds { get; private set; }
@@ -74,6 +96,19 @@ namespace deepduplicates
                         join item in fullTableScan on path equals item.path into tmp
                         from subItem in tmp.DefaultIfEmpty()
                         select new VideoInfoWrapper { path = path, item = subItem }).ToList();
+
+            // A file that is not the one that was read any more (another size than the row says) is read again
+            int changedFiles = 0;
+            foreach (var w in query)
+            {
+                if (w.item != null && fileHandler.allFileSizes.TryGetValue(w.path, out long sizeNow) && IsStale(w.item, sizeNow))
+                {
+                    Console.WriteLine($"Changed since it was read ({Fmt.Size(w.item.fileSize ?? 0)} then, {Fmt.Size(sizeNow)} now) - reading again: {w.path}");
+                    ForgetWhatWasRead(w.item);
+                    changedFiles++;
+                }
+            }
+            if (changedFiles > 0) Console.WriteLine($"{changedFiles} files changed since they were read and are read again.");
 
             // Workload: files not in the database yet, or incomplete there. Cached files take almost no time.
             int newTotal = query.Count(w => w.item == null ||
