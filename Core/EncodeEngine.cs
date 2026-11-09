@@ -300,6 +300,87 @@ namespace deepduplicates
             return true;
         }
 
+        // A finished video has a new file (it can be deleted) when it was encoded, found there already, or found incomplete
+        private static bool HasNewFile(EncodeItem i) => i.Status is EncodeItemStatus.Done or EncodeItemStatus.AlreadyEncoded or EncodeItemStatus.Incomplete;
+
+        /// <summary>
+        /// Notes that files were deleted by something else (Review's delete, the Re-encode list, All files): a finished video whose
+        /// original is among them gets its original marked as deleted, one whose new file is among them its new file. Returns how many
+        /// videos of the queue changed. Videos still waiting are left alone: a missing original is found out when its turn comes.
+        /// </summary>
+        public int NoteDeleted(IEnumerable<string> paths)
+        {
+            var gone = new HashSet<string>(paths.Where(p => !string.IsNullOrEmpty(p)), EncodeProgress.PathComparer);
+            if (gone.Count == 0) return 0;
+            int changed = 0;
+            lock (sync)
+            {
+                foreach (var item in items.Where(i => i.IsFinishedStatus()))
+                {
+                    bool was = false;
+                    if (!item.OriginalDeleted && gone.Contains(item.Path)) { item.OriginalDeleted = true; was = true; }
+                    if (!item.NewDeleted && HasNewFile(item) && gone.Contains(item.OutputPath)) { item.NewDeleted = true; was = true; }
+                    if (was) changed++;
+                }
+                if (changed > 0) Save();
+            }
+            if (changed > 0) Publish();
+            return changed;
+        }
+
+        /// <summary>
+        /// A file that is not there: its folder can be reached, and the file is not in it. (A folder or share that can't be reached
+        /// - a network drive that is off, a disk that is unplugged - tells nothing about the file, so it does not count as missing.)
+        /// </summary>
+        public static bool IsMissing(string path)
+        {
+            try
+            {
+                if (File.Exists(path)) return false;
+                string? folder = Path.GetDirectoryName(path);
+                return !string.IsNullOrEmpty(folder) && Directory.Exists(folder);
+            }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// Looks for the files of the finished videos (the original and the new file) and marks the ones that have been deleted
+        /// outside the program, one video at a time in the background: the queue is shown at once and each row is updated (and the
+        /// change published) as soon as its files are known. The check only reads. Returns how many videos had a file missing.
+        /// </summary>
+        public async Task<int> VerifyFinishedFilesAsync(CancellationToken ct = default)
+        {
+            List<(string Id, string? Original, string? Output)> todo;
+            lock (sync)
+                todo = items.Where(i => i.IsFinishedStatus() && (!i.OriginalDeleted || HasNewFile(i) && !i.NewDeleted))
+                    .Select(i => (i.Id, i.OriginalDeleted ? null : i.Path, HasNewFile(i) && !i.NewDeleted ? i.OutputPath : null)).ToList();
+            int changed = 0;
+            try
+            {
+                foreach (var (id, original, output) in todo)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    // A share can be slow to answer: never on the caller's thread
+                    bool originalGone = original != null && await Task.Run(() => IsMissing(original), ct);
+                    bool newGone = output != null && await Task.Run(() => IsMissing(output), ct);
+                    if (!originalGone && !newGone) continue;
+                    lock (sync)
+                    {
+                        var item = items.FirstOrDefault(i => i.Id == id);
+                        if (item == null) continue;
+                        if (originalGone) item.OriginalDeleted = true;
+                        if (newGone && HasNewFile(item)) item.NewDeleted = true;
+                        Save();
+                    }
+                    changed++;
+                    Publish();
+                }
+            }
+            catch (OperationCanceledException) { }
+            if (changed > 0) AddLog($"Checked the finished videos: {changed:N0} had a file that was deleted outside the program (marked as deleted).");
+            return changed;
+        }
+
         private void Forget(EncodeItem item) => EncodeChecker.DeleteShots(checksFolder, item.Id);
 
         // Finished videos with a new file that was never checked: made before checks existed (a Done item, or one that was
