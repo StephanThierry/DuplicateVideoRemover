@@ -73,7 +73,7 @@
             }
             <label class="inline">Only above <input type="number" min="0" step="500" @bind="minKbps" @bind:after="ResetPaging" aria-label="Minimum bitrate" /> kbit/s</label>
             <label class="inline">and above <input type="number" min="0" step="50" @bind="minMb" @bind:after="ResetPaging" aria-label="Minimum file size in MB" /> MB</label>
-            <input type="search" placeholder="Filter by file or folder name" @bind="search" @bind:event="oninput" @bind:after="ResetPaging" aria-label="Filter by file or folder name" />
+            <input type="search" placeholder='e.g. vacation lisbon 2026 -ocean' title='All words must be in the path, -word leaves out paths with that word, "two words" searches that exact phrase in that order; inside the quotes a regular expression works, e.g. "night.?drive".' @bind="search" @bind:event="oninput" @bind:after="ResetPaging" aria-label="Filter by file or folder name" />
         </div>
 
         var visible = Visible().ToList();
@@ -243,9 +243,13 @@
 
     private void OnDataChanged() => InvokeAsync(async () => { await Load(); StateHasChanged(); });
 
-    private IEnumerable<EncodeCandidate> Visible() => (candidates ?? new()).Where(c =>
-        !(hideQueued && queueMap.ContainsKey(c.Path)) && c.AverageKbps >= minKbps && c.SizeBytes >= (long)minMb * 1024 * 1024 && !hidden.Contains(c.Folder) &&
-        (string.IsNullOrWhiteSpace(search) || c.Path.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase)));
+    private IEnumerable<EncodeCandidate> Visible()
+    {
+        var query = SearchQuery.Parse(search);
+        return (candidates ?? new()).Where(c =>
+            !(hideQueued && queueMap.ContainsKey(c.Path)) && c.AverageKbps >= minKbps && c.SizeBytes >= (long)minMb * 1024 * 1024 && !hidden.Contains(c.Folder) &&
+            query.Matches(c.Path));
+    }
 
     private long PickedBytes => candidates?.Where(c => picked.Contains(c.Id)).Sum(c => c.SizeBytes) ?? 0;
 

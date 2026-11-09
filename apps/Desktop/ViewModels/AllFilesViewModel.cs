@@ -100,7 +100,7 @@ public partial class AllFilesViewModel : ObservableObject
         ResultText = query.IsEmpty && hidden.Count == 0 ? $"{total:N0} files" : $"{Rows.Count:N0} of {total:N0} files";
     }
 
-    private static bool SameQuery(SearchQuery a, SearchQuery b) => a.Include.SequenceEqual(b.Include) && a.Exclude.SequenceEqual(b.Exclude);
+    private static bool SameQuery(SearchQuery a, SearchQuery b) => a.Key == b.Key;
 
     internal void HideFolder(FileRow row)
     {

@@ -133,9 +133,13 @@ public partial class EncodeViewModel : ObservableObject
         Filter();
     }
 
-    private IEnumerable<EncodeRow> Visible() => all.Where(r =>
-        !(HideQueued && r.IsQueued) && r.Candidate.AverageKbps >= (double)MinKbps && r.Candidate.SizeBytes >= (double)MinMb * 1024 * 1024 && !hidden.Contains(r.Candidate.Folder) &&
-        (string.IsNullOrWhiteSpace(Search) || r.Candidate.Path.Contains(Search.Trim(), StringComparison.OrdinalIgnoreCase)));
+    private IEnumerable<EncodeRow> Visible()
+    {
+        var query = SearchQuery.Parse(Search);
+        return all.Where(r =>
+            !(HideQueued && r.IsQueued) && r.Candidate.AverageKbps >= (double)MinKbps && r.Candidate.SizeBytes >= (double)MinMb * 1024 * 1024 && !hidden.Contains(r.Candidate.Folder) &&
+            query.Matches(r.Candidate.Path));
+    }
 
     private void Filter()
     {

@@ -66,7 +66,8 @@
       <TextBlock Text="and above" VerticalAlignment="Center" Margin="0,0,6,6"/>
       <NumericUpDown Value="{Binding MinMb}" Minimum="0" Increment="50" FormatString="0" Width="140" Margin="0,0,6,6"/>
       <TextBlock Text="MB" VerticalAlignment="Center" Margin="0,0,16,6"/>
-      <TextBox Text="{Binding Search}" PlaceholderText="Filter by file or folder name" Width="280" Margin="0,0,0,6"/>
+      <TextBox Text="{Binding Search}" PlaceholderText="e.g. vacation lisbon 2026 -ocean" Width="280" Margin="0,0,0,6"
+               ToolTip.Tip="All words must be in the path, -word leaves out paths with that word, &quot;two words&quot; searches that exact phrase in that order; inside the quotes a regular expression works, e.g. &quot;night.?drive&quot;. Not case sensitive."/>
     </WrapPanel>
 
     <!-- Reading the list takes a few seconds: say so, instead of suggesting a new scan -->

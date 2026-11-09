@@ -10,7 +10,7 @@
     <div class="page-head">
         <div>
             <h1>All files</h1>
-            <p>@SourceText() Search: all words must be in the path, <code>-word</code> leaves out paths with that word, <code>"two words"</code> searches a phrase. Not case sensitive.</p>
+            <p>@SourceText() Search: all words must be in the path, <code>-word</code> leaves out paths with that word, <code>"two words"</code> searches a phrase, and inside the quotes <code>.?</code> <code>d</code> <code>(a|b)</code> work as a regular expression, e.g. <code>"night.?drive"</code>. Not case sensitive.</p>
         </div>
         <button @onclick='() => Nav.NavigateTo("scan")' title="Find new and moved files">Scan again</button>
     </div>

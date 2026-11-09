@@ -32,7 +32,7 @@
       </DockPanel>
       <TextBlock Text="{Binding SourceText}" TextWrapping="Wrap" Margin="0,4,0,0"/>
       <TextBlock Classes="muted" TextWrapping="Wrap" Margin="0,4,0,0"
-                 Text="Search: all words must be in the path, -word leaves out paths with that word, &quot;two words&quot; searches a phrase. Not case sensitive."/>
+                 Text="Search: all words must be in the path, -word leaves out paths with that word, &quot;two words&quot; searches a phrase; inside the quotes a regular expression works, e.g. &quot;night.?drive&quot;. Not case sensitive."/>
     </StackPanel>
 
     <DockPanel Grid.Row="1" Margin="0,0,0,10" IsVisible="{Binding HasFiles}">

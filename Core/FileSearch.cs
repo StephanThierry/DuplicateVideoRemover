@@ -2,22 +2,75 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace deepduplicates
 {
     /// <summary>
     /// A search like  vacation lisbon 2026 -ocean : every word must be in the path, a word starting with "-" must
-    /// not be. Not case sensitive. "Quoted words" are searched as one phrase, also after "-".
+    /// not be. Not case sensitive. "Quoted words" are searched as one phrase, in that order, also after "-".
+    /// Inside quotes a regular expression works: "night.?drive" finds nightdrive and night3drive. The quoted text
+    /// is also tried as plain text, so "file (1)" still finds exactly that.
     /// </summary>
-    public sealed record SearchQuery(string[] Include, string[] Exclude)
+    public sealed record SearchQuery(string[] Include, string[] Exclude, Regex[] IncludeRx = null, Regex[] ExcludeRx = null)
     {
-        public bool IsEmpty => Include.Length == 0 && Exclude.Length == 0;
+        private static readonly Regex[] None = Array.Empty<Regex>();
+        public Regex[] IncludeRx { get; init; } = IncludeRx ?? None;
+        public Regex[] ExcludeRx { get; init; } = ExcludeRx ?? None;
+
+        public bool IsEmpty => Include.Length == 0 && Exclude.Length == 0 && IncludeRx.Length == 0 && ExcludeRx.Length == 0;
+
+        /// <summary>Same for equal searches (to see whether the text was typed on meanwhile).</summary>
+        public string Key => string.Join("\u0001", Include) + "\u0002" + string.Join("\u0001", Exclude) + "\u0002"
+            + string.Join("\u0001", IncludeRx.Select(r => r.ToString())) + "\u0002" + string.Join("\u0001", ExcludeRx.Select(r => r.ToString()));
+
+        /// <summary>True when the (lower-cased or not) path fits the search.</summary>
+        public bool Matches(string path)
+        {
+            if (IsEmpty) return true;
+            foreach (var t in Include) if (path.IndexOf(t, StringComparison.OrdinalIgnoreCase) < 0) return false;
+            foreach (var t in Exclude) if (path.IndexOf(t, StringComparison.OrdinalIgnoreCase) >= 0) return false;
+            return MatchesRegex(path);
+        }
+
+        /// <summary>Only the regular-expression terms (the plain terms are checked by the caller).</summary>
+        public bool MatchesRegex(string path)
+        {
+            foreach (var r in IncludeRx) if (!Safe(r, path)) return false;
+            foreach (var r in ExcludeRx) if (Safe(r, path)) return false;
+            return true;
+        }
+
+        private static bool Safe(Regex r, string path)
+        {
+            try { return r.IsMatch(path); }
+            catch (RegexMatchTimeoutException) { return false; }
+        }
+
+        private static bool HasRegexChars(string s) => s.IndexOfAny(new[] { '\\', '.', '?', '*', '+', '[', ']', '(', ')', '{', '}', '|', '^', '$' }) >= 0;
+
+        /// <summary>The term as a regex that finds the pattern or the same text literally; plain text when it has no regex characters.</summary>
+        private static Regex ToRegex(string raw)
+        {
+            string literal = Regex.Escape(raw);
+            string pattern = literal;
+            try
+            {
+                new Regex(raw, RegexOptions.CultureInvariant);   // only to see that it is valid
+                pattern = $"(?:{literal})|(?:{raw})";
+            }
+            catch (ArgumentException) { }                         // not a valid regex: plain text only
+            return new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(200));
+        }
 
         public static SearchQuery Parse(string text)
         {
             var include = new List<string>();
             var exclude = new List<string>();
-            text ??= "";
+            var includeRx = new List<Regex>();
+            var excludeRx = new List<Regex>();
+            // Typographic quotes (from a phone keyboard or a pasted text) count as plain quotes
+            text = (text ?? "").Replace('\u201C', '"').Replace('\u201D', '"');
             int i = 0;
             while (i < text.Length)
             {
@@ -26,8 +79,10 @@ namespace deepduplicates
                 bool not = text[i] == '-';
                 if (not) i++;
                 string term;
+                bool quoted = false;
                 if (i < text.Length && text[i] == '"')
                 {
+                    quoted = true;
                     int end = text.IndexOf('"', i + 1);
                     if (end < 0) end = text.Length;
                     term = text.Substring(i + 1, end - i - 1);
@@ -39,11 +94,11 @@ namespace deepduplicates
                     while (i < text.Length && !char.IsWhiteSpace(text[i])) i++;
                     term = text.Substring(start, i - start);
                 }
-                term = term.Trim().ToLowerInvariant();
-                if (term.Length == 0) continue;     // a lone "-" or ""
-                (not ? exclude : include).Add(term);
+                if (quoted ? term.Trim().Length == 0 : term.Length == 0) continue;     // a lone "-" or ""
+                if (quoted && HasRegexChars(term)) (not ? excludeRx : includeRx).Add(ToRegex(term.Trim()));
+                else (not ? exclude : include).Add(term.Trim().ToLowerInvariant());
             }
-            return new SearchQuery(include.Distinct().ToArray(), exclude.Distinct().ToArray());
+            return new SearchQuery(include.Distinct().ToArray(), exclude.Distinct().ToArray(), includeRx.ToArray(), excludeRx.ToArray());
         }
     }
 
@@ -109,6 +164,7 @@ namespace deepduplicates
                 bool ok = true;
                 for (int t = 0; t < include.Length && ok; t++) ok = path.Contains(include[t], StringComparison.Ordinal);
                 for (int t = 0; t < exclude.Length && ok; t++) ok = !path.Contains(exclude[t], StringComparison.Ordinal);
+                if (ok && (query.IncludeRx.Length > 0 || query.ExcludeRx.Length > 0)) ok = query.MatchesRegex(path);
                 if (ok && (alsoKeep == null || alsoKeep(entries[i]))) found.Add(entries[i]);
             }
             return found;
