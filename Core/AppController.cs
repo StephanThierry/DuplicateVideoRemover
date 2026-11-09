@@ -57,9 +57,13 @@ namespace deepduplicates
             catch (Exception e) { Console.WriteLine("Could not update the rules to the main names: " + e.Message); }
             Session = new ResultSession(ResultSet.LoadSaved());
             Encoder = new EncodeEngine(Path.Combine(FileHandler.AppFolder, "output", "encodequeue.json"), PrepareFFmpeg);
-            // Finished videos from before new files were checked get their check now, in the background
+            HookSession(Session);
+            // In the background, so the screens load at once and the queue is updated as it goes: first which finished files have been
+            // deleted since (marked as deleted), then the new files that were never checked get their check
             _ = System.Threading.Tasks.Task.Run(async () =>
             {
+                try { await Encoder.VerifyFinishedFilesAsync(); }
+                catch (Exception e) { Console.WriteLine("Could not look for deleted files: " + e.Message); }
                 try { await Encoder.CheckUncheckedAsync(); }
                 catch (Exception e) { Console.WriteLine("Could not check earlier results: " + e.Message); }
             });
@@ -440,9 +444,11 @@ namespace deepduplicates
             return null;
         }
 
-        // A video file is gone: out of the database (with its screenshots), the scan list and the caches
+        // A video file is gone: out of the database (with its screenshots), the scan list and the caches, and the encode queue
+        // shows it as deleted (an original or a new file of a finished video)
         private void RemoveDeletedVideo(int id, string path)
         {
+            Encoder.NoteDeleted(new[] { path });
             ResultSession.RemoveFromDatabase(new List<VideoEntry> { new VideoEntry { Id = id, Path = path } }, CreateFileHandler());
             LastScan.Remove(path);
             InvalidateCache();
@@ -453,9 +459,13 @@ namespace deepduplicates
             lock (cacheLock) { cachedMedia = null; currentMedia = null; fileIndex = null; }
         }
 
+        // What Review deletes is also noted in the encode queue: a deleted original or new file shows as deleted there
+        private void HookSession(ResultSession session) => session.FilesRemoved += paths => Encoder.NoteDeleted(paths);
+
         private void ReplaceSession(ResultSet results)
         {
             Session = new ResultSession(results);
+            HookSession(Session);
             SessionReplaced?.Invoke();
         }
     }

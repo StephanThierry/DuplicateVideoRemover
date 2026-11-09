@@ -426,6 +426,80 @@ public class EncodeEngineTests : IDisposable
     }
 
     [Fact]
+    public async Task FinishedVideosWhoseFilesAreGone_AreMarkedDeleted_AsTheCheckGoesOn()
+    {
+        var engine = NewEngine(new FakeRunner());
+        var a = Video("a.mp4"); var b = Video("b.mp4", 2); var c = Video("c.mp4", 3);
+        var settings = EncodeSettings.CreateDefault();
+        engine.Enqueue(new[] { a, b, c }, settings);
+        WaitFor(() => engine.Current.DoneCount == 3 && !engine.Current.Running, "done");
+
+        // Outside the program: a's original, b's new file, and both files of c are deleted
+        File.Delete(a.Path);
+        File.Delete(EncodePlanner.OutputPath(b.Path, settings));
+        File.Delete(c.Path); File.Delete(EncodePlanner.OutputPath(c.Path, settings));
+
+        var seen = new List<int>();
+        engine.ProgressChanged += p => { lock (seen) seen.Add(p.Items.Count(i => i.OriginalDeleted || i.NewDeleted)); };
+        Assert.Equal(3, await engine.VerifyFinishedFilesAsync());
+
+        var items = engine.Current.Items;
+        Assert.True(items[0].OriginalDeleted && !items[0].NewDeleted);
+        Assert.True(!items[1].OriginalDeleted && items[1].NewDeleted);
+        Assert.True(items[2].OriginalDeleted && items[2].NewDeleted);
+        Assert.Contains(1, seen); Assert.Contains(2, seen); Assert.Contains(3, seen);   // each row was published as soon as it was known
+        Assert.Equal(3, items.Count);                                                   // the rows stay, greyed out
+
+        // It is kept: a restart shows the same, and a second look finds nothing new
+        Assert.Equal(0, await engine.VerifyFinishedFilesAsync());
+        var again = NewEngine(new FakeRunner());
+        Assert.True(again.Current.Items[2].OriginalDeleted && again.Current.Items[2].NewDeleted);
+    }
+
+    [Fact]
+    public async Task AFolderThatCannotBeReachedIsNotTakenForDeletedFiles()
+    {
+        var engine = NewEngine(new FakeRunner());
+        var a = Video("a.mp4");
+        engine.Enqueue(new[] { a }, EncodeSettings.CreateDefault());
+        WaitFor(() => engine.Current.DoneCount == 1 && !engine.Current.Running, "done");
+
+        Assert.False(EncodeEngine.IsMissing(a.Path));                                              // there
+        Assert.True(EncodeEngine.IsMissing(Path.Combine(dir, "not-there.mp4")));                   // the folder is reachable, the file is not
+        Assert.False(EncodeEngine.IsMissing(Path.Combine(dir, "no-such-folder", "x.mp4")));        // an unreachable folder (a share that is off) tells nothing
+
+        // The whole folder is out of reach: nothing is marked
+        Directory.Move(dir, dir + "-away");
+        try { Assert.Equal(0, await engine.VerifyFinishedFilesAsync()); }
+        finally { Directory.Move(dir + "-away", dir); }
+        Assert.False(engine.Current.Items[0].OriginalDeleted || engine.Current.Items[0].NewDeleted);
+    }
+
+    [Fact]
+    public void FilesDeletedByReviewOrTheListsAreNotedInTheFinishedVideos()
+    {
+        var engine = NewEngine(new FakeRunner());
+        var a = Video("a.mp4"); var b = Video("b.mp4", 2);
+        var settings = EncodeSettings.CreateDefault();
+        engine.Enqueue(new[] { a, b }, settings);
+        WaitFor(() => engine.Current.DoneCount == 2 && !engine.Current.Running, "done");
+        var published = 0;
+        engine.ProgressChanged += _ => published++;
+
+        Assert.Equal(0, engine.NoteDeleted(new[] { Path.Combine(dir, "other.mp4"), "" }));         // not in the queue: nothing changes
+        Assert.Equal(0, published);
+
+        Assert.Equal(1, engine.NoteDeleted(new[] { a.Path }));   // an original
+        Assert.Equal(1, engine.NoteDeleted(new[] { EncodePlanner.OutputPath(b.Path, settings) }));              // a new file
+        var items = engine.Current.Items;
+        Assert.True(items[0].OriginalDeleted && !items[0].NewDeleted);
+        Assert.True(!items[1].OriginalDeleted && items[1].NewDeleted);
+        Assert.Equal(2, published);
+        Assert.Equal(0, engine.NoteDeleted(new[] { a.Path }));                                      // already known
+        Assert.False(engine.Current.StatusByPath().ContainsKey(b.Path));                            // b's new file is gone: planned again like any video
+    }
+
+    [Fact]
     public void DismissLeavesWaitingVideosAlone()
     {
         var runner = new FakeRunner { Behavior = FakeRunner.Hang };

@@ -38,6 +38,9 @@ namespace deepduplicates
         /// <summary>Raised after any change to the selection or the results.</summary>
         public event Action Changed;
 
+        /// <summary>Raised with the paths of the files <see cref="Execute"/> deleted (so others, like the encode queue, can follow).</summary>
+        public event Action<IReadOnlyList<string>> FilesRemoved;
+
         public ResultSession(ResultSet results)
         {
             Results = results ?? new ResultSet();
@@ -281,6 +284,7 @@ namespace deepduplicates
                 foreach (var g in Results.Groups) g.SuggestedKeepId = keep[g.Id];
             });
             try { Results.Save(); } catch (Exception e) { Console.WriteLine("Could not save results: " + e.Message); }
+            if (report.Removed.Count > 0) FilesRemoved?.Invoke(report.Removed.Select(r => r.Path).ToList());
             return report;
         }
 
