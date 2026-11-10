@@ -16,9 +16,23 @@ namespace deepduplicates
         public double Bitrate { get; set; }
         /// <summary>Why the engine suggests removing it (match score, broken, too short ...).</summary>
         public string Reason { get; set; } = "";
+        /// <summary>A live picture on the Scan page: the video was read for the first time in this scan (not already in the database).</summary>
+        public bool IsNew { get; set; }
 
         [System.Text.Json.Serialization.JsonIgnore] public string Folder => System.IO.Path.GetDirectoryName(Path) ?? "";
         [System.Text.Json.Serialization.JsonIgnore] public string FileName => System.IO.Path.GetFileName(Path);
+
+        /// <summary>
+        /// The bitrate to show and sort by, in bit/s. The one stored in the database is what the video stream's header says, and some
+        /// files lie (a .wmv with 4,294,096 kbps - a 32-bit overflow - for 476 MB in 41 minutes; a placeholder of 104,857 kbps). A stored value
+        /// far from the average (size / length, which includes the sound) is replaced by that average.
+        /// </summary>
+        public static double SaneBitrate(double stored, long sizeBytes, int durationSeconds)
+        {
+            double average = durationSeconds > 0 && sizeBytes > 0 ? sizeBytes * 8.0 / durationSeconds : 0;
+            if (average <= 0) return stored > 0 && stored < 1e9 ? stored : 0;      // no length: nothing to check against, but not an overflow
+            return stored >= average * 0.5 && stored <= average * 1.5 ? stored : average;
+        }
 
         public static VideoEntry From(VideoInfo v) => new VideoEntry
         {
@@ -26,7 +40,7 @@ namespace deepduplicates
             Path = v.path ?? "",
             SizeBytes = Math.Max(v.fileSize ?? 0, 0),
             DurationSeconds = v.duration ?? -1,
-            Bitrate = v.bitrate ?? 0,
+            Bitrate = SaneBitrate(v.bitrate ?? 0, Math.Max(v.fileSize ?? 0, 0), v.duration ?? -1),
             Reason = v.reason ?? ""
         };
     }

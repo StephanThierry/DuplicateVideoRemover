@@ -43,6 +43,110 @@ void Shot(string name)
     Console.WriteLine("saved " + name);
 }
 
+// SHOT_DOOMED=1 (with SHOT_FFMPEG=<folder with ffmpeg and ffprobe>, and an empty data folder): selecting BOTH copies of a video - the original
+// and the duplicate - is allowed; both cards turn red, a warning toast comes, and the confirmation says every copy goes
+if (Environment.GetEnvironmentVariable("SHOT_DOOMED") == "1")
+{
+    string ffSource3 = Environment.GetEnvironmentVariable("SHOT_FFMPEG")!;
+    if (!File.Exists(FileHandler.FFmpegPath))
+    {
+        Directory.CreateDirectory(Path.Combine(FileHandler.AppFolder, "ffmpeg"));
+        foreach (var f in Directory.GetFiles(ffSource3)) File.Copy(f, Path.Combine(FileHandler.AppFolder, "ffmpeg", Path.GetFileName(f)), true);
+    }
+    string pair = Path.Combine(FileHandler.AppFolder, "videos");
+    Directory.CreateDirectory(pair);
+    string original = Path.Combine(pair, "Holiday original.mp4"), copy = Path.Combine(pair, "Holiday original - copy.mp4");
+    var maker3 = new ProcessEncodeRunner();
+    Task.Run(() => maker3.RunAsync(FileHandler.FFmpegPath, new[] { "-hide_banner", "-y", "-f", "lavfi", "-i", "testsrc2=duration=30:size=1280x720:rate=25",
+        "-f", "lavfi", "-i", "sine=duration=30", "-shortest", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "30", "-pix_fmt", "yuv420p", "-c:a", "aac", original },
+        _ => { }, _ => { }, CancellationToken.None)).GetAwaiter().GetResult();
+    File.Copy(original, copy, true);
+    foreach (var f in Directory.GetFiles(pair)) File.SetLastWriteTime(f, DateTime.Now.AddHours(-2));
+    var st3 = controller.Settings.Clone();
+    st3.contentFolders = new[] { pair };
+    controller.SaveSettings(st3, PathMapper.Mappings);
+    controller.StartScan();
+    var t3 = DateTime.UtcNow;
+    while ((controller.Scanner.IsRunning || controller.Scanner.Current.Phase == ScanPhase.Idle) && DateTime.UtcNow - t3 < TimeSpan.FromMinutes(3)) Pump(200);
+    Pump(800);
+    vm.SelectedTab = MainViewModel.ReviewTab; Pump(800);
+    var cards = vm.Review.Rows.OfType<VideoRow>().ToList();
+    Console.WriteLine($"[doomed] {cards.Count} copies in the group: {string.Join(", ", cards.Select(c => c.FileName + (c.IsKept ? " (keep)" : "")))}");
+    var keepCard = cards.First(c => c.IsKept); var dupeCard = cards.First(c => !c.IsKept);
+    dupeCard.IsSelected = true; Pump(400);
+    Console.WriteLine($"[doomed] only the duplicate selected: toast = {(vm.Review.Toast ?? "(none)")}, red cards = {cards.Count(c => c.IsDoomed)}, keep mark on the original = {keepCard.IsKept}");
+    keepCard.IsSelected = true; Pump(500);
+    Console.WriteLine($"[doomed] the original selected too: selected = {cards.Count(c => c.IsSelected)}, red cards = {cards.Count(c => c.IsDoomed)}, keep marks = {cards.Count(c => c.IsKept)}");
+    Console.WriteLine($"[doomed] toast: {vm.Review.Toast}");
+    Shot("d_doomed");
+    vm.Review.AskExecuteCommand.Execute(null); Pump(400);
+    Console.WriteLine($"[doomed] confirmation: {vm.Review.ConfirmTitle} | {vm.Review.ConfirmText}");
+    Shot("d_doomed_confirm");
+    // SHOT_DOOMED_DELETE=1: really delete both (they are the test copies in the data folder)
+    if (Environment.GetEnvironmentVariable("SHOT_DOOMED_DELETE") == "1")
+    {
+        vm.Review.ExecuteCommand.Execute(null);
+        var until = DateTime.UtcNow.AddSeconds(30);
+        while ((vm.Review.Busy || Directory.GetFiles(pair).Length > 0) && DateTime.UtcNow < until) Pump(200);
+        Pump(800);
+        Console.WriteLine($"[doomed] deleted both: files left in the folder = {Directory.GetFiles(pair).Length}, groups left = {controller.Session.Results.Groups.Count}, toast = {vm.Review.Toast}");
+        return;
+    }
+    vm.Review.CancelExecuteCommand.Execute(null); Pump(300);
+    dupeCard.IsSelected = false; Pump(400);
+    Console.WriteLine($"[doomed] the duplicate unselected again: red cards = {cards.Count(c => c.IsDoomed)}, keep marks = {cards.Count(c => c.IsKept)} (on {cards.FirstOrDefault(c => c.IsKept)?.FileName})");
+    return;
+}
+// SHOT_SCANTHUMBS=1 (with SHOT_FFMPEG=<folder with ffmpeg and ffprobe>, and an empty data folder): the live pictures on the Scan screen -
+// each has a play button (it opens the video) - made by really scanning a few clips
+if (Environment.GetEnvironmentVariable("SHOT_SCANTHUMBS") == "1")
+{
+    string ffSource2 = Environment.GetEnvironmentVariable("SHOT_FFMPEG")!;
+    if (!File.Exists(FileHandler.FFmpegPath))
+    {
+        Directory.CreateDirectory(Path.Combine(FileHandler.AppFolder, "ffmpeg"));
+        foreach (var f in Directory.GetFiles(ffSource2)) File.Copy(f, Path.Combine(FileHandler.AppFolder, "ffmpeg", Path.GetFileName(f)), true);
+    }
+    string clips = Path.Combine(FileHandler.AppFolder, "videos");
+    Directory.CreateDirectory(clips);
+    var maker = new ProcessEncodeRunner();
+    for (int n = 0; n < 4; n++)
+    {
+        string clip = Path.Combine(clips, $"Holiday clip {n + 1}.mp4");
+        if (File.Exists(clip)) continue;
+        int seconds = 20 + n * 5;
+        Task.Run(() => maker.RunAsync(FileHandler.FFmpegPath, new[] { "-hide_banner", "-y", "-f", "lavfi", "-i", $"testsrc2=duration={seconds}:size=1280x720:rate=25",
+            "-f", "lavfi", "-i", "sine=duration=" + seconds, "-shortest", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "30", "-pix_fmt", "yuv420p", "-c:a", "aac", clip },
+            _ => { }, _ => { }, CancellationToken.None)).GetAwaiter().GetResult();
+    }
+    foreach (var f in Directory.GetFiles(clips)) File.SetLastWriteTime(f, DateTime.Now.AddHours(-2));
+    var st = controller.Settings.Clone();
+    st.contentFolders = new[] { clips };
+    controller.SaveSettings(st, PathMapper.Mappings);
+    vm.SelectedTab = MainViewModel.ScanTab;
+    vm.Scan.StartCommand.Execute(null);
+    var t0 = DateTime.UtcNow;
+    while (vm.Scan.Recent.Count < 3 && controller.Scanner.IsRunning && DateTime.UtcNow - t0 < TimeSpan.FromMinutes(2)) Pump(200);
+    Pump(500); Shot("d_scan_thumbs");
+    while (controller.Scanner.IsRunning && DateTime.UtcNow - t0 < TimeSpan.FromMinutes(3)) Pump(200);
+    Pump(500);
+    Console.WriteLine($"[thumbs] the pictures: {vm.Scan.Recent.Count}; names: {string.Join(", ", vm.Scan.Recent.Select(t => t.Name))}");
+    Console.WriteLine($"[thumbs] marked new: {string.Join(", ", vm.Scan.Recent.Select(t => t.IsNew))}");
+    var first = vm.Scan.Recent[0];
+    Console.WriteLine($"[thumbs] newest: {first.Name}, play button ready: {first.Play.CanExecute(null)}, path is the file on disk: {File.Exists(first.VideoPath)}");
+    var shown = controller.Scanner.Current.LastVideo;
+    var found = shown == null ? null : controller.FindEntry(shown.Id);
+    Console.WriteLine($"[thumbs] the web player can ask for it (video/{shown?.Id}): {(found != null && found.Path == shown!.Path ? "OK" : "FAILED")}; {found?.FileName}, {found?.DurationSeconds} s");
+    vm.SelectedTab = MainViewModel.ScanTab; Pump(500); Shot("d_scan_thumbs_done");
+    // A second scan: every video is in the database already, none is read again - the Scan screen still shows a picture at once
+    vm.Scan.StartCommand.Execute(null);
+    var t1 = DateTime.UtcNow;
+    while (controller.Scanner.IsRunning && DateTime.UtcNow - t1 < TimeSpan.FromMinutes(1)) Pump(100);
+    Pump(500);
+    Console.WriteLine($"[thumbs] second scan, nothing read again (new videos read: {controller.Scanner.Current.NewDone}): pictures on the Scan screen = {vm.Scan.Recent.Count} ({(vm.Scan.Recent.Count >= 1 ? "OK" : "FAILED")}), first: {vm.Scan.Recent.FirstOrDefault()?.Name}");
+    vm.SelectedTab = MainViewModel.ScanTab; Pump(500); Shot("d_scan_thumbs_cached");
+    return;
+}
 // SHOT_QUEUE=1 (with SHOT_FFMPEG=<folder with ffmpeg and ffprobe>, and an empty data folder): the whole encode queue for real -
 // makes a few clips, scans them, adds some to the queue in the Re-encode planning screen, then adds more while it runs
 if (Environment.GetEnvironmentVariable("SHOT_QUEUE") == "1")

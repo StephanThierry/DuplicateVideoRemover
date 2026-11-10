@@ -103,7 +103,7 @@ namespace deepduplicates
     }
 
     /// <summary>How the All files list is ordered.</summary>
-    public enum FileSort { Path, NameUp, NameDown, FolderUp, FolderDown, SizeUp, SizeDown }
+    public enum FileSort { Path, NameUp, NameDown, FolderUp, FolderDown, SizeUp, SizeDown, BitrateUp, BitrateDown }
 
     public static class FileSorting
     {
@@ -114,7 +114,33 @@ namespace deepduplicates
             ("Filename, A to Z", FileSort.NameUp), ("Filename, Z to A", FileSort.NameDown),
             ("Folder name, A to Z", FileSort.FolderUp), ("Folder name, Z to A", FileSort.FolderDown),
             ("Size, smallest first", FileSort.SizeUp), ("Size, largest first", FileSort.SizeDown),
+            ("Bitrate, lowest first", FileSort.BitrateUp), ("Bitrate, highest first", FileSort.BitrateDown),
         };
+
+        /// <summary>
+        /// Any list of videos in the chosen order (ties by path). Used by the Re-encode planning list, which has candidates, not entries.
+        /// Path sorts by the full path.
+        /// </summary>
+        public static List<T> Order<T>(IEnumerable<T> items, FileSort sort, Func<T, string> path, Func<T, long> size, Func<T, double> bitrate)
+        {
+            var cmp = StringComparer.OrdinalIgnoreCase;
+            string Name(T t) => System.IO.Path.GetFileName(path(t));
+            string Folder(T t) => System.IO.Path.GetDirectoryName(path(t)) ?? "";
+            var list = items.ToList();
+            IOrderedEnumerable<T> ordered = sort switch
+            {
+                FileSort.NameUp => list.OrderBy(Name, cmp).ThenBy(Folder, cmp),
+                FileSort.NameDown => list.OrderByDescending(Name, cmp).ThenBy(Folder, cmp),
+                FileSort.FolderUp => list.OrderBy(Folder, cmp).ThenBy(Name, cmp),
+                FileSort.FolderDown => list.OrderByDescending(Folder, cmp).ThenBy(Name, cmp),
+                FileSort.SizeUp => list.OrderBy(size).ThenBy(path, cmp),
+                FileSort.SizeDown => list.OrderByDescending(size).ThenBy(path, cmp),
+                FileSort.BitrateUp => list.OrderBy(bitrate).ThenBy(path, cmp),
+                FileSort.BitrateDown => list.OrderByDescending(bitrate).ThenBy(path, cmp),
+                _ => list.OrderBy(path, cmp)
+            };
+            return ordered.ToList();
+        }
 
         /// <summary>The list in the chosen order (ties by path, so the order is the same every time). The list is kept as it is for Path.</summary>
         public static List<VideoEntry> Apply(List<VideoEntry> list, FileSort sort)
@@ -128,6 +154,8 @@ namespace deepduplicates
                 FileSort.FolderDown => list.OrderByDescending(e => e.Folder, cmp).ThenBy(e => e.FileName, cmp),
                 FileSort.SizeUp => list.OrderBy(e => e.SizeBytes).ThenBy(e => e.Path, cmp),
                 FileSort.SizeDown => list.OrderByDescending(e => e.SizeBytes).ThenBy(e => e.Path, cmp),
+                FileSort.BitrateUp => list.OrderBy(e => e.Bitrate).ThenBy(e => e.Path, cmp),
+                FileSort.BitrateDown => list.OrderByDescending(e => e.Bitrate).ThenBy(e => e.Path, cmp),
                 _ => null
             };
             return ordered == null ? list : ordered.ToList();

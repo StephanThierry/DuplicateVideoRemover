@@ -67,6 +67,7 @@ namespace deepduplicates
                 try { await Encoder.CheckUncheckedAsync(); }
                 catch (Exception e) { Console.WriteLine("Could not check earlier results: " + e.Message); }
             });
+            Scanner.ProgressChanged += NoteScanVideo;
             Scanner.Completed += results =>
             {
                 InvalidateCache();
@@ -168,11 +169,26 @@ namespace deepduplicates
             }
         }
 
+        // The videos shown as live thumbnails on the Scan page (the latest ones read), so they can be played while the scan runs
+        private readonly Dictionary<int, VideoEntry> scanVideos = new();
+
+        private void NoteScanVideo(ScanProgress p)
+        {
+            if (p.LastVideo == null || p.LastVideo.Id == 0) return;
+            lock (scanVideos)
+            {
+                scanVideos[p.LastVideo.Id] = p.LastVideo;
+                if (scanVideos.Count > 40) scanVideos.Remove(scanVideos.Keys.First());
+            }
+        }
+
         /// <summary>A video in the current results or found by the last scan (for playing it), or null.</summary>
         public VideoEntry FindEntry(int id)
         {
             var entry = Session.Results.AllEntries().FirstOrDefault(e => e.Id == id);
             if (entry != null) return entry;
+            // A video the running scan has just read (its live thumbnail on the Scan page)
+            lock (scanVideos) if (scanVideos.TryGetValue(id, out var shown)) return shown;
             // Re-encode lists the other videos the last scan found
             var video = CurrentMedia().FirstOrDefault(v => v.id == id);
             return video == null ? null : VideoEntry.From(video);

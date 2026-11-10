@@ -97,6 +97,7 @@
                             {
                                 var m = g.Members[i];
                                 bool sel = Session.IsSelected(m.Id);
+                                bool doomed = Session.IsDoomed(m.Id);
                                 @if (i > 0)
                                 {
                                     @* Each copy was matched with the first video: the button takes the copy below out of the group *@
@@ -104,12 +105,12 @@
                                         <button class="small" @onclick="() => MarkFalsePositive(m.Id)" title="These videos only look alike: take @m.FileName out of the group and never match it with these copies again">False positive</button>
                                     </div>
                                 }
-                                <div class="row @(sel ? "is-selected" : "") @(m.Id == keepId ? "is-kept" : "")" @key="m.Id">
+                                <div class="row @(sel ? "is-selected" : "") @(m.Id == keepId && !sel ? "is-kept" : "") @(doomed ? "is-doomed" : "")" @key="m.Id">
                                     <input type="checkbox" checked="@sel" @onchange="() => Toggle(m.Id)" aria-label="Select @m.FileName for removal" />
                                     <Strip VideoId="m.Id" Title="Click to select or unselect" OnClick="() => Toggle(m.Id)" />
                                     <button class="icon" @onclick="() => playing = m" title="Play" aria-label="Play @m.FileName">@VideoPlayer.Icon</button>
                                     <div class="info">
-                                        <div class="name">@m.FileName</div>
+                                        <div class="name">@m.FileName @if (doomed) { <span class="doomed-tag" title="Every copy of this video is selected: deleting removes all of them. Unselect one to keep it.">Every copy will be deleted</span> }</div>
                                         <div class="folderline">
                                             <button class="link folderlink" @onclick="() => FilterFolder(m.Folder)" title="Show only this folder">@m.Folder</button>
                                             <button class="small" @onclick="() => ExcludeFolder(m.Folder)" title="Skip this folder in later scans (added to the paths to skip) and take its files out of the matches">Exclude this folder</button>
@@ -182,7 +183,9 @@
 {
     <div class="dialog-backdrop" @onclick="() => confirming = false">
         <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" @onclick:stopPropagation="true">
-            <h2 id="confirm-title">Delete @Fmt.Plural(Session.SelectedCount, "file", "files") permanently?</h2>
+            @{ int doomedGroups = Session.GroupsFullySelected(); }
+            <h2 id="confirm-title">@(doomedGroups > 0 ? $"Delete {Fmt.Plural(Session.SelectedCount, "file", "files")}, including every copy of {Fmt.Plural(doomedGroups, "video", "videos")}?" : $"Delete {Fmt.Plural(Session.SelectedCount, "file", "files")} permanently?")</h2>
+            @if (doomedGroups > 0) { <p class="doomed-warning" role="alert">Warning: for @Fmt.Plural(doomedGroups, "video", "videos") every copy is selected, so nothing of @(doomedGroups == 1 ? "it" : "them") will be left.</p> }
             <p>@Fmt.Size(Session.SelectedBytes) will be deleted. This can't be undone.</p>
             <div class="buttons">
                 <button @onclick="() => confirming = false">Cancel</button>
@@ -314,8 +317,9 @@
 
     private void Toggle(int id)
     {
+        // A message warns that this selects every copy of a video (it is selected anyway: its rows turn red)
         var message = Session.Toggle(id);
-        if (message != null) ShowToast(message);
+        if (message != null) ShowToast("Warning: " + message, 10000);
     }
 
     private void SelectFolder()

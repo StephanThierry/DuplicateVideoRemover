@@ -26,6 +26,9 @@ namespace deepduplicates
         /// <summary>Database id of the last video that got screenshots (for live thumbnails).</summary>
         public int? LastScreenshotId { get; init; }
 
+        /// <summary>The same video (path, size, length), so the live thumbnail can be played.</summary>
+        public VideoEntry LastVideo { get; init; }
+
         public TimeSpan Elapsed { get; init; }
 
         /// <summary>Estimated time left of the reading phase, when it can be estimated.</summary>

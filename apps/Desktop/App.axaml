@@ -25,6 +25,7 @@
           <SolidColorBrush x:Key="Grease" Color="#D63A3A"/>
           <SolidColorBrush x:Key="GreaseHover" Color="#E54B4B"/>
           <SolidColorBrush x:Key="GreaseWash" Color="#FCEBEB"/>
+          <SolidColorBrush x:Key="GreaseStrong" Color="#F6BFBF"/>
           <SolidColorBrush x:Key="Warn" Color="#8A4B00"/>
           <SolidColorBrush x:Key="WarnWash" Color="#FFF3D6"/>
           <SolidColorBrush x:Key="Frame" Color="#1D222B"/>
@@ -46,6 +47,7 @@
           <SolidColorBrush x:Key="Grease" Color="#F2605A"/>
           <SolidColorBrush x:Key="GreaseHover" Color="#FF7A74"/>
           <SolidColorBrush x:Key="GreaseWash" Color="#2E1619"/>
+          <SolidColorBrush x:Key="GreaseStrong" Color="#6B2326"/>
           <SolidColorBrush x:Key="Warn" Color="#F2B84B"/>
           <SolidColorBrush x:Key="WarnWash" Color="#2B2312"/>
           <SolidColorBrush x:Key="Frame" Color="#06080B"/>

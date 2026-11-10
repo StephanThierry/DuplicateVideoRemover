@@ -50,10 +50,29 @@ namespace deepduplicates
             return true;
         }
 
+        // Progress comes from the scan and from the live pictures (their own thread): one at a time
+        private readonly object reportSync = new();
+
         private void Report(ScanProgress p)
         {
-            Current = p;
-            ProgressChanged?.Invoke(p);
+            lock (reportSync)
+            {
+                // The last live picture stays on the Scan page between phases and at the end
+                if (p.LastVideo == null && Current != null) p = p with { LastScreenshotId = Current.LastScreenshotId, LastVideo = Current.LastVideo };
+                Current = p;
+                ProgressChanged?.Invoke(p);
+            }
+        }
+
+        // A live picture on the Scan page: the progress as it is, with this video
+        private void ShowLive(VideoEntry entry)
+        {
+            lock (reportSync)
+            {
+                var p = Current with { LastScreenshotId = entry.Id, LastVideo = entry };
+                Current = p;
+                ProgressChanged?.Invoke(p);
+            }
         }
 
         public async Task<ResultSet> RunAsync(Settings settings, CancellationToken ct)
@@ -67,13 +86,18 @@ namespace deepduplicates
             };
             var videoHandler = (VideoHandler)null;
             ScanLock scanLock = null;
+            LiveScanPictures live = null;
             try
             {
                 scanLock = ScanLock.Acquire("a scan from " + ProgramName);
+                lock (reportSync) Current = new ScanProgress { Phase = ScanPhase.Idle };   // no picture left over from the last run
                 Report(new ScanProgress { Phase = ScanPhase.Preparing, Message = "Checking FFmpeg" });
                 await FileHandler.EnsureFFmpegAsync();
 
                 var fileHandler = new FileHandler(settings);
+                // A picture of a video at least every 2.5 seconds during the whole run: from the files found, the database, the comparing
+                live = new LiveScanPictures(() => Current.Phase, () => Enumerable.Reverse(fileHandler.RecentFound.ToArray()).ToArray(),
+                    LiveScanPictures.LookupInDatabase, v => File.Exists(fileHandler.screenshotPath(v, 2)), ShowLive);
                 // Phase A: finding the files. From the last scan of these folders: how many to expect, how long it took
                 int? expected = RunHistory.ExpectedFiles(settings);
                 double? lastFindSeconds = RunHistory.FindSeconds(settings);
@@ -144,7 +168,7 @@ namespace deepduplicates
 
                 using var db = new VideoInfoContext();
                 db.Database.EnsureCreated();
-                videoHandler = new VideoHandler(fileHandler, new ImageHandler());
+                videoHandler = new VideoHandler(fileHandler, new ImageHandler()) { OnSeen = live.Seen, OnRead = live.Read };
                 // Phase B has two steps: reading the new videos, then comparing all of them. How the bar is shared
                 // between them is set once, when the number of new videos is known, from the expected time of each.
                 double? lastCompareSeconds = RunHistory.CompareSeconds(settings);
@@ -186,7 +210,7 @@ namespace deepduplicates
                 {
                     ct.ThrowIfCancellationRequested();   // Stop scan also works while comparing, so the lock is freed at once
                     Report(Comparing(done));
-                });
+                }, live.Compared);
                 record.CompareSeconds = compare.Elapsed.TotalSeconds;
                 results.Save();
 
@@ -226,6 +250,7 @@ namespace deepduplicates
             }
             finally
             {
+                live?.Dispose();
                 // No history entry when the scan never started (another scan held the lock)
                 if (scanLock != null)
                 {
@@ -262,14 +287,18 @@ namespace deepduplicates
             var list = new List<VideoEntry>();
             using var r = cmd.ExecuteReader();
             while (r.Read())
+            {
+                long size = r.IsDBNull(2) ? 0 : Math.Max(r.GetInt64(2), 0);
+                int seconds = r.IsDBNull(3) ? -1 : r.GetInt32(3);
                 list.Add(new VideoEntry
                 {
                     Id = r.GetInt32(0),
                     Path = PathMapper.ToLocal(r.GetString(1)),
-                    SizeBytes = r.IsDBNull(2) ? 0 : Math.Max(r.GetInt64(2), 0),
-                    DurationSeconds = r.IsDBNull(3) ? -1 : r.GetInt32(3),
-                    Bitrate = r.IsDBNull(4) ? 0 : r.GetDouble(4)
+                    SizeBytes = size,
+                    DurationSeconds = seconds,
+                    Bitrate = VideoEntry.SaneBitrate(r.IsDBNull(4) ? 0 : r.GetDouble(4), size, seconds)
                 });
+            }
             return list;
         }
 

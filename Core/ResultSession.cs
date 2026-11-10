@@ -55,7 +55,20 @@ namespace deepduplicates
 
         public bool IsSelected(int id) { lock (sync) return selected.Contains(id); }
         public int KeepId(DuplicateGroup g) { lock (sync) return keep.TryGetValue(g.Id, out var k) ? k : g.SuggestedKeepId; }
-        public bool IsKept(VideoEntry e) { lock (sync) return groupOf.TryGetValue(e.Id, out var g) && keep[g.Id] == e.Id; }
+        /// <summary>The copy that stays (a copy that is selected for removal does not stay).</summary>
+        public bool IsKept(VideoEntry e) { lock (sync) return groupOf.TryGetValue(e.Id, out var g) && keep[g.Id] == e.Id && !selected.Contains(e.Id); }
+
+        /// <summary>Every copy in this copy's group is selected for removal: deleting would leave no copy of the video.</summary>
+        public bool IsDoomed(int id)
+        {
+            lock (sync) return groupOf.TryGetValue(id, out var g) && g.Members.All(m => selected.Contains(m.Id));
+        }
+
+        /// <summary>How many groups have every copy selected for removal.</summary>
+        public int GroupsFullySelected()
+        {
+            lock (sync) return Results.Groups.Count(g => g.Members.All(m => selected.Contains(m.Id)));
+        }
 
         public int SelectedCount { get { lock (sync) return selected.Count; } }
         public long SelectedBytes { get { lock (sync) return Results.AllEntries().Where(e => selected.Contains(e.Id)).Sum(e => e.SizeBytes); } }
@@ -90,25 +103,37 @@ namespace deepduplicates
 
         public void SelectNone() => Change(() => selected.Clear());
 
-        /// <summary>Selects or unselects one file. Returns a message when the safety rule prevents it.</summary>
+        /// <summary>Selects or unselects one file. Returns a warning when this selects every copy of a video.</summary>
         public string Toggle(int id) => SetSelected(id, !IsSelected(id));
 
+        /// <summary>
+        /// Selects or unselects one file. Every copy of a video can be selected, by hand (the buttons that select many files always keep
+        /// one): the file is selected then, and the message warns that all copies of the video will be deleted.
+        /// </summary>
         public string SetSelected(int id, bool select)
         {
             string message = null;
             Change(() =>
             {
-                if (!select) { selected.Remove(id); return; }
+                if (!select)
+                {
+                    selected.Remove(id);
+                    // A copy that is not selected is the one that stays: when every copy was selected, this one is it now
+                    if (groupOf.TryGetValue(id, out var own) && keep.TryGetValue(own.Id, out var kept) && selected.Contains(kept)) keep[own.Id] = id;
+                    return;
+                }
                 if (groupOf.TryGetValue(id, out var g))
                 {
                     var others = g.Members.Where(m => m.Id != id && !selected.Contains(m.Id)).ToList();
                     if (others.Count == 0)
                     {
-                        message = "Every copy in this group would be removed. Keep at least one.";
-                        return;
+                        // Every copy is selected now: allowed, but said loudly
+                        message = g.Members.Count == 2
+                            ? "Both copies of this video are selected: deleting would remove both files. Unselect one to keep it."
+                            : $"All {g.Members.Count} copies of this video are selected: deleting would remove every file. Unselect one to keep it.";
                     }
-                    // Selecting the kept copy: keep another one instead
-                    if (keep[g.Id] == id) keep[g.Id] = others[0].Id;
+                    // Selecting the kept copy while another is unselected: keep that one instead
+                    else if (keep[g.Id] == id) keep[g.Id] = others[0].Id;
                 }
                 selected.Add(id);
             });
