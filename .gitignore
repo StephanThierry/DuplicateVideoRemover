@@ -11,3 +11,6 @@ runhistory.json
 .vs/
 
 .fake
+
+# Output of dotnet publish (see the readme)
+publish/
