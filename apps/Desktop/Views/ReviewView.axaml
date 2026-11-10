@@ -217,9 +217,9 @@
     </Border>
 
     <!-- Toast -->
-    <Border Grid.Row="1" Grid.RowSpan="2" IsVisible="{Binding Toast, Converter={x:Static ObjectConverters.IsNotNull}}"
-            Background="{DynamicResource Ink}" CornerRadius="4" Padding="14,10" Margin="0,0,0,80"
-            HorizontalAlignment="Center" VerticalAlignment="Bottom" MaxWidth="680">
+    <Border Grid.Row="2" IsVisible="{Binding Toast, Converter={x:Static ObjectConverters.IsNotNull}}"
+            Background="{DynamicResource Ink}" CornerRadius="4" Padding="14,10" Margin="16,0"
+            HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="680">
       <!-- A grid, not a horizontal stack: a long message must wrap inside the toast's width instead of being cut off -->
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
         <TextBlock Text="{Binding Toast}" Foreground="{DynamicResource Sheet}" TextWrapping="Wrap" VerticalAlignment="Center"/>
