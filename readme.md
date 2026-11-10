@@ -70,7 +70,14 @@ These are stored as `encodeSettings` in `settings.json` (older files with `scale
 
 **Desktop app data folder:** `--data <folder>`, otherwise the current folder if it has a `settings.json`, otherwise the user's app data folder.
 
-**Publishing a single program file:** `dotnet publish apps/Desktop -r win-x64 -c Release /p:PublishSingleFile=true --self-contained` (use `linux-x64` for Linux, and `apps/Web` or `apps/Cli` for the others).
+**A self-contained desktop app (one file, no .NET needed):**
+```cmd
+dotnet publish apps/Desktop -r win-x64 -c Release -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none --self-contained -o publish
+```
+This makes `publish\DuplicateVideoRemover.Desktop.exe` (about 210 MB: the .NET runtime is inside). Copy that one file to any Windows computer and start it - nothing has to be installed. Leave out `-p:IncludeNativeLibrariesForSelfExtract=true` and the exe is smaller, but the DLLs published next to it (SQLite and Skia) must stay in the same folder. The first start is a little slower, because the exe unpacks its native libraries to a temporary folder.
+* **Linux:** use `-r linux-x64` (the output file has no `.exe`). **Web app / command line:** use `apps/Web` or `apps/Cli` instead of `apps/Desktop`.
+* **Write `-p:`, not `/p:`:** it works in every shell (Git Bash turns `/p:...` into a path).
+* **First run:** the exe makes its own data folder (`settings.json`, the database and the screenshots; `--data <folder>` to choose one), and downloads FFmpeg the first time it is needed, so that needs internet once.
 
 ### Running in Docker (for example on a Synology NAS)
 The web app comes as a Docker image, with FFmpeg and the command-line version included.
