@@ -22,6 +22,9 @@ namespace deepduplicates
         /// </summary>
         public Dictionary<string, long> allFileSizes { get; private set; } = new(StringComparer.Ordinal);
 
+        /// <summary>Some of the files found most recently (every 16th one), the oldest first: the live pictures on the Scan page are taken from them while the folders are walked.</summary>
+        public System.Collections.Concurrent.ConcurrentQueue<string> RecentFound { get; } = new();
+
         private static string appFolder = Directory.GetCurrentDirectory();
         public Settings settings = null;
 
@@ -193,7 +196,16 @@ namespace deepduplicates
                                 // A path with an excluded text in it: so is everything below it, no need to walk it
                                 if (exclude.Any(x => path.Contains(x))) continue;
                                 if (isDir) Add(path);
-                                else { mine.Add((path, length)); Interlocked.Increment(ref files); }
+                                else
+                                {
+                                    mine.Add((path, length));
+                                    int n = Interlocked.Increment(ref files);
+                                    if (n == 1 || (n & 15) == 0)
+                                    {
+                                        RecentFound.Enqueue(path);
+                                        while (RecentFound.Count > 120 && RecentFound.TryDequeue(out _)) { }
+                                    }
+                                }
                             }
                         }
                         catch { /* unreadable folder: skip it */ }

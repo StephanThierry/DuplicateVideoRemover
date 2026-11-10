@@ -60,6 +60,11 @@
     else
     {
         <div class="toolbar">
+            <label class="sortpick">Search
+                <input type="search" class="files-search" placeholder='e.g. vacation lisbon 2026 -ocean' title='All words must be in the path, -word leaves out paths with that word, "two words" searches that exact phrase in that order; inside the quotes a regular expression works, e.g. "night.?drive".' @bind="search" @bind:event="oninput" @bind:after="ResetPaging" aria-label="Search in the file paths" />
+            </label>
+        </div>
+        <div class="toolbar">
             <button @onclick="SelectVisible">Select all</button>
             <button @onclick="() => SelectTop(20)">Select top 20</button>
             <button @onclick="() => picked.Clear()" disabled="@(picked.Count == 0)">Select none</button>
@@ -73,7 +78,14 @@
             }
             <label class="inline">Only above <input type="number" min="0" step="500" @bind="minKbps" @bind:after="ResetPaging" aria-label="Minimum bitrate" /> kbit/s</label>
             <label class="inline">and above <input type="number" min="0" step="50" @bind="minMb" @bind:after="ResetPaging" aria-label="Minimum file size in MB" /> MB</label>
-            <input type="search" placeholder='e.g. vacation lisbon 2026 -ocean' title='All words must be in the path, -word leaves out paths with that word, "two words" searches that exact phrase in that order; inside the quotes a regular expression works, e.g. "night.?drive".' @bind="search" @bind:event="oninput" @bind:after="ResetPaging" aria-label="Filter by file or folder name" />
+            <label class="sortpick">Sort by
+                <select @bind="sort" @bind:after="ResetPaging" aria-label="Sort the videos by">
+                    @foreach (var (label, value) in FileSorting.Choices)
+                    {
+                        <option value="@value">@label</option>
+                    }
+                </select>
+            </label>
         </div>
 
         var visible = Visible().ToList();
@@ -177,6 +189,7 @@
     private List<EncodeCandidate>? candidates;
     private readonly HashSet<int> picked = new();
     private string search = "";
+    private FileSort sort = FileSort.BitrateDown;   // highest bitrate first, as before
     private int minKbps;
     private int minMb = 100;
     private int shown = 100;
@@ -246,9 +259,10 @@
     private IEnumerable<EncodeCandidate> Visible()
     {
         var query = SearchQuery.Parse(search);
-        return (candidates ?? new()).Where(c =>
+        var shown = (candidates ?? new()).Where(c =>
             !(hideQueued && queueMap.ContainsKey(c.Path)) && c.AverageKbps >= minKbps && c.SizeBytes >= (long)minMb * 1024 * 1024 && !hidden.Contains(c.Folder) &&
             query.Matches(c.Path));
+        return FileSorting.Order(shown, sort, c => c.Path, c => c.SizeBytes, c => c.AverageKbps);
     }
 
     private long PickedBytes => candidates?.Where(c => picked.Contains(c.Id)).Sum(c => c.SizeBytes) ?? 0;

@@ -104,6 +104,15 @@ second from a background thread - screens coalesce it onto their UI thread).
   runner (`IEncodeRunner`); two tests encode and stop a real clip when `ffmpeg/ffmpeg(.exe)` exists in the repo.
   `SHOT_QUEUE=1` in `tests/DesktopShots` runs the whole thing through the desktop UI (see Program.cs).
 
+## Selecting copies for deletion (Review)
+
+`ResultSession` keeps, per group, which copy is kept (`keep`) and a set of selected files. The buttons that select many files
+(all duplicates, a folder) always leave one copy per group. Ticking files **by hand** may select every copy of a video:
+`SetSelected` allows it and returns a warning ("Both copies of this video are selected...") that the screens show as a toast.
+The group is then "doomed" (`IsDoomed`, `GroupsFullySelected`): all its rows turn red with a "Every copy will be deleted" mark, nothing
+shows as kept, and the confirmation says that every copy of N videos goes. Unselecting one copy makes it the kept one again, so
+`keep` is never a selected file unless every copy is selected.
+
 ## Recognising a video when its path changes
 
 Paths change (moves, renames, drive letters), so anything that must follow a video across moves uses a

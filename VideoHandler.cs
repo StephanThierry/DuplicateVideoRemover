@@ -61,6 +61,12 @@ namespace deepduplicates
             item.image1hash = item.image2hash = item.image3hash = null;
         }
 
+        /// <summary>Called for each video as the scan gets to it in the database (read before or just read).</summary>
+        public Action<VideoInfo> OnSeen { get; set; }
+
+        /// <summary>Called when a new video has been read (its pictures are made).</summary>
+        public Action<VideoInfo> OnRead { get; set; }
+
         /// <summary>Files that needed reading in the last run, and the seconds spent on them (for time estimates).</summary>
         public int LastNewFiles { get; private set; }
         public double LastNewSeconds { get; private set; }
@@ -115,7 +121,6 @@ namespace deepduplicates
                 ((w.item.duration == -1 || w.item.image1Checksum == null || w.item.image1hash_blob == null) && w.item.formatNotSupported != true));
             int newDone = 0, failed = 0;
             double newSeconds = 0;
-            int? lastScreenshotId = null;
             var lastReport = Stopwatch.StartNew();
 
             void Report(string current, bool force)
@@ -133,7 +138,6 @@ namespace deepduplicates
                     NewDone = newDone,
                     Failed = failed,
                     CurrentFile = current,
-                    LastScreenshotId = lastScreenshotId,
                     Elapsed = stopWatch_total.Elapsed,
                     SecondsPerNewFile = perFile,
                     EstimateFromHistory = newDone < 3 && historicalSecondsPerNewFile.HasValue,
@@ -244,7 +248,7 @@ namespace deepduplicates
                         newDone++;
                         newSeconds += itemTimer.Elapsed.TotalSeconds;
                         if (wrapper.item.remove == true || wrapper.item.duration == -1) failed++;
-                        else if (wrapper.item.id != 0) lastScreenshotId = wrapper.item.id;
+                        else if (wrapper.item.id != 0) OnRead?.Invoke(wrapper.item);   // a new video was read: its picture is shown at once
                         Report(wrapper.path, true);
                     }
                 }
@@ -253,6 +257,7 @@ namespace deepduplicates
                 if (wrapper.item.image2hash_blob != null) wrapper.item.image2hash = imageHandler.ByteArrayToImageHash(wrapper.item.image2hash_blob);
                 if (wrapper.item.image3hash_blob != null) wrapper.item.image3hash = imageHandler.ByteArrayToImageHash(wrapper.item.image3hash_blob);
 
+                OnSeen?.Invoke(wrapper.item);   // the video the scan is at (a live picture is taken from it every 2.5 seconds)
             }
             await db.SaveChangesAsync();
             LastNewFiles = newDone; LastNewSeconds = newSeconds;

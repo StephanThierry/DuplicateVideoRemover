@@ -186,8 +186,10 @@ public partial class ReviewViewModel : ObservableObject
         int n = session.SelectedCount;
         if (n == 0) return;
         string size = Fmt.Size(session.SelectedBytes);
-        ConfirmTitle = $"Delete {Fmt.Plural(n, "file", "files")} permanently?";
-        ConfirmText = $"{size} will be deleted. This can't be undone.";
+        int doomed = session.GroupsFullySelected();
+        ConfirmTitle = doomed > 0 ? $"Delete {Fmt.Plural(n, "file", "files")}, including every copy of {Fmt.Plural(doomed, "video", "videos")}?" : $"Delete {Fmt.Plural(n, "file", "files")} permanently?";
+        ConfirmText = (doomed > 0 ? $"Warning: for {Fmt.Plural(doomed, "video", "videos")} every copy is selected, so nothing of {(doomed == 1 ? "it" : "them")} will be left. " : "")
+            + $"{size} will be deleted. This can't be undone.";
         ConfirmVisible = true;
     }
 
@@ -240,8 +242,9 @@ public partial class ReviewViewModel : ObservableObject
 
     internal void Select(VideoRow row, bool select)
     {
+        // A message warns that this selects every copy of a video (it is selected anyway: both rows turn red)
         var message = session.SetSelected(row.Entry.Id, select);
-        if (message != null) { ShowToast(message); row.Refresh(); }
+        if (message != null) { ShowToast("Warning: " + message, 10000); row.Refresh(); }
     }
 
 
@@ -263,6 +266,7 @@ public partial class ReviewViewModel : ObservableObject
     }
     internal bool IsSelected(int id) => session.IsSelected(id);
     internal bool IsKept(VideoEntry e) => session.IsKept(e);
+    internal bool IsDoomed(int id) => session.IsDoomed(id);
 
     private void ShowToast(string text, int ms = 4000)
     {
@@ -353,6 +357,8 @@ public partial class VideoRow : ObservableObject
 
     [ObservableProperty] private bool isSelected;
     [ObservableProperty] private bool isKept;
+    /// <summary>Every copy of this video is selected for removal (the card turns red).</summary>
+    [ObservableProperty] private bool isDoomed;
 
     public bool ShowReason => HasReason && !IsKept;
 
@@ -384,6 +390,7 @@ public partial class VideoRow : ObservableObject
         refreshing = true;
         IsSelected = owner.IsSelected(Entry.Id);
         IsKept = InGroup && owner.IsKept(Entry);
+        IsDoomed = InGroup && owner.IsDoomed(Entry.Id);
         refreshing = false;
     }
 

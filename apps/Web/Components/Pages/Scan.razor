@@ -73,8 +73,15 @@
 
                 @if (recent.Count > 0)
                 {
-                    <div class="recent" aria-label="Screenshots of the latest videos read">
-                        @foreach (var id in recent) { <img src="shots/@(id)_2.png" alt="" onerror="this.style.display='none'" /> }
+                    <p class="muted small" style="margin:18px 0 4px">Scan status</p>
+                    <div class="recent" style="margin-top:0" aria-label="Pictures of the latest videos read">
+                        @foreach (var v in recent)
+                        {
+                            <button type="button" class="@ThumbClass(v)" @onclick="() => playing = v" title="@ThumbTitle(v)" aria-label="Play @v.FileName">
+                                <img src="shots/@(v.Id)_2.png" alt="" onerror="this.style.display='none'" />
+                                <span class="playbadge" aria-hidden="true"><svg width="10" height="11" viewBox="0 0 10 11"><path d="M0 0v11l10-5.5z" fill="currentColor" /></svg></span>
+                            </button>
+                        }
                     </div>
                 }
 
@@ -133,9 +140,12 @@
     </div>
 </div>
 
+<VideoPlayer Video="playing" OnClose="() => playing = null" />
+
 @code {
     private ScanProgress p = new();
-    private readonly List<int> recent = new();
+    private readonly List<VideoEntry> recent = new();
+    private VideoEntry? playing;
     private RunRecord? last;
     private bool stopping;
 
@@ -160,12 +170,17 @@
         App.Scanner.ProgressChanged += OnProgress;
     }
 
+    private static string ThumbClass(VideoEntry v) => v.IsNew ? "thumbbtn isnew" : "thumbbtn";
+    private static string ThumbTitle(VideoEntry v) => (v.IsNew ? "New file: " : "") + v.FileName;
+
     private void OnProgress(ScanProgress progress)
     {
         p = progress;
-        if (progress.LastScreenshotId is int id && !recent.Contains(id))
+        if (progress.LastVideo is { } shown && recent.FirstOrDefault(r => r.Id == shown.Id) is { } same && shown.IsNew && !same.IsNew)
+            recent[recent.IndexOf(same)] = shown;   // it was shown as a known file, and turned out to be a new one
+        else if (progress.LastVideo is { } shown2 && !recent.Any(r => r.Id == shown2.Id))
         {
-            recent.Insert(0, id);
+            recent.Insert(0, shown2);
             if (recent.Count > 8) recent.RemoveAt(recent.Count - 1);
         }
         if (progress.Phase is ScanPhase.Done or ScanPhase.Cancelled or ScanPhase.Failed)

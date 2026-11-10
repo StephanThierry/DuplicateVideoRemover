@@ -6,6 +6,9 @@ namespace deepduplicates
 {
     public class RecommendationHandler
     {
+        /// <summary>Called with the first video of each group of videos of the same length that is compared (a live picture on the Scan page).</summary>
+        public Action<VideoInfo> OnVideo { get; set; }
+
         public List<VideoInfo> removingShortVideos(List<VideoInfo> mediaList, int minVideoLength, int minVideoSizeKb)
         {
             foreach (VideoInfo item in mediaList)
@@ -97,6 +100,7 @@ public List<VideoInfo> checkChecksumOfAllSimilarVideos_Optimized(List<VideoInfo>
             .ThenBy(p => p.fileSize)
             .ToList();
 
+        OnVideo?.Invoke(comparisonGroup[0]);
         CompareVideosInGroup(comparisonGroup, settings);
         if (progress != null)
         {

@@ -9,13 +9,39 @@ using deepduplicates;
 
 namespace DuplicateVideoRemover.Desktop.ViewModels;
 
+/// <summary>A picture of a video read during the scan; clicking it plays the video.</summary>
+public sealed record ScanThumb(Bitmap Image, string VideoPath, IRelayCommand Play, bool IsNew = false)
+{
+    /// <summary>The file name, shown when the pointer rests on the picture.</summary>
+    public string Name => System.IO.Path.GetFileName(VideoPath);
+
+    /// <summary>A thick white border marks a video read for the first time in this scan.</summary>
+    public Avalonia.Media.IBrush Frame => IsNew ? Avalonia.Media.Brushes.White : Avalonia.Media.Brushes.Transparent;
+}
+
 public partial class ScanViewModel : ObservableObject
 {
     private readonly AppController app;
     private readonly MainViewModel main;
     private int? lastShot;
 
-    public ObservableCollection<Bitmap> Recent { get; } = new();
+    public ObservableCollection<ScanThumb> Recent { get; } = new();
+    public bool HasRecent => Recent.Count > 0;
+    [ObservableProperty] private string playError = "";
+    public bool HasPlayError => PlayError.Length > 0;
+    partial void OnPlayErrorChanged(string value) => OnPropertyChanged(nameof(HasPlayError));
+
+    // Opens a video in the program the system uses for it
+    private void Play(string path)
+    {
+        try
+        {
+            PlayError = "";
+            if (!System.IO.File.Exists(path)) { PlayError = "The file is not there any more: " + path; return; }
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception e) { PlayError = "Could not open the video: " + e.Message; }
+    }
 
     // The two phases of a scan, each with its own bar: A) finding the files, B) processing them
     public PhaseItem FindPhase { get; } = new("A", "Finding files");
@@ -48,6 +74,7 @@ public partial class ScanViewModel : ObservableObject
     {
         this.app = app;
         this.main = main;
+        Recent.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasRecent));
         app.Scanner.ProgressChanged += p => Dispatcher.UIThread.Post(() => Apply(p));
         app.ExcludeAdded += _ => Dispatcher.UIThread.Post(RefreshInfo);
         RefreshInfo();
@@ -101,13 +128,16 @@ public partial class ScanViewModel : ObservableObject
         if (p.Phase == ScanPhase.Failed) Message = "The scan stopped with an error: " + p.Message;
 
 
+        if (p.LastScreenshotId is int same && same == lastShot && p.LastVideo is { IsNew: true } && Recent.Count > 0 && !Recent[0].IsNew && Recent[0].VideoPath == p.LastVideo.Path)
+            Recent[0] = Recent[0] with { IsNew = true };   // shown as a known file, and turned out to be a new one
         if (p.LastScreenshotId is int id && id != lastShot)
         {
             lastShot = id;
             var shot = Shots.Get(id, 2);
-            if (shot != null)
+            string? video = p.LastVideo?.Path;
+            if (shot != null && !string.IsNullOrEmpty(video))
             {
-                Recent.Insert(0, shot);
+                Recent.Insert(0, new ScanThumb(shot, video, new RelayCommand(() => Play(video)), p.LastVideo!.IsNew));
                 while (Recent.Count > 8) Recent.RemoveAt(Recent.Count - 1);
             }
         }

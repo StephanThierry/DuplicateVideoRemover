@@ -53,7 +53,13 @@
       </StackPanel>
     </Border>
 
-    <WrapPanel Grid.Row="3" Margin="0,0,0,10" IsVisible="{Binding HasVideos}">
+    <StackPanel Grid.Row="3" Margin="0,0,0,10" IsVisible="{Binding HasVideos}">
+    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+      <TextBlock Text="Search" VerticalAlignment="Center"/>
+      <TextBox Text="{Binding Search}" PlaceholderText="e.g. vacation lisbon 2026 -ocean" Width="360" AutomationProperties.Name="Search"
+               ToolTip.Tip="All words must be in the path, -word leaves out paths with that word, &quot;two words&quot; searches that exact phrase in that order; inside the quotes a regular expression works, e.g. &quot;night.?drive&quot;. Not case sensitive."/>
+    </StackPanel>
+    <WrapPanel>
       <Button Content="Select all" Command="{Binding SelectAllCommand}" Margin="0,0,8,6"/>
       <Button Content="Select top 20" Command="{Binding SelectTopCommand}" Margin="0,0,8,6"/>
       <Button Content="Select none" Command="{Binding SelectNoneCommand}" IsEnabled="{Binding HasPicked}" Margin="0,0,8,6"/>
@@ -66,9 +72,10 @@
       <TextBlock Text="and above" VerticalAlignment="Center" Margin="0,0,6,6"/>
       <NumericUpDown Value="{Binding MinMb}" Minimum="0" Increment="50" FormatString="0" Width="140" Margin="0,0,6,6"/>
       <TextBlock Text="MB" VerticalAlignment="Center" Margin="0,0,16,6"/>
-      <TextBox Text="{Binding Search}" PlaceholderText="e.g. vacation lisbon 2026 -ocean" Width="280" Margin="0,0,0,6"
-               ToolTip.Tip="All words must be in the path, -word leaves out paths with that word, &quot;two words&quot; searches that exact phrase in that order; inside the quotes a regular expression works, e.g. &quot;night.?drive&quot;. Not case sensitive."/>
+      <TextBlock Text="Sort by" VerticalAlignment="Center" Margin="0,0,6,6"/>
+      <ComboBox ItemsSource="{Binding SortLabels}" SelectedIndex="{Binding SortIndex}" MinWidth="190" Margin="0,0,0,6"/>
     </WrapPanel>
+    </StackPanel>
 
     <!-- Reading the list takes a few seconds: say so, instead of suggesting a new scan -->
     <Border Grid.Row="4" Classes="panel" Padding="40" VerticalAlignment="Top" IsVisible="{Binding Loading}">

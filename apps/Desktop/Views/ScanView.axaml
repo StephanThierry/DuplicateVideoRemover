@@ -34,6 +34,12 @@
     </DataTemplate>
   </UserControl.DataTemplates>
   <UserControl.Styles>
+    <!-- A picture of a video read during the scan: a button that plays the video (round play badge at the bottom right) -->
+    <Style Selector="Button.thumbbtn"><Setter Property="Padding" Value="0"/><Setter Property="BorderThickness" Value="0"/><Setter Property="CornerRadius" Value="3"/>
+      <Setter Property="Background" Value="{DynamicResource Frame}"/><Setter Property="Cursor" Value="Hand"/><Setter Property="ClipToBounds" Value="True"/></Style>
+    <Style Selector="Button.thumbbtn:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{DynamicResource Frame}"/></Style>
+    <Style Selector="Button.thumbbtn Border.playbadge"><Setter Property="Background" Value="#99000000"/></Style>
+    <Style Selector="Button.thumbbtn:pointerover Border.playbadge"><Setter Property="Background" Value="#E6000000"/></Style>
     <Style Selector="ProgressBar.done"><Setter Property="Foreground" Value="{DynamicResource Keep}"/></Style>
   </UserControl.Styles>
   <ScrollViewer Classes="gutter">
@@ -97,14 +103,28 @@
 
               <TextBlock Classes="muted small" Text="{Binding CurrentFile}" TextWrapping="Wrap"/>
 
-              <Border Background="{DynamicResource Frame}" CornerRadius="3" Padding="4" ClipToBounds="True" HorizontalAlignment="Left">
+              <TextBlock Classes="muted small" TextWrapping="Wrap" IsVisible="{Binding HasRecent}"
+                         Text="Scan status"/>
+              <Border Background="{DynamicResource Frame}" CornerRadius="3" Padding="4" ClipToBounds="True" HorizontalAlignment="Left" IsVisible="{Binding HasRecent}">
                 <ItemsControl ItemsSource="{Binding Recent}">
                   <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="3"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                   <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="img:Bitmap"><Image Source="{Binding}" Width="120" Height="80" Stretch="UniformToFill"/></DataTemplate>
+                    <DataTemplate x:DataType="vm:ScanThumb">
+                      <Button Classes="thumbbtn" Command="{Binding Play}" ToolTip.Tip="{Binding Name}" AutomationProperties.Name="{Binding Name}">
+                        <Border Padding="4" Background="{Binding Frame}">
+                        <Panel>
+                          <Image Source="{Binding Image}" Width="120" Height="80" Stretch="UniformToFill"/>
+                          <Border Classes="playbadge" Width="22" Height="22" CornerRadius="11" Margin="0,0,5,5" HorizontalAlignment="Right" VerticalAlignment="Bottom" IsHitTestVisible="False">
+                            <Path Data="M0,0 L0,10 L9,5 Z" Fill="White" Width="8" Height="9" Stretch="Uniform" Margin="2,0,0,0" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                          </Border>
+                        </Panel>
+                        </Border>
+                      </Button>
+                    </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
               </Border>
+              <TextBlock Text="{Binding PlayError}" TextWrapping="Wrap" IsVisible="{Binding HasPlayError}" Foreground="{DynamicResource Grease}"/>
 
               <Border IsVisible="{Binding IsDone}" Background="{DynamicResource KeepWash}" CornerRadius="4" Padding="14,12">
                 <StackPanel Spacing="10">
