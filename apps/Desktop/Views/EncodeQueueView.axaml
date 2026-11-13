@@ -28,12 +28,12 @@
     <Style Selector="Border.deletedtag"><Setter Property="Background" Value="{DynamicResource GreaseWash}"/><Setter Property="CornerRadius" Value="10"/><Setter Property="Padding" Value="9,2"/><Setter Property="HorizontalAlignment" Value="Left"/><Setter Property="VerticalAlignment" Value="Center"/></Style>
     <Style Selector="Border.deletedtag > TextBlock"><Setter Property="Foreground" Value="{DynamicResource Grease}"/><Setter Property="FontSize" Value="12"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
     <Style Selector="Image.qshot"><Setter Property="Width" Value="96"/><Setter Property="Height" Value="64"/></Style>
-    <!-- Dragging a waiting video: the grip, the row being moved, and a line where it will land -->
+    <!-- Dragging a waiting video: the grip, and the card being moved (lifted: it follows the pointer, see EncodeQueueView.axaml.cs) -->
     <Style Selector="Border.grip"><Setter Property="Width" Value="18"/><Setter Property="Background" Value="Transparent"/><Setter Property="Cursor" Value="SizeNorthSouth"/>
       <Setter Property="VerticalAlignment" Value="Stretch"/><Setter Property="Margin" Value="-4,-4,0,-4"/></Style>
     <Style Selector="Border.grip:pointerover > Path"><Setter Property="Fill" Value="{DynamicResource Accent}"/></Style>
-    <Style Selector="Border.qrow.dragged"><Setter Property="Opacity" Value="0.45"/></Style>
-    <Style Selector="Border.dropline"><Setter Property="Height" Value="3"/><Setter Property="Background" Value="{DynamicResource Accent}"/><Setter Property="IsHitTestVisible" Value="False"/></Style>
+    <Style Selector="Border.qrow.dragged"><Setter Property="Background" Value="{DynamicResource Raised}"/><Setter Property="BoxShadow" Value="0 8 24 0 #66000000"/>
+      <Setter Property="CornerRadius" Value="6"/></Style>
   </UserControl.Styles>
 
   <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto" Margin="12,16,12,12">
@@ -169,8 +169,6 @@
                     <Button Grid.Column="5" Classes="small" Content="Remove" Command="{Binding RemoveCommand}" VerticalAlignment="Center"
                             ToolTip.Tip="Take this video out of the queue"/>
                   </Grid>
-                  <Border Classes="dropline" VerticalAlignment="Top" Margin="-12,-9,-12,0" IsVisible="{Binding DropAbove}"/>
-                  <Border Classes="dropline" VerticalAlignment="Bottom" Margin="-12,0,-12,-9" IsVisible="{Binding DropBelow}"/>
                   </Panel>
                 </Border>
               </DataTemplate>
@@ -207,8 +205,6 @@
                       </Button>
                       <Button Grid.Column="6" Classes="small" Content="Remove" Command="{Binding RemoveCommand}" HorizontalAlignment="Right" ToolTip.Tip="Take this video out of the queue"/>
                     </Grid>
-                    <Border Classes="dropline" VerticalAlignment="Top" Margin="-12,-4,-12,0" IsVisible="{Binding DropAbove}"/>
-                    <Border Classes="dropline" VerticalAlignment="Bottom" Margin="-12,0,-12,-4" IsVisible="{Binding DropBelow}"/>
                     </Panel>
                   </Border>
                 </DataTemplate>

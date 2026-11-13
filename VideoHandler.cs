@@ -148,6 +148,7 @@ namespace deepduplicates
             int newTotal = query.Count(w => w.item == null ||
                 ((w.item.duration == -1 || w.item.image1Checksum == null || w.item.image1hash_blob == null) && w.item.formatNotSupported != true));
             int newDone = 0, failed = 0;
+            var failedFiles = new List<FailedRead>();
             double newSeconds = 0;
             var lastReport = Stopwatch.StartNew();
 
@@ -165,6 +166,7 @@ namespace deepduplicates
                     NewTotal = newTotal,
                     NewDone = newDone,
                     Failed = failed,
+                    FailedFiles = failedFiles.ToArray(),
                     CurrentFile = current,
                     Elapsed = stopWatch_total.Elapsed,
                     SecondsPerNewFile = perFile,
@@ -276,8 +278,13 @@ namespace deepduplicates
                     {
                         newDone++;
                         newSeconds += itemTimer.Elapsed.TotalSeconds;
-                        if (wrapper.item.remove == true || wrapper.item.duration == -1) failed++;
-                        else if (wrapper.item.id != 0) OnRead?.Invoke(wrapper.item);   // a new video was read: its picture is shown at once
+                        // Counted (and listed) only when reading failed - a video that is too short or too small was read fine
+                        if (FailedRead.IsFailure(wrapper.item.duration, wrapper.item.reason))
+                        {
+                            failed++;
+                            failedFiles.Add(new FailedRead(wrapper.path, FailedRead.Describe(wrapper.item.reason)));
+                        }
+                        if (wrapper.item.remove != true && wrapper.item.duration != -1 && wrapper.item.id != 0) OnRead?.Invoke(wrapper.item);   // a new video was read: its picture is shown at once   // a new video was read: its picture is shown at once
                         Report(wrapper.path, true);
                     }
                 }
@@ -326,15 +333,15 @@ namespace deepduplicates
                 item.image3Checksum = responses[2];
 
             }
-            catch (Xabe.FFmpeg.Exceptions.UnknownDecoderException)
+            catch (PictureFailedException e) when (e.Unsupported)
             {
                 item.formatNotSupported = true;
                 item.reason = "Screenshot failed! UnknownDecoderException - The most likely reason is that Ffmpeg does not support this codec-variant. The video will be disregarded in the rest of the process.";
             }
-            catch (Xabe.FFmpeg.Exceptions.ConversionException)
+            catch (PictureFailedException e)
             {
                 item.remove = true;
-                item.reason = "Screenshot failed! ConversionException. " + fatalErrorMsg;
+                item.reason = "Screenshot failed! ConversionException. " + fatalErrorMsg + " <!-- " + e.Message + " -->";
                 if (item.image3Checksum != null) item.reason += "It seems we managed to create all screenshots - so the video might be playable.";
             }
             catch (Exception e)

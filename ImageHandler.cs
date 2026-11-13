@@ -146,6 +146,6 @@ namespace deepduplicates
 
         /// <summary>One picture, taken the way <see cref="Picture"/> describes (the same frame the check of a re-encoded file takes).</summary>
         public System.Threading.Tasks.Task takeScreenshot(string videoPath, string outputPath, int second, int width, int height) =>
-            new Conversion().Start(Picture.CommandLine(Picture.Arguments(videoPath, second, outputPath, width, height)));
+            Picture.TakeAsync(FileHandler.FFmpegPath, videoPath, second, outputPath, width, height);
     }
 }

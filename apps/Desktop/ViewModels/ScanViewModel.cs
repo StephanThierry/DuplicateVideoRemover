@@ -55,6 +55,13 @@ public partial class ScanViewModel : ObservableObject
     [ObservableProperty] private string alreadyRead = "-";
     [ObservableProperty] private string newRead = "-";
     [ObservableProperty] private string failed = "-";
+    // The files that could not be read in this scan (the "i" next to the number)
+    public System.Collections.ObjectModel.ObservableCollection<FailedRead> FailedFiles { get; } = new();
+    [ObservableProperty] private bool hasFailedFiles;
+    [ObservableProperty] private bool failedVisible;
+    [ObservableProperty] private string failedTitle = "";
+    [RelayCommand] private void ShowFailed() => FailedVisible = true;
+    [RelayCommand] private void CloseFailed() => FailedVisible = false;
     [ObservableProperty] private string elapsed = "0:00";
     [ObservableProperty] private string perVideo = "-";
     [ObservableProperty] private string currentFile = "";
@@ -119,6 +126,14 @@ public partial class ScanViewModel : ObservableObject
             AlreadyRead = Math.Max(p.FilesFound - p.NewTotal, 0).ToString("N0");
             NewRead = $"{p.NewDone:N0} of {p.NewTotal:N0}";
             Failed = p.Failed.ToString("N0");
+            if (p.FailedFiles.Count != FailedFiles.Count)
+            {
+                // Only ever grows during a scan: add what is new
+                if (p.FailedFiles.Count < FailedFiles.Count) FailedFiles.Clear();
+                for (int i = FailedFiles.Count; i < p.FailedFiles.Count; i++) FailedFiles.Add(p.FailedFiles[i]);
+            }
+            HasFailedFiles = FailedFiles.Count > 0;
+            FailedTitle = Fmt.Plural(FailedFiles.Count, "video could not be read", "videos could not be read");
         }
         Elapsed = Fmt.Time(p.Elapsed);
         PerVideo = p.SecondsPerNewFile is double s ? $"{s:0.0} s" : "-";

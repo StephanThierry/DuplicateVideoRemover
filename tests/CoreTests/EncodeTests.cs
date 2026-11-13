@@ -1047,7 +1047,7 @@ public class SameFrameTests : IDisposable
         Assert.Equal("119", args[args.IndexOf("-ss") + 1]);                     // decoding starts a second before
         Assert.Equal(@"select=gte(t\,0.998),scale=240:160", args[args.IndexOf("-vf") + 1]);
         Assert.DoesNotContain("-ss", Picture.Arguments("/v/a.mp4", 0, "/s/1.png", 240, 160));
-        Assert.Contains("\"/v/a b.mp4\"", Picture.CommandLine(args));
+        Assert.Equal(new[] { "-fps_mode", "passthrough", "-update", "1", "/s/1.png" }, args.TakeLast(5));   // one picture, no repeated frames
     }
 
     private static double Difference(string a, string b)

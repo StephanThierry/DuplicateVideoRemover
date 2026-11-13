@@ -158,7 +158,12 @@
             },
             // Firefox only starts a drag that carries data (the queue's grips are dragged in Blazor, which sets none)
             _gripDrag: document.addEventListener("dragstart", e => {
-                if (e.target && e.target.closest && e.target.closest(".grip")) { e.dataTransfer.setData("text/plain", ""); e.dataTransfer.effectAllowed = "move"; }
+                if (e.target && e.target.closest && e.target.closest(".grip")) {
+                    e.dataTransfer.setData("text/plain", ""); e.dataTransfer.effectAllowed = "move";
+                    // The whole card (picture and all) follows the pointer, not just the grip
+                    const card = e.target.closest(".q-wait, .q-cwait");
+                    if (card) e.dataTransfer.setDragImage(card, 24, card.offsetHeight / 2);
+                }
             }),
             copy: async function (text) {
                 if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return; }
