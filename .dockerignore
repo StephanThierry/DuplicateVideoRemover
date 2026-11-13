@@ -12,3 +12,4 @@ deepdupes.db*
 settings.json
 pathmapping.json
 runhistory.json
+**/.keys/
