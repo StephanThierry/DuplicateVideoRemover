@@ -144,17 +144,8 @@ namespace deepduplicates
             return (max + min) / (byte.MaxValue * 2f);
         }
 
-        public IConversion takeScreenshot(IMediaInfo info, string outputPath, TimeSpan captureTime, int width, int height)
-        {
-
-            IVideoStream videoStream = info.VideoStreams.FirstOrDefault()
-                                              .SetCodec(VideoCodec.Png)
-                                              .SetOutputFramesCount(1)
-                                              .SetSeek(captureTime)
-                                              .SetScale(new VideoSize(width, height));
-            return new Conversion()
-                .AddStream(videoStream)
-                .SetOutput(outputPath);
-        }
+        /// <summary>One picture, taken the way <see cref="Picture"/> describes (the same frame the check of a re-encoded file takes).</summary>
+        public System.Threading.Tasks.Task takeScreenshot(string videoPath, string outputPath, int second, int width, int height) =>
+            new Conversion().Start(Picture.CommandLine(Picture.Arguments(videoPath, second, outputPath, width, height)));
     }
 }

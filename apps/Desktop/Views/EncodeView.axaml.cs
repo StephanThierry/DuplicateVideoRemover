@@ -1,5 +1,7 @@
 using System.IO;
+using System.Linq;
 using Avalonia.Controls;
+using Avalonia.Platform.Storage;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using DuplicateVideoRemover.Desktop.ViewModels;
@@ -18,6 +20,14 @@ public partial class EncodeView : UserControl
                 {
                     var top = TopLevel.GetTopLevel(this);
                     if (top != null) await top.Launcher.LaunchUriAsync(new System.Uri(Path.GetFullPath(folder)));
+                };
+            if (DataContext is EncodeViewModel picker)
+                picker.PickFolder = async () =>
+                {
+                    var top = TopLevel.GetTopLevel(this);
+                    if (top == null) return null;
+                    var result = await top.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = "Choose a folder to hide", AllowMultiple = false });
+                    return result.FirstOrDefault()?.TryGetLocalPath();
                 };
             if (DataContext is EncodeViewModel model)
                 model.CopyText = async text =>

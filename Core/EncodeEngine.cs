@@ -205,6 +205,28 @@ namespace deepduplicates
         }
 
         /// <summary>
+        /// Changes the order of the waiting videos: moves one to just before another waiting video, or to the end when
+        /// <paramref name="beforeId"/> is null. The worker takes the first waiting video, so this is the order they are encoded in.
+        /// </summary>
+        public bool Move(string id, string? beforeId)
+        {
+            lock (sync)
+            {
+                if (id == beforeId) return false;
+                var item = items.FirstOrDefault(i => i.Id == id && i.Status == EncodeItemStatus.Queued);
+                if (item == null) return false;
+                var before = beforeId == null ? null : items.FirstOrDefault(i => i.Id == beforeId && i.Status == EncodeItemStatus.Queued);
+                if (beforeId != null && before == null) return false;
+                items.Remove(item);
+                if (before == null) items.Add(item);
+                else items.Insert(items.IndexOf(before), item);
+                Save();
+            }
+            Publish();
+            return true;
+        }
+
+        /// <summary>
         /// Puts a failed or skipped video at the end of the queue again. Also one with an incomplete new file - but then
         /// the incomplete file must be gone first (see AppController.ReplaceIncomplete), or it would be skipped again.
         /// </summary>
@@ -519,7 +541,8 @@ namespace deepduplicates
                 TryDelete(part);
 
                 var parser = new FfmpegProgressParser();
-                var args = EncodePlanner.Arguments(item.Path, s, part);
+                var subtitles = await Subtitles.ProbeAsync(runner, ffmpeg, item.Path, itemToken);
+                var args = EncodePlanner.Arguments(item.Path, s, part, subtitles);
                 int exit = await runner.RunAsync(ffmpeg, args,
                     line =>
                     {

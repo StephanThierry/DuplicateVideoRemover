@@ -96,12 +96,13 @@
             else
             {
                 var waiting = p.Items.Where(i => i.Status == EncodeItemStatus.Queued).ToList();
-                @if (compact) { <div class="q-crow q-cwait q-chead"><div>Video</div><div>Folder</div><div class="num">Length</div><div class="num">Size</div><div></div><div></div></div> }
+                @if (compact) { <div class="q-crow q-cwait q-chead"><div></div><div>Video</div><div>Folder</div><div class="num">Length</div><div class="num">Size</div><div></div><div></div></div> }
                 @foreach (var i in waiting.Take(waitShown))
                 {
                     @if (compact)
                     {
-                        <div class="q-crow q-cwait" @key='"c" + i.Id'>
+                        <div class="q-crow q-cwait @DragClass(i.Id, waiting)" @key='"c" + i.Id' @ondragenter="() => DragEnter(i.Id)" @ondragover:preventDefault="true" @ondrop="() => Drop(i.Id)">
+                            <span class="grip" draggable="true" @ondragstart="() => dragId = i.Id" @ondragend="EndDrag" title="Drag up or down to change the order" aria-label="Drag to change the order of @i.FileName"><svg width="8" height="13" viewBox="0 0 8 13" aria-hidden="true"><path d="M0 0h2.6v2.6H0zM5 0h2.6v2.6H5zM0 5h2.6v2.6H0zM5 5h2.6v2.6H5zM0 10h2.6v2.6H0zM5 10h2.6v2.6H5z" fill="currentColor"/></svg></span>
                             <div class="cname" title="@i.Path">@i.FileName</div>
                             <div class="cfolder muted" title="@i.Folder">@i.Folder</div>
                             <div class="num">@Fmt.Duration(i.DurationSeconds)</div>
@@ -112,7 +113,8 @@
                     }
                     else
                     {
-                    <div class="q-row" @key="i.Id">
+                    <div class="q-row q-wait @DragClass(i.Id, waiting)" @key="i.Id" @ondragenter="() => DragEnter(i.Id)" @ondragover:preventDefault="true" @ondrop="() => Drop(i.Id)">
+                        <span class="grip" draggable="true" @ondragstart="() => dragId = i.Id" @ondragend="EndDrag" title="Drag up or down to change the order" aria-label="Drag to change the order of @i.FileName"><svg width="8" height="13" viewBox="0 0 8 13" aria-hidden="true"><path d="M0 0h2.6v2.6H0zM5 0h2.6v2.6H5zM0 5h2.6v2.6H0zM5 5h2.6v2.6H5zM0 10h2.6v2.6H0zM5 10h2.6v2.6H5z" fill="currentColor"/></svg></span>
                         <div class="q-strip">
                             <img src="shots/@(i.VideoId)_2.png" alt="" loading="lazy" onerror="this.style.visibility='hidden'" />
                             <button class="icon" @onclick="() => PlayOriginal(i)" title="Play (opens the player)" aria-label="Play @i.FileName">@VideoPlayer.Icon</button>
@@ -270,6 +272,34 @@
 }
 
 @code {
+    // --- Dragging a waiting video by its grip to change the order ---
+    // Dropped on a row, it takes that row's place: below it when it came from above, above it when it came from below.
+    private string? dragId, dropId;
+
+    private void DragEnter(string id) { if (dragId != null) dropId = id == dragId ? null : id; }
+
+    private void EndDrag() { dragId = null; dropId = null; }
+
+    private void Drop(string targetId)
+    {
+        string? from = dragId;
+        EndDrag();
+        if (from == null || from == targetId) return;
+        var ids = App.Encoder.Current.Items.Where(i => i.Status == EncodeItemStatus.Queued).Select(i => i.Id).ToList();
+        int a = ids.IndexOf(from), b = ids.IndexOf(targetId);
+        if (a < 0 || b < 0) return;
+        string? before = a < b ? (b + 1 < ids.Count ? ids[b + 1] : null) : targetId;
+        App.Encoder.Move(from, before);
+    }
+
+    private string DragClass(string id, List<EncodeItemInfo> waiting)
+    {
+        if (dragId == null) return "";
+        if (id == dragId) return "dragging";
+        if (id != dropId) return "";
+        return waiting.FindIndex(i => i.Id == dragId) < waiting.FindIndex(i => i.Id == id) ? "drop-below" : "drop-above";
+    }
+
     private EncodeProgress p = new();
     private int waitShown = 100, doneShown = 100;
     private bool confirmDeletes = true;            // off: deleting needs no confirmation, not even where nothing can be restored

@@ -138,7 +138,11 @@ public class EncodeEngineTests : IDisposable
             }
             if (args.Contains("-frames:v"))
             {
-                int second = int.Parse(args[args.ToList().IndexOf("-ss") + 1]);
+                // The second the picture is for: decoding starts at -ss, the select filter picks the frame from there
+                var list = args.ToList();
+                double from = list.Contains("-ss") ? double.Parse(list[list.IndexOf("-ss") + 1], System.Globalization.CultureInfo.InvariantCulture) : 0;
+                var gte = System.Text.RegularExpressions.Regex.Match(list[list.IndexOf("-vf") + 1], @"gte\(t\\,([0-9.]+)\)");
+                int second = (int)Math.Round(from + double.Parse(gte.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture));
                 lock (PictureSeconds) PictureSeconds.Add(second);
                 if (second == FailPictureAt) { onError("Invalid data found when processing input"); return Task.FromResult(1); }
                 using var bitmap = new SkiaSharp.SKBitmap(240, 160);
@@ -662,6 +666,35 @@ public class EncodeEngineTests : IDisposable
     }
 
     [Fact]
+    public void WaitingVideosCanBeReordered_AndAreEncodedInTheNewOrder()
+    {
+        var runner = new FakeRunner { Behavior = FakeRunner.Hang };
+        var engine = NewEngine(runner);
+        var videos = new[] { Video("a.mp4", 1), Video("b.mp4", 2), Video("c.mp4", 3), Video("d.mp4", 4) };
+        engine.Enqueue(videos, EncodeSettings.CreateDefault());
+        WaitFor(() => engine.Current.Current != null, "a running");
+        string Id(string name) => engine.Current.Items.First(i => i.Path.EndsWith(name)).Id;
+        string[] Waiting() => engine.Current.Items.Where(i => i.Status == EncodeItemStatus.Queued).Select(i => Path.GetFileName(i.Path)).ToArray();
+
+        Assert.True(engine.Move(Id("d.mp4"), Id("b.mp4")));     // dragged above b
+        Assert.Equal(new[] { "d.mp4", "b.mp4", "c.mp4" }, Waiting());
+        Assert.True(engine.Move(Id("d.mp4"), null));              // dragged to the end
+        Assert.Equal(new[] { "b.mp4", "c.mp4", "d.mp4" }, Waiting());
+        Assert.True(engine.Move(Id("c.mp4"), Id("b.mp4")));
+        Assert.Equal(new[] { "c.mp4", "b.mp4", "d.mp4" }, Waiting());
+        Assert.False(engine.Move(Id("a.mp4"), Id("b.mp4")));     // the one being encoded stays where it is
+        Assert.False(engine.Move(Id("b.mp4"), Id("a.mp4")));     // and nothing goes before it
+        Assert.False(engine.Move(Id("b.mp4"), Id("b.mp4")));
+
+        // The new order is kept (a restart reads it back, with the one that was being encoded first again) and is the order of encoding
+        Assert.Equal(new[] { "a.mp4", "c.mp4", "b.mp4", "d.mp4" }, NewEngine(new FakeRunner()).Current.Items.Where(i => i.Status == EncodeItemStatus.Queued).Select(i => Path.GetFileName(i.Path)).ToArray());
+        runner.Behavior = FakeRunner.Succeed;
+        engine.SkipCurrent();
+        WaitFor(() => engine.Current.DoneCount == 3 && !engine.Current.Running, "the rest done");
+        Assert.Equal(new[] { "a.mp4", "c.mp4", "b.mp4", "d.mp4" }, runner.Inputs.Select(Path.GetFileName).ToArray());
+    }
+
+    [Fact]
     public void TheQueueSurvivesARestartAndWaitsForStart()
     {
         var runner = new FakeRunner { Behavior = FakeRunner.Hang };
@@ -901,5 +934,168 @@ public class RealCheckTests : IDisposable
             Console.WriteLine("cut-off file: " + cut.Message);
         }
         finally { engine.Shutdown(); }
+    }
+}
+
+public class SubtitleTests : IDisposable
+{
+    private readonly string dir = Path.Combine(Path.GetTempPath(), "dvr-subs-" + Guid.NewGuid().ToString("N"));
+
+    public SubtitleTests() => Directory.CreateDirectory(dir);
+    public void Dispose() { try { Directory.Delete(dir, true); } catch { } }
+
+    [Fact]
+    public void Mkv_CopiesPictureAndTextSubtitles_ConvertsMovTextToSrt()
+    {
+        var args = Subtitles.Arguments("/v/a.mkv", "mkv", new[] { "subrip", "hdmv_pgs_subtitle", "mov_text" });
+        Assert.Equal(new[] { "-map", "0:s:0", "-map", "0:s:1", "-map", "0:s:2", "-c:s:0", "copy", "-c:s:1", "copy", "-c:s:2", "srt" }, args);
+    }
+
+    [Fact]
+    public void Mp4_ConvertsTextSubtitles_LeavesOutPictureSubtitles()
+    {
+        var args = Subtitles.Arguments("/v/a.mkv", "mp4", new[] { "hdmv_pgs_subtitle", "subrip", "dvd_subtitle", "ass" });
+        Assert.Equal(new[] { "-map", "0:s:1", "-map", "0:s:3", "-c:s:0", "mov_text", "-c:s:1", "mov_text" }, args);
+    }
+
+    [Fact]
+    public void NoSubtitles_NoArguments() => Assert.Empty(Subtitles.Arguments("/v/a.mkv", "mp4", Array.Empty<string>()));
+
+    [Theory]
+    [InlineData("/v/a.mkv", "mkv", "-map 0:s? -c:s copy")]
+    [InlineData("/v/a.mp4", "mkv", "-map 0:s? -c:s srt")]
+    [InlineData("/v/a.mp4", "mp4", "-map 0:s? -c:s mov_text")]
+    [InlineData("/v/a.mkv", "mp4", "")]   // could be picture subtitles, which MP4 cannot hold
+    public void Unknown_DoesOnlyWhatIsSafeForTheFileType(string input, string container, string expected) =>
+        Assert.Equal(expected, string.Join(" ", Subtitles.Arguments(input, container, null)));
+
+    [Fact]
+    public void ScriptArgumentsIncludeSubtitles()
+    {
+        var e = EncodeSettings.CreateDefault();
+        e.container = "mkv";
+        var args = EncodePlanner.Arguments("/v/a.avi", e);
+        Assert.Contains("0:s?", args);
+    }
+
+    private static string? FindFFmpeg()
+    {
+        for (var d = new DirectoryInfo(AppContext.BaseDirectory); d != null; d = d.Parent)
+        {
+            string p = Path.Combine(d.FullName, "ffmpeg", OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg");
+            if (File.Exists(p)) return p;
+        }
+        return null;
+    }
+
+    [Theory]
+    [InlineData("mkv", "mp4", "mov_text")]
+    [InlineData("mp4", "mkv", "subrip")]
+    public async Task RealEncodeKeepsTheSubtitles(string sourceContainer, string target, string expectedCodec)
+    {
+        string? ffmpeg = FindFFmpeg();
+        if (ffmpeg == null) return;
+        var runner = new ProcessEncodeRunner();
+
+        string srt = Path.Combine(dir, "subs.srt");
+        File.WriteAllText(srt, "1\n00:00:00,500 --> 00:00:02,500\nHello\n\n2\n00:00:03,000 --> 00:00:05,000\nWorld\n");
+        string source = Path.Combine(dir, "clip." + sourceContainer);
+        Assert.Equal(0, await runner.RunAsync(ffmpeg, new[] { "-hide_banner", "-y", "-f", "lavfi", "-i", "testsrc=duration=6:size=640x360:rate=25", "-i", srt,
+            "-map", "0", "-map", "1", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:s", sourceContainer == "mp4" ? "mov_text" : "srt",
+            "-metadata:s:s:0", "language=dan", source }, _ => { }, _ => { }, CancellationToken.None));
+
+        var codecs = await Subtitles.ProbeAsync(runner, ffmpeg, source, CancellationToken.None);
+        Assert.NotNull(codecs);
+        Assert.Single(codecs!);
+
+        var e = EncodeSettings.CreateDefault();
+        e.codec = "x264"; e.crf = 30; e.preset = "veryfast"; e.resolution = 360; e.container = target;
+        string output = Path.Combine(dir, "out." + target);
+        var args = EncodePlanner.Arguments(source, e, output, codecs);
+        var errors = new List<string>();
+        Assert.True(0 == await runner.RunAsync(ffmpeg, args, _ => { }, l => errors.Add(l), CancellationToken.None), string.Join("\n", errors.TakeLast(5)));
+
+        var lines = new List<string>();
+        await runner.RunAsync(Subtitles.FfprobePath(ffmpeg), new[] { "-v", "error", "-select_streams", "s", "-show_entries", "stream=codec_name:stream_tags=language",
+            "-of", "default=noprint_wrappers=1", output }, l => lines.Add(l), _ => { }, CancellationToken.None);
+        Assert.Contains("codec_name=" + expectedCodec, lines);
+        Assert.Contains("TAG:language=dan", lines);
+    }
+}
+
+/// <summary>The scan's pictures of a video and of its re-encode must be the same frames, or the two never match as duplicates.</summary>
+public class SameFrameTests : IDisposable
+{
+    private readonly string dir = Path.Combine(Path.GetTempPath(), "dvr-frames-" + Guid.NewGuid().ToString("N"));
+    public SameFrameTests() => Directory.CreateDirectory(dir);
+    public void Dispose() { try { Directory.Delete(dir, true); } catch { } }
+
+    private static string? FindFFmpeg()
+    {
+        for (var d = new DirectoryInfo(AppContext.BaseDirectory); d != null; d = d.Parent)
+        {
+            string p = Path.Combine(d.FullName, "ffmpeg", OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg");
+            if (File.Exists(p)) return p;
+        }
+        return null;
+    }
+
+    [Fact]
+    public void PictureArguments_PickTheFirstFrameFromTheSecond()
+    {
+        var args = Picture.Arguments("/v/a b.mp4", 120, "/s/1.png", 240, 160);
+        Assert.Equal("119", args[args.IndexOf("-ss") + 1]);                     // decoding starts a second before
+        Assert.Equal(@"select=gte(t\,0.998),scale=240:160", args[args.IndexOf("-vf") + 1]);
+        Assert.DoesNotContain("-ss", Picture.Arguments("/v/a.mp4", 0, "/s/1.png", 240, 160));
+        Assert.Contains("\"/v/a b.mp4\"", Picture.CommandLine(args));
+    }
+
+    private static double Difference(string a, string b)
+    {
+        using var x = SkiaSharp.SKBitmap.Decode(a);
+        using var y = SkiaSharp.SKBitmap.Decode(b);
+        double sum = 0;
+        for (int i = 0; i < x.Width; i++)
+            for (int j = 0; j < x.Height; j++)
+            {
+                var p = x.GetPixel(i, j); var q = y.GetPixel(i, j);
+                sum += Math.Abs(p.Red - q.Red) + Math.Abs(p.Green - q.Green) + Math.Abs(p.Blue - q.Blue);
+            }
+        return sum / (x.Width * x.Height * 3);
+    }
+
+    [Theory]
+    [InlineData("mp4")]
+    [InlineData("mkv")]
+    public async Task AReEncodeGivesTheSamePictures_AlsoForAVariableFrameRateVideoThatStartsAfterItsSound(string container)
+    {
+        string? ffmpeg = FindFFmpeg();
+        if (ffmpeg == null) return;
+        var runner = new ProcessEncodeRunner();
+        var errors = new List<string>();
+
+        // Frames 0.05, 0.05, 0.02 s apart (variable), the picture starting 0.08 s after the sound; a moving test pattern, so
+        // neighbouring frames look different
+        string source = Path.Combine(dir, "vfr.mp4");
+        Assert.True(0 == await runner.RunAsync(ffmpeg, new[] { "-hide_banner", "-y", "-f", "lavfi", "-i", "testsrc2=duration=12:size=640x360:rate=25",
+            "-f", "lavfi", "-i", "sine=duration=12", "-vf", @"setpts='(N/25+0.01*mod(N\,3))/TB+0.08/TB'", "-fps_mode", "passthrough",
+            "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", source }, _ => { }, l => errors.Add(l), CancellationToken.None),
+            string.Join("\n", errors.TakeLast(5)));
+
+        var e = EncodeSettings.CreateDefault();
+        e.codec = "x265"; e.crf = 20; e.preset = "veryfast"; e.resolution = 360; e.container = container;
+        string output = Path.Combine(dir, "out." + container);
+        errors.Clear();
+        Assert.True(0 == await runner.RunAsync(ffmpeg, EncodePlanner.Arguments(source, e, output), _ => { }, l => errors.Add(l), CancellationToken.None),
+            string.Join("\n", errors.TakeLast(5)));
+
+        foreach (int second in new[] { 1, 3, 5, 8, 11 })
+        {
+            string a = Path.Combine(dir, $"a{second}.png"), b = Path.Combine(dir, $"b{second}.png");
+            Assert.Equal(0, await runner.RunAsync(ffmpeg, Picture.Arguments(source, second, a, 240, 160), _ => { }, _ => { }, CancellationToken.None));
+            Assert.Equal(0, await runner.RunAsync(ffmpeg, Picture.Arguments(output, second, b, 240, 160), _ => { }, _ => { }, CancellationToken.None));
+            double d = Difference(a, b);
+            Assert.True(d < 4, $"the pictures at {second} s differ by {d:0.0} (another frame)");
+        }
     }
 }

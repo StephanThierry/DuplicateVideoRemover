@@ -48,7 +48,7 @@ namespace deepduplicates
             DeleteShots(folder, itemId);
 
             // 1. Length and a video stream
-            string ffprobe = Path.Combine(Path.GetDirectoryName(ffmpeg) ?? "", Path.GetFileName(ffmpeg).Replace("ffmpeg", "ffprobe"));
+            string ffprobe = Subtitles.FfprobePath(ffmpeg);
             double? seconds = null;
             bool video = false;
             string lastError = "";
@@ -88,12 +88,11 @@ namespace deepduplicates
 
         private static EncodeCheckResult Bad(string problem, int pictures = 0) => new(false, "", problem, pictures);
 
-        // One picture like the scan's: seek, one frame, 240x160. Null when it was made and could be decoded.
+        // One picture like the scan's (the same frame, see Picture), 240x160. Null when it was made and could be decoded.
         private async Task<string?> TakePicture(string ffmpeg, string file, int second, string output, CancellationToken ct)
         {
             string lastError = "", empty = "";
-            int exit = await runner.RunAsync(ffmpeg, new[] { "-hide_banner", "-nostdin", "-nostats", "-y", "-ss", second.ToString(CultureInfo.InvariantCulture), "-i", file,
-                    "-map", "0:v:0", "-frames:v", "1", "-vf", "scale=240:160", output },
+            int exit = await runner.RunAsync(ffmpeg, Picture.Arguments(file, second, output, 240, 160),
                 _ => { },
                 line =>
                 {

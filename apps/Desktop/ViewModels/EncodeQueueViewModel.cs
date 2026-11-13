@@ -252,6 +252,13 @@ public partial class EncodeQueueViewModel : ObservableObject
     internal string NewShotPath(string id, int n) => engine.CheckShotPath(id, n);
 
     internal void Remove(EncodeQueueRow row) => engine.Remove(row.Id);
+
+    /// <summary>Dragged in the waiting list: <paramref name="row"/> goes just before <paramref name="before"/> (null: to the end).</summary>
+    public void MoveWaiting(EncodeQueueRow row, EncodeQueueRow? before)
+    {
+        if (ReferenceEquals(row, before)) return;
+        engine.Move(row.Id, before?.Id);
+    }
     internal void Retry(EncodeQueueRow row) => engine.Retry(row.Id);
     internal async Task ShowFolder(string folder) { if (OpenFolder != null) await OpenFolder(folder); }
 }
@@ -275,6 +282,10 @@ public partial class EncodeQueueRow : ObservableObject
     public string Summary { get; }
 
     [ObservableProperty] private string statusText = "";
+    // While a waiting video is dragged: the row being moved, and where it would land (a line above or below this row)
+    [ObservableProperty] private bool isDragged;
+    [ObservableProperty] private bool dropAbove;
+    [ObservableProperty] private bool dropBelow;
     [ObservableProperty] private string detail = "";
     [ObservableProperty] private string resultText = "";
     [ObservableProperty] private double percent;

@@ -47,6 +47,9 @@ public partial class ReviewViewModel : ObservableObject
     [ObservableProperty] private string deleteText = "";
     [ObservableProperty] private string deleteFailedText = "";
 
+    /// <summary>Set by the view: puts text on the clipboard (false when there is none).</summary>
+    public Func<string, Task<bool>>? CopyText { get; set; }
+
     public string ExecuteLabel => "Delete " + Fmt.Plural(session.SelectedCount, "file", "files");
     public bool FolderFilterActive => FolderFilter != null;
 
@@ -248,6 +251,16 @@ public partial class ReviewViewModel : ObservableObject
     }
 
 
+    internal async Task CopyFolder(VideoRow row)
+    {
+        try
+        {
+            bool ok = CopyText != null && await CopyText(row.Folder);
+            ShowToast(ok ? "Copied: " + row.Folder : "Could not reach the clipboard.");
+        }
+        catch (Exception e) { ShowToast("Could not copy: " + e.Message); }
+    }
+
     internal void MarkFalsePositive(VideoRow row)
     {
         ShowToast(app.MarkFalsePositive(row.Entry.Id), 6000);
@@ -360,8 +373,6 @@ public partial class VideoRow : ObservableObject
     /// <summary>Every copy of this video is selected for removal (the card turns red).</summary>
     [ObservableProperty] private bool isDoomed;
 
-    public bool ShowReason => HasReason && !IsKept;
-
     // Screenshots load when the row is first shown (the list is virtualized)
     public Bitmap? Shot1 { get { LoadShots(); return shot1; } }
     public Bitmap? Shot2 { get { LoadShots(); return shot2; } }
@@ -399,14 +410,10 @@ public partial class VideoRow : ObservableObject
         if (!refreshing) owner.Select(this, value);
     }
 
-    partial void OnIsKeptChanged(bool value)
-    {
-        OnPropertyChanged(nameof(ShowReason));
-    }
-
     [RelayCommand] private void Toggle() => IsSelected = !IsSelected;
     [RelayCommand] private void Play() => owner.Play(this);
     internal void MarkFalsePositive() => owner.MarkFalsePositive(this);
     [RelayCommand] private void ShowFolder() => owner.ShowFolderCommand.Execute(Folder);
     [RelayCommand] private void ExcludeFolder() => owner.ExcludeFolderOf(Folder);
+    [RelayCommand] private Task CopyFolder() => owner.CopyFolder(this);
 }

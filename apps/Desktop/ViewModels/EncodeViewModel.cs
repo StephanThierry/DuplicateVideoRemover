@@ -26,11 +26,18 @@ public partial class EncodeViewModel : ObservableObject
     /// <summary>Set by the view: puts text on the clipboard (false when there is none).</summary>
     public Func<string, Task<bool>>? CopyText { get; set; }
 
-    // Folders hidden with "Exclude folder", until "Unhide folders"
-    private readonly HashSet<string> hidden = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Set by the view: asks for a folder (null when cancelled).</summary>
+    public Func<Task<string?>>? PickFolder { get; set; }
+
+    // Folders hidden with "Exclude folder" or on the Manage hidden folders screen (kept between runs, see HiddenFolders)
+    private HiddenFolders hidden => app.HiddenFolders;
     private System.Threading.CancellationTokenSource? toastTimer;
-    [ObservableProperty] private bool hasHidden;
-    [ObservableProperty] private string unhideText = "";
+    [ObservableProperty] private string manageHiddenText = "";
+    // The Manage hidden folders screen
+    [ObservableProperty] private bool hiddenVisible;
+    [ObservableProperty] private string newHiddenFolder = "";
+    [ObservableProperty] private bool hasHiddenFolders;
+    public ObservableCollection<HiddenFolderRow> HiddenList { get; } = new();
     [ObservableProperty] private string? toast;
     // "Delete" confirmation for one video
     [ObservableProperty] private EncodeRow? deleting;
@@ -82,6 +89,9 @@ public partial class EncodeViewModel : ObservableObject
         this.app = app;
         this.main = main;
         app.DataChanged += () => Dispatcher.UIThread.Post(() => _ = Reload());
+        // Changed here, or by the web interface on the same data folder
+        app.HiddenFolders.Changed += () => Dispatcher.UIThread.Post(() => { UpdateHidden(); Filter(); });
+        UpdateHidden();
         // The queue changes while it runs: grey out what was added, show what finished (progress ticks change nothing here)
         app.Encoder.ProgressChanged += _ =>
         {
@@ -134,6 +144,7 @@ public partial class EncodeViewModel : ObservableObject
         anchor = null;
         HasVideos = all.Count > 0;
         Loading = false;
+        UpdateHidden();   // the number of videos in each hidden folder
         RefreshQueue(force: true);
         Filter();
     }
@@ -142,7 +153,7 @@ public partial class EncodeViewModel : ObservableObject
     {
         var query = SearchQuery.Parse(Search);
         var shown = all.Where(r =>
-            !(HideQueued && r.IsQueued) && r.Candidate.AverageKbps >= (double)MinKbps && r.Candidate.SizeBytes >= (double)MinMb * 1024 * 1024 && !hidden.Contains(r.Candidate.Folder) &&
+            !(HideQueued && r.IsQueued) && r.Candidate.AverageKbps >= (double)MinKbps && r.Candidate.SizeBytes >= (double)MinMb * 1024 * 1024 && !hidden.Hides(r.Candidate.Folder) &&
             query.Matches(r.Candidate.Path));
         var sort = FileSorting.Choices[Math.Clamp(SortIndex, 0, FileSorting.Choices.Length - 1)].Sort;
         return FileSorting.Order(shown, sort, r => r.Candidate.Path, r => r.Candidate.SizeBytes, r => r.Candidate.AverageKbps);
@@ -237,28 +248,58 @@ public partial class EncodeViewModel : ObservableObject
     // --- Per video: exclude its folder, copy its path, delete it ---
 
     /// <summary>Hides every video in the folder (they are unpicked, so the script only holds what can be seen).</summary>
-    internal void HideFolder(EncodeRow row)
-    {
-        string folder = row.Candidate.Folder;
-        hidden.Add(folder);
-        foreach (var r in all.Where(r => string.Equals(r.Candidate.Folder, folder, StringComparison.OrdinalIgnoreCase))) r.IsPicked = false;
-        UpdateHidden();
-        Filter();
-        ShowToast($"Hid the videos in {folder}.");
-    }
+    internal void HideFolder(EncodeRow row) => Hide(row.Candidate.Folder);
 
-    [RelayCommand]
-    private void UnhideFolders()
+    private bool Hide(string folder)
     {
-        hidden.Clear();
-        UpdateHidden();
-        Filter();
+        if (!hidden.Add(folder)) { ShowToast($"{folder} is hidden already."); return false; }
+        // Changed (raised by Add) refreshes the list; what is hidden now is unpicked
+        int n = 0;
+        foreach (var r in all.Where(r => HiddenFolders.Covers(folder, r.Candidate.Folder))) { r.IsPicked = false; n++; }
+        ShowToast($"Hid {Fmt.Plural(n, "video", "videos")} in {folder} and its subfolders.");
+        return true;
     }
 
     private void UpdateHidden()
     {
-        HasHidden = hidden.Count > 0;
-        UnhideText = $"Unhide folders ({hidden.Count})";
+        int n = hidden.Count;
+        ManageHiddenText = n == 0 ? "Manage hidden folders" : $"Manage hidden folders ({n})";
+        HiddenList.Clear();
+        foreach (var f in hidden.List)
+            HiddenList.Add(new HiddenFolderRow(f, all.Count(r => HiddenFolders.Covers(f, r.Candidate.Folder)), this));
+        HasHiddenFolders = n > 0;
+    }
+
+    [RelayCommand] private void ManageHidden() { UpdateHidden(); HiddenVisible = true; }
+    [RelayCommand] private void CloseHidden() => HiddenVisible = false;
+
+    [RelayCommand]
+    private void AddHidden()
+    {
+        string folder = NewHiddenFolder.Trim().Trim('"');
+        if (folder.Length == 0) return;
+        if (Hide(folder)) NewHiddenFolder = "";
+    }
+
+    [RelayCommand]
+    private async Task BrowseHidden()
+    {
+        if (PickFolder == null) return;
+        string? folder = await PickFolder();
+        if (!string.IsNullOrEmpty(folder)) NewHiddenFolder = folder;
+    }
+
+    internal void Unhide(HiddenFolderRow row)
+    {
+        if (hidden.Remove(row.Folder)) ShowToast($"{row.Folder} is shown again.");
+    }
+
+    [RelayCommand]
+    private void UnhideAll()
+    {
+        int n = hidden.Count;
+        hidden.Clear();
+        if (n > 0) ShowToast($"Showing all folders again ({Fmt.Plural(n, "folder was", "folders were")} hidden).");
     }
 
     /// <summary>Opens the video in the program the system uses for it.</summary>
@@ -350,6 +391,21 @@ public partial class EncodeViewModel : ObservableObject
     {
         if (ScriptPath != null && OpenFolder != null) await OpenFolder(System.IO.Path.GetDirectoryName(ScriptPath)!);
     }
+}
+
+/// <summary>One hidden folder on the Manage hidden folders screen.</summary>
+public sealed partial class HiddenFolderRow
+{
+    private readonly EncodeViewModel owner;
+    public string Folder { get; }
+    public string Videos { get; }
+    public HiddenFolderRow(string folder, int videos, EncodeViewModel owner)
+    {
+        Folder = folder;
+        Videos = videos == 0 ? "no videos in the list" : Fmt.Plural(videos, "video", "videos") + " hidden";
+        this.owner = owner;
+    }
+    [RelayCommand] private void Unhide() => owner.Unhide(this);
 }
 
 public partial class EncodeRow : ObservableObject

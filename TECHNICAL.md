@@ -66,6 +66,29 @@ second from a background thread - screens coalesce it onto their UI thread).
   argument list the scripts use, plus `-progress pipe:1 -nostats -nostdin`. Progress comes from the `key=value`
   blocks on stdout (`FfmpegProgressParser`: `out_time_us`, `fps`, `speed`, `total_size`; early blocks hold `N/A`).
   Percent is `out_time` over the duration already in the database. stderr goes to the log and the failure message.
+- **Same frames in the original and the new file.** A re-encode must give the scan the same three pictures as its
+  original, or the two never match. Two things made them a frame or two apart: (1) `-ss N` gives the frame still on
+  screen at N, which depends on frame lengths, and those change in a re-encode - `Picture.Arguments` (used by the scan
+  and the check) takes the first frame that starts at or after N (`select=gte(t,…)` after seeking a second earlier);
+  for ordinary files this is the same frame as before, so old pictures stay valid. (2) By default MP4 output gets a
+  constant frame rate on a grid of its own time base, which drops/repeats frames of variable-rate videos and moves the
+  rest by up to half a frame - the encode uses `-fps_mode passthrough -enc_time_base:v -1`, so every frame keeps its
+  exact time. Files re-encoded before this keep their small shift.
+- **Leftover pictures.** Pictures are named by row id and used to be reused when the file existed; a read that failed
+  (an unfinished download) left broken ones that the next scan adopted for good. Now a row without pictures always
+  gets new ones, a row with pictures but a "Screenshot failed" reason is read again, and so is a file written after its
+  pictures were made (a download that reserved its full size keeps its size, so the size check missed it).
+- **Hidden folders** (`HiddenFolders`, `output/hiddenfolders.json`). What Re-encode planning hides ("Exclude folder", or
+  added on Manage hidden folders). A folder covers its subfolders, so a parent can be hidden. Kept between runs and
+  shared by the desktop app and the web interface on the same data folder (each reads the file when it starts).
+  Only hides rows; scans are steered by the paths to skip in Settings.
+- **Queue order.** The worker takes the first waiting item, so `EncodeEngine.Move(id, beforeId)` (drag in either
+  interface) is the whole of reordering; the order is saved with the queue.
+- **Subtitles** (`Subtitles`). Before each encode ffprobe lists the input's subtitle kinds, and each stream is mapped
+  on its own: MKV copies them (MP4's `mov_text` becomes SRT), MP4 converts text ones to `mov_text` and leaves out
+  picture ones (PGS, DVD, DVB), which it cannot hold and which would make FFmpeg fail. The script can't probe, so it
+  goes by the input's extension: `-map 0:s?` only where that is safe for any file of that type (none from non-MP4
+  files into MP4).
 - **`.part` files.** The output is written to `<new name>.part` with `-f mp4|matroska` named explicitly, and renamed
   when FFmpeg exits with 0. The `.part` extension keeps a scan that runs at the same time from picking up half a
   video, which is why scans and encodes are not made to exclude each other. A stop, skip or failure deletes the

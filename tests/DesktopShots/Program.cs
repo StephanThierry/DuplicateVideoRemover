@@ -43,6 +43,123 @@ void Shot(string name)
     Console.WriteLine("saved " + name);
 }
 
+// SHOT_JUMP=1 (with a data folder whose output/results.json has groups of 3 with long reasons, keep = the 2nd copy): selects and
+// unselects the kept copy and prints how far its card moves in the list - it should not move at all
+if (Environment.GetEnvironmentVariable("SHOT_JUMP") == "1")
+{
+    vm.SelectedTab = MainViewModel.ReviewTab; Pump(800);
+    var list = window.GetVisualDescendants().OfType<Avalonia.Controls.ListBox>().First(l => l.Classes.Contains("rows"));
+    var rows = vm.Review.Rows.OfType<VideoRow>().ToList();
+    // A group in the middle of the list, scrolled to the middle of the view
+    var target = rows.Where(r => r.IsKept).Skip(6).First();
+    list.ScrollIntoView(vm.Review.Rows.IndexOf(target)); Pump(500);
+    var group = rows.Where(r => controller.Session.Results.Groups.First(g => g.Members.Contains(target.Entry)).Members.Contains(r.Entry)).ToList();
+    double Y(VideoRow r) => list.ContainerFromItem(r) is Avalonia.Controls.Control c ? c.TranslatePoint(new Point(0, 0), list)?.Y ?? double.NaN : double.NaN;
+    double H(VideoRow r) => list.ContainerFromItem(r)?.Bounds.Height ?? double.NaN;
+    void Step(string what, Action act)
+    {
+        double y0 = Y(target), lh0 = list.Bounds.Height; var h0 = group.Select(H).ToArray();
+        act(); Pump(500);
+        double y1 = Y(target), lh1 = list.Bounds.Height; var h1 = group.Select(H).ToArray();
+        Console.WriteLine($"[jump] {what}: card moved {y1 - y0:+0.0;-0.0;0}px (y {y0:0} -> {y1:0}), list height {lh0:0} -> {lh1:0}, " +
+            $"card heights {string.Join("/", h0.Select(h => h.ToString("0")))} -> {string.Join("/", h1.Select(h => h.ToString("0")))}, toast: {vm.Review.Toast ?? "-"}");
+    }
+    Shot("j_before");
+    Step("select the kept copy (keep moves to the copy above)", () => target.IsSelected = true);
+    Step("unselect it again", () => target.IsSelected = false);
+    Step("select the other two", () => { foreach (var r in group.Where(r => r != target)) r.IsSelected = true; });
+    Step("select the kept copy too (every copy)", () => target.IsSelected = true);
+    Shot("j_doomed");
+    Step("unselect it again", () => target.IsSelected = false);
+    return;
+}
+// SHOT_HIDDEN=1 (with SHOT_FFMPEG=<folder with ffmpeg and ffprobe>, and an empty data folder): Manage hidden folders in Re-encode
+// planning, on six different clips in nested folders - hide a folder, then its parent folder, unhide one, and the list after a restart
+if (Environment.GetEnvironmentVariable("SHOT_HIDDEN") == "1")
+{
+    string ffSource4 = Environment.GetEnvironmentVariable("SHOT_FFMPEG")!;
+    if (!File.Exists(FileHandler.FFmpegPath))
+    {
+        Directory.CreateDirectory(Path.Combine(FileHandler.AppFolder, "ffmpeg"));
+        foreach (var f in Directory.GetFiles(ffSource4)) File.Copy(f, Path.Combine(FileHandler.AppFolder, "ffmpeg", Path.GetFileName(f)), true);
+    }
+    string lib = Path.Combine(FileHandler.AppFolder, "videos");
+    var clips = new[] { ("Shows/Season 1", "testsrc"), ("Shows/Season 1", "testsrc2"), ("Shows/Season 2", "smptebars"), ("Shows/Season 2", "rgbtestsrc"), ("Movies", "mandelbrot"), ("Movies", "yuvtestsrc") };
+    var maker4 = new ProcessEncodeRunner();
+    for (int n = 0; n < clips.Length; n++)
+    {
+        string folder = Path.Combine(lib, clips[n].Item1.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(folder);
+        string clip = Path.Combine(folder, $"{clips[n].Item2} {n + 1}.mp4");
+        if (File.Exists(clip)) continue;
+        Task.Run(() => maker4.RunAsync(FileHandler.FFmpegPath, new[] { "-hide_banner", "-y", "-f", "lavfi", "-i", $"{clips[n].Item2}=duration=30:size=640x360:rate=25",
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18", "-pix_fmt", "yuv420p", clip }, _ => { }, _ => { }, CancellationToken.None)).GetAwaiter().GetResult();
+    }
+    foreach (var f in Directory.GetFiles(lib, "*.mp4", SearchOption.AllDirectories)) File.SetLastWriteTime(f, DateTime.Now.AddHours(-2));
+    var st4 = controller.Settings.Clone();
+    st4.contentFolders = new[] { lib };
+    controller.SaveSettings(st4, PathMapper.Mappings);
+    controller.StartScan();
+    var t4 = DateTime.UtcNow;
+    while ((controller.Scanner.IsRunning || controller.Scanner.Current.Phase == ScanPhase.Idle) && DateTime.UtcNow - t4 < TimeSpan.FromMinutes(3)) Pump(200);
+    vm.SelectedTab = MainViewModel.EncodeTab; Pump(800);
+    var l4 = DateTime.UtcNow;
+    while (vm.Encode.Loading && DateTime.UtcNow - l4 < TimeSpan.FromMinutes(2)) Pump(200);
+    vm.Encode.MinMb = 0; Pump(300);
+    Console.WriteLine($"[hidden] {vm.Encode.Rows.Count} videos shown, button: {vm.Encode.ManageHiddenText}");
+    var season1 = vm.Encode.Rows.First(r => r.Folder.EndsWith("Season 1"));
+    season1.ExcludeFolderCommand.Execute(null); Pump(300);
+    Console.WriteLine($"[hidden] Exclude folder on {season1.Folder}: {vm.Encode.Rows.Count} shown, {vm.Encode.ManageHiddenText}");
+    vm.Encode.ManageHiddenCommand.Execute(null);
+    vm.Encode.NewHiddenFolder = Path.Combine(lib, "Shows");   // the parent folder: Season 2 goes too
+    vm.Encode.AddHiddenCommand.Execute(null); Pump(400);
+    Console.WriteLine($"[hidden] parent added: {vm.Encode.Rows.Count} shown ({string.Join(", ", vm.Encode.Rows.Select(r => r.FileName))}); list: {string.Join(" | ", vm.Encode.HiddenList.Select(h => h.Folder + " = " + h.Videos))}");
+    Shot("h_manage");
+    Console.WriteLine($"[hidden] after a restart the list holds: {string.Join(" | ", new HiddenFolders(Path.Combine(FileHandler.AppFolder, "output", "hiddenfolders.json")).List)}");
+    vm.Encode.HiddenList.First(h => h.Folder.EndsWith("Shows")).UnhideCommand.Execute(null); Pump(300);
+    Console.WriteLine($"[hidden] parent unhidden: {vm.Encode.Rows.Count} shown, {vm.Encode.ManageHiddenText}");
+    vm.Encode.UnhideAllCommand.Execute(null); Pump(300);
+    Console.WriteLine($"[hidden] unhide all: {vm.Encode.Rows.Count} shown, {vm.Encode.ManageHiddenText}");
+    Shot("h_manage_empty");
+    vm.Encode.CloseHiddenCommand.Execute(null);
+    return;
+}
+// SHOT_DRAG=1 (with a data folder that SHOT_HIDDEN has scanned): the waiting videos are reordered by dragging their grip with the
+// mouse, in the full and in the compact view; prints the engine's order after each drag
+if (Environment.GetEnvironmentVariable("SHOT_DRAG") == "1")
+{
+    controller.Encoder.Stop();   // nothing starts: every video stays waiting
+    controller.Encoder.ClearQueued();
+    var cands = controller.EncodeCandidates();
+    controller.EnqueueEncode(cands);
+    vm.SelectedTab = MainViewModel.QueueTab; Pump(800);
+    string Order() => string.Join(", ", controller.Encoder.Current.Items.Where(i => i.Status == EncodeItemStatus.Queued).Select(i => Path.GetFileNameWithoutExtension(i.Path)));
+    Console.WriteLine($"[drag] start: {Order()}");
+    void Drag(int from, int to, bool below, string shot)
+    {
+        var list = window.GetVisualDescendants().OfType<Avalonia.Controls.ListBox>().First(l => l.IsEffectivelyVisible && l.ItemsSource == vm.EncodeQueue.Waiting);
+        var grips = list.GetVisualDescendants().OfType<Avalonia.Controls.Border>().Where(b => b.Classes.Contains("grip")).ToList();
+        var rows = list.GetRealizedContainers().ToList();
+        Point Center(Avalonia.Visual v) => v.TranslatePoint(new Point(v.Bounds.Width / 2, v.Bounds.Height / 2), window)!.Value;
+        var start = Center(grips[from]);
+        var target = rows[to];
+        var top = target.TranslatePoint(new Point(0, 0), window)!.Value;
+        var end = new Point(start.X, top.Y + (below ? target.Bounds.Height * 0.8 : target.Bounds.Height * 0.2));
+        window.MouseDown(start, Avalonia.Input.MouseButton.Left); Pump(50);
+        for (int s = 1; s <= 8; s++) { window.MouseMove(new Point(start.X, start.Y + (end.Y - start.Y) * s / 8)); Pump(30); }
+        Shot(shot);
+        Console.WriteLine($"[drag] line shown: {string.Join(", ", vm.EncodeQueue.Waiting.Select(r => r.FileName + (r.DropAbove ? " (line above)" : r.DropBelow ? " (line below)" : "") + (r.IsDragged ? " (dragged)" : "")))}");
+        window.MouseUp(end, Avalonia.Input.MouseButton.Left); Pump(400);
+        Console.WriteLine($"[drag] row {from + 1} to {(below ? "below" : "above")} row {to + 1}: {Order()} | shown: {string.Join(", ", vm.EncodeQueue.Waiting.Select(r => Path.GetFileNameWithoutExtension(r.FileName)))}");
+    }
+    Drag(0, 2, below: true, "g_drag_full");
+    Drag(4, 0, below: false, "g_drag_full2");
+    vm.EncodeQueue.Compact = true; Pump(600);
+    Drag(1, 3, below: true, "g_drag_compact");
+    if (Environment.GetEnvironmentVariable("SHOT_DRAG_KEEP") != "1") controller.Encoder.ClearQueued();   // keep: for trying the web page on it
+    controller.Encoder.Shutdown();
+    return;
+}
 // SHOT_DOOMED=1 (with SHOT_FFMPEG=<folder with ffmpeg and ffprobe>, and an empty data folder): selecting BOTH copies of a video - the original
 // and the duplicate - is allowed; both cards turn red, a warning toast comes, and the confirmation says every copy goes
 if (Environment.GetEnvironmentVariable("SHOT_DOOMED") == "1")
@@ -395,9 +512,17 @@ if (Environment.GetEnvironmentVariable("SHOT_ENCODE") == "1")
     vm.Encode.RowClicked(vm.Encode.Rows[2], false); Shot("d_encode");
     int shownBefore = vm.Encode.Rows.Count;
     vm.Encode.Rows[0].ExcludeFolderCommand.Execute(null); Pump(300);
-    Console.WriteLine($"hide folder: {shownBefore} -> {vm.Encode.Rows.Count} rows, {vm.Encode.UnhideText}"); Shot("d_encode_hidden");
-    vm.Encode.UnhideFoldersCommand.Execute(null); Pump(300);
-    Console.WriteLine($"unhide: {vm.Encode.Rows.Count} rows");
+    Console.WriteLine($"hide folder: {shownBefore} -> {vm.Encode.Rows.Count} rows, {vm.Encode.ManageHiddenText}"); Shot("d_encode_hidden");
+    // Manage hidden folders: hide a parent folder too, then unhide one by one and all
+    vm.Encode.ManageHiddenCommand.Execute(null);
+    string? parent = System.IO.Path.GetDirectoryName(vm.Encode.Rows[0].Folder);
+    if (parent != null) { vm.Encode.NewHiddenFolder = parent; vm.Encode.AddHiddenCommand.Execute(null); }
+    Pump(300);
+    Console.WriteLine($"parent hidden ({parent}): {vm.Encode.Rows.Count} rows, list: {string.Join(" | ", vm.Encode.HiddenList.Select(h => h.Folder + " = " + h.Videos))}"); Shot("d_encode_manage_hidden");
+    vm.Encode.HiddenList[0].UnhideCommand.Execute(null); Pump(300);
+    Console.WriteLine($"one unhidden: {vm.Encode.Rows.Count} rows, {vm.Encode.ManageHiddenText}");
+    vm.Encode.UnhideAllCommand.Execute(null); vm.Encode.CloseHiddenCommand.Execute(null); Pump(300);
+    Console.WriteLine($"unhide all: {vm.Encode.Rows.Count} rows, {vm.Encode.ManageHiddenText}");
     vm.Encode.Rows[1].DeleteCommand.Execute(null); Shot("d_encode_delete_confirm"); vm.Encode.CancelDeleteCommand.Execute(null);
     vm.Encode.AskCreateCommand.Execute(null); Shot("d_encode_confirm");
     vm.Encode.CreateCommand.Execute(null); Pump(300);
