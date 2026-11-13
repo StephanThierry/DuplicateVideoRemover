@@ -318,6 +318,15 @@ if (Environment.GetEnvironmentVariable("SHOT_SHAPES") == "1")
     vm.SelectedTab = MainViewModel.FilesTab; Pump(1200); Shot("d_shapes_files");
     vm.SelectedTab = MainViewModel.ReviewTab; Pump(1200); Shot("d_shapes_review");
     Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light; Pump(800); Shot("d_shapes_review_light");
+    // The x at the top right of the pop-ups
+    Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
+    vm.SelectedTab = MainViewModel.EncodeTab; Pump(1500);
+    vm.Encode.ManageHiddenCommand.Execute(null); Pump(600); Shot("d_close_hidden");
+    vm.Encode.CloseHiddenCommand.Execute(null);
+    vm.SelectedTab = MainViewModel.ReviewTab; Pump(600);
+    vm.Review.Rows.OfType<VideoRow>().First().IsSelected = true; Pump(300);
+    vm.Review.AskExecuteCommand.Execute(null); Pump(600); Shot("d_close_confirm");
+    vm.Review.CancelExecuteCommand.Execute(null);
     return;
 }
 // SHOT_SCANTHUMBS=1 (with SHOT_FFMPEG=<folder with ffmpeg and ffprobe>, and an empty data folder): the live pictures on the Scan screen -
