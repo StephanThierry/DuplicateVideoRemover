@@ -260,6 +260,66 @@ if (Environment.GetEnvironmentVariable("SHOT_DOOMED") == "1")
     Console.WriteLine($"[doomed] the duplicate unselected again: red cards = {cards.Count(c => c.IsDoomed)}, keep marks = {cards.Count(c => c.IsKept)} (on {cards.FirstOrDefault(c => c.IsKept)?.FileName})");
     return;
 }
+// SHOT_SHAPES=1 (with SHOT_FFMPEG=<folder with ffmpeg and ffprobe>, and an empty data folder): the pictures at the videos' own shape -
+// a 16:9 clip, a phone clip held upright (stored on its side with a rotation, as phones do) twice, and a 4:3 clip, scanned for real
+if (Environment.GetEnvironmentVariable("SHOT_SHAPES") == "1")
+{
+    string ffS = Environment.GetEnvironmentVariable("SHOT_FFMPEG")!;
+    if (!File.Exists(FileHandler.FFmpegPath))
+    {
+        Directory.CreateDirectory(Path.Combine(FileHandler.AppFolder, "ffmpeg"));
+        foreach (var f in Directory.GetFiles(ffS)) File.Copy(f, Path.Combine(FileHandler.AppFolder, "ffmpeg", Path.GetFileName(f)), true);
+    }
+    string clips = Path.Combine(FileHandler.AppFolder, "videos");
+    Directory.CreateDirectory(clips);
+    var maker = new ProcessEncodeRunner();
+    void Make(params string[] a) => Task.Run(() => maker.RunAsync(FileHandler.FFmpegPath, a, _ => { }, _ => { }, CancellationToken.None)).GetAwaiter().GetResult();
+    string Clip(string name) => Path.Combine(clips, name);
+    if (!File.Exists(Clip("Wide 16x9.mp4")))
+    {
+        Make("-hide_banner", "-y", "-f", "lavfi", "-i", "testsrc2=duration=30:size=1280x720:rate=25", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", Clip("Wide 16x9.mp4"));
+        Make("-hide_banner", "-y", "-f", "lavfi", "-i", "testsrc=duration=30:size=1280x720:rate=25", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", Clip("side.tmp.mp4"));
+        Make("-hide_banner", "-y", "-display_rotation", "90", "-i", Clip("side.tmp.mp4"), "-c", "copy", Clip("Phone upright.mp4"));
+        Make("-hide_banner", "-y", "-display_rotation", "90", "-i", Clip("side.tmp.mp4"), "-c", "copy", Clip("Phone upright copy.mp4"));
+        File.Delete(Clip("side.tmp.mp4"));
+        Make("-hide_banner", "-y", "-f", "lavfi", "-i", "smptebars=duration=30:size=640x480:rate=25", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", Clip("Old 4x3.mp4"));
+    }
+    foreach (var f in Directory.GetFiles(clips)) File.SetLastWriteTime(f, DateTime.Now.AddHours(-2));
+    var st = controller.Settings.Clone();
+    st.contentFolders = new[] { clips };
+    controller.SaveSettings(st, PathMapper.Mappings);
+    vm.SelectedTab = MainViewModel.ScanTab;
+    vm.Scan.StartCommand.Execute(null);
+    var t0 = DateTime.UtcNow;
+    Pump(500);
+    while (controller.Scanner.IsRunning && DateTime.UtcNow - t0 < TimeSpan.FromMinutes(3)) Pump(200);
+    Pump(800);
+    using (var db = new VideoInfoContext())
+        foreach (var v in db.VideoInfos.OrderBy(v => v.id))
+        {
+            var bmp = Shots.Get(v.id, 2);
+            string edge = "none";
+            if (bmp != null)
+            {
+                // Is the frame's edge empty (the picture drawn narrower or lower than the frame)?
+                int w = bmp.PixelSize.Width, h = bmp.PixelSize.Height, stride = w * 4;
+                var mem = System.Runtime.InteropServices.Marshal.AllocHGlobal(stride * h);
+                try
+                {
+                    bmp.CopyPixels(new PixelRect(bmp.PixelSize), mem, stride * h, stride);
+                    byte A(int x, int y) => System.Runtime.InteropServices.Marshal.ReadByte(mem, y * stride + x * 4 + 3);
+                    edge = $"{w}x{h}: left edge {(A(2, h / 2) == 0 ? "empty" : "picture")}, top edge {(A(w / 2, 2) == 0 ? "empty" : "picture")}, middle {(A(w / 2, h / 2) == 0 ? "empty" : "picture")}";
+                }
+                finally { System.Runtime.InteropServices.Marshal.FreeHGlobal(mem); }
+            }
+            Console.WriteLine($"[shapes] {Path.GetFileName(v.path)}: shape {v.aspect:0.###} -> {edge}");
+        }
+    vm.SelectedTab = MainViewModel.ScanTab; Pump(500); Shot("d_shapes_scan");
+    vm.SelectedTab = MainViewModel.FilesTab; Pump(1200); Shot("d_shapes_files");
+    vm.SelectedTab = MainViewModel.ReviewTab; Pump(1200); Shot("d_shapes_review");
+    Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light; Pump(800); Shot("d_shapes_review_light");
+    return;
+}
 // SHOT_SCANTHUMBS=1 (with SHOT_FFMPEG=<folder with ffmpeg and ffprobe>, and an empty data folder): the live pictures on the Scan screen -
 // each has a play button (it opens the video) - made by really scanning a few clips
 if (Environment.GetEnvironmentVariable("SHOT_SCANTHUMBS") == "1")

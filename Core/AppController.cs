@@ -61,15 +61,21 @@ namespace deepduplicates
             Encoder = new EncodeEngine(Path.Combine(FileHandler.AppFolder, "output", "encodequeue.json"), PrepareFFmpeg);
             HiddenFolders = new HiddenFolders(Path.Combine(FileHandler.AppFolder, "output", "hiddenfolders.json"));
             HookSession(Session);
-            // In the background, so the screens load at once and the queue is updated as it goes: first which finished files have been
-            // deleted since (marked as deleted), then the new files that were never checked get their check
+            // In the background, so the screens load at once and the queue is updated as it goes: first the waiting videos whose file
+            // has been deleted leave the queue, then which finished files have been deleted since (marked as deleted), then the new files
+            // that were never checked get their check
             _ = System.Threading.Tasks.Task.Run(async () =>
             {
+                try { await Encoder.RemoveDeletedWaitingAsync(); }
+                catch (Exception e) { Console.WriteLine("Could not look for deleted waiting videos: " + e.Message); }
                 try { await Encoder.VerifyFinishedFilesAsync(); }
                 catch (Exception e) { Console.WriteLine("Could not look for deleted files: " + e.Message); }
                 try { await Encoder.CheckUncheckedAsync(); }
                 catch (Exception e) { Console.WriteLine("Could not check earlier results: " + e.Message); }
             });
+            // The picture shape of videos read before it was stored, in the background (only while no scan runs; the results first)
+            _ = System.Threading.Tasks.Task.Run(() => ShapeFiller.RunAsync(async () => { try { return await PrepareFFmpeg(); } catch { return null; } },
+                () => Scanner.IsRunning, () => Session.Results.AllEntries().Select(e => e.Id).ToHashSet()));
             Scanner.ProgressChanged += NoteScanVideo;
             Scanner.Completed += results =>
             {

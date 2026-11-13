@@ -6,7 +6,7 @@
         x:DataType="vm:MainViewModel"
         Title="Duplicate Video Remover"
         Icon="/Assets/appicon.ico"
-        Width="1320" Height="860" MinWidth="1100" MinHeight="700"
+        Width="1716" Height="860" MinWidth="1100" MinHeight="700" WindowStartupLocation="CenterScreen"
         Background="{DynamicResource Table}">
   <Window.Styles>
     <Style Selector="Border.sidebar"><Setter Property="Width" Value="232"/></Style>

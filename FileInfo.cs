@@ -39,7 +39,7 @@ namespace deepduplicates
         public static void Prepare()
         {
             using var db = new VideoInfoContext();
-            db.Database.EnsureCreated();
+            EnsureSchema(db);
             try
             {
                 // Can only change while no other program has the database open; it's stored in the file,
@@ -50,6 +50,40 @@ namespace deepduplicates
             catch (Exception e)
             {
                 Console.WriteLine("Database journal mode not changed (in use by another program): " + e.Message);
+            }
+        }
+
+        /// <summary>
+        /// Makes the database if needed, and adds the columns added after a database was made (EnsureCreated only makes new databases). Each is nullable, so an older version of
+        /// the app that uses the same database (the NAS) still works: it does not ask for them.
+        /// </summary>
+        public static void EnsureSchema(VideoInfoContext db)
+        {
+            db.Database.EnsureCreated();
+            var columns = new List<string>();
+            var connection = db.Database.GetDbConnection();
+            bool wasOpen = connection.State == System.Data.ConnectionState.Open;
+            if (!wasOpen) connection.Open();
+            try
+            {
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = "PRAGMA table_info(VideoInfos)";
+                    using var reader = cmd.ExecuteReader();
+                    while (reader.Read()) columns.Add(reader.GetString(1));
+                }
+                // The video's picture shape (see VideoShape), read by the scan
+                if (columns.Count > 0 && !columns.Contains("aspect"))
+                {
+                    using var cmd = connection.CreateCommand();
+                    cmd.CommandText = "ALTER TABLE VideoInfos ADD COLUMN aspect REAL NULL";
+                    cmd.ExecuteNonQuery();
+                    Console.WriteLine("Database: added the column for the videos' picture shape");
+                }
+            }
+            finally
+            {
+                if (!wasOpen) connection.Close();
             }
         }
 
@@ -77,6 +111,8 @@ namespace deepduplicates
         public int? duration { get; set; }
         public long? fileSize { get; set; }
         public double? bitrate { get; set; }
+        /// <summary>The picture's shape when played, width / height (see VideoShape). Null: not read yet; 0: ffprobe could not tell.</summary>
+        public double? aspect { get; set; }
         public string fileHash { get; set; }
 
         public string image1Checksum_json

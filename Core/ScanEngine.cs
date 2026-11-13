@@ -167,7 +167,7 @@ namespace deepduplicates
                 try { LastScan.Save(fileHandler.allFiles); } catch (Exception e) { Console.WriteLine("Could not save lastscan.json: " + e.Message); }
 
                 using var db = new VideoInfoContext();
-                db.Database.EnsureCreated();
+                VideoInfoContext.EnsureSchema(db);
                 videoHandler = new VideoHandler(fileHandler, new ImageHandler()) { OnSeen = live.Seen, OnRead = live.Read };
                 // Phase B has two steps: reading the new videos, then comparing all of them. How the bar is shared
                 // between them is set once, when the number of new videos is known, from the expected time of each.
@@ -279,7 +279,7 @@ namespace deepduplicates
         public static List<VideoEntry> LoadEntries()
         {
             using var db = new VideoInfoContext();
-            db.Database.EnsureCreated();
+            VideoInfoContext.EnsureSchema(db);
             var conn = db.Database.GetDbConnection();
             conn.Open();
             using var cmd = conn.CreateCommand();
@@ -306,7 +306,7 @@ namespace deepduplicates
         public static List<VideoInfo> LoadAllCached()
         {
             using var db = new VideoInfoContext();
-            db.Database.EnsureCreated();
+            VideoInfoContext.EnsureSchema(db);
             var images = new ImageHandler();
             var list = new List<VideoInfo>();
             foreach (var v in db.VideoInfos.AsNoTracking().AsEnumerable())
