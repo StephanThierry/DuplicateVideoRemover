@@ -136,6 +136,26 @@
     <Style Selector="Button.icon:pointerover /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Foreground" Value="{DynamicResource AccentHover}"/>
     </Style>
+    <!-- The x at the top right of a pop-up: closes it (the same as its Cancel or Close button) -->
+    <Style Selector="Button.close">
+      <Setter Property="Width" Value="30"/>
+      <Setter Property="Height" Value="30"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="CornerRadius" Value="15"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="HorizontalAlignment" Value="Right"/>
+      <Setter Property="VerticalAlignment" Value="Top"/>
+      <Setter Property="Margin" Value="0,-6,-8,0"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
+      <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Button.close:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Raised}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+    </Style>
     <!-- Small buttons in list rows -->
     <Style Selector="Button.small">
       <Setter Property="Padding" Value="9,3"/>

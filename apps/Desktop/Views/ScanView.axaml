@@ -197,7 +197,10 @@
   <Grid Background="#80000000" IsVisible="{Binding FailedVisible}">
     <Border Classes="panel" Width="760" MaxHeight="560" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
       <DockPanel>
-        <TextBlock DockPanel.Dock="Top" Classes="h2" Text="{Binding FailedTitle}"/>
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+          <TextBlock Classes="h2" Text="{Binding FailedTitle}"/>
+          <Button Grid.Column="1" Classes="close" Command="{Binding CloseFailedCommand}" ToolTip.Tip="Close"><Path Data="M0,0 L10,10 M10,0 L0,10" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.6" StrokeLineCap="Round" Width="10" Height="10"/></Button>
+        </Grid>
         <TextBlock DockPanel.Dock="Top" Classes="muted" TextWrapping="Wrap" Margin="0,8,0,12"
                    Text="These are left out of the comparison. Try opening one in a video player: a file that is still being copied or downloaded is read again by the next scan."/>
         <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*" ColumnSpacing="16" Margin="0,0,0,6">

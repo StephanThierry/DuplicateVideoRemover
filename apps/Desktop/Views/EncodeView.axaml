@@ -201,7 +201,10 @@
     <Grid Grid.RowSpan="6" Margin="-12,-16,-12,0" Background="#80000000" IsVisible="{Binding HiddenVisible}">
       <Border Classes="panel" Width="680" MaxHeight="620" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
         <DockPanel>
-          <TextBlock DockPanel.Dock="Top" Classes="h2" Text="Hidden folders"/>
+          <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <TextBlock Classes="h2" Text="Hidden folders"/>
+            <Button Grid.Column="1" Classes="close" Command="{Binding CloseHiddenCommand}" ToolTip.Tip="Close"><Path Data="M0,0 L10,10 M10,0 L0,10" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.6" StrokeLineCap="Round" Width="10" Height="10"/></Button>
+          </Grid>
           <TextBlock DockPanel.Dock="Top" Classes="muted" TextWrapping="Wrap" Margin="0,6,0,14"
                      Text="Videos in these folders, and in the folders below them, are left out of this list. They stay hidden after a restart. Scans still read them (to skip a folder in scans, use the paths to skip in Settings)."/>
           <!-- Hide another folder: typed, pasted or chosen -->
@@ -250,7 +253,10 @@
     <Grid Grid.RowSpan="6" Margin="-12,-16,-12,0" Background="#80000000" IsVisible="{Binding DeleteVisible}">
       <Border Classes="panel" Width="560" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
         <StackPanel Spacing="12">
-          <TextBlock Classes="h2" Text="{Binding DeleteTitle}" TextWrapping="Wrap"/>
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <TextBlock Classes="h2" Text="{Binding DeleteTitle}" TextWrapping="Wrap"/>
+            <Button Grid.Column="1" Classes="close" Command="{Binding CancelDeleteCommand}" ToolTip.Tip="Cancel"><Path Data="M0,0 L10,10 M10,0 L0,10" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.6" StrokeLineCap="Round" Width="10" Height="10"/></Button>
+          </Grid>
           <TextBlock Classes="muted" Text="{Binding DeleteText}" TextWrapping="Wrap"/>
           <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0">
             <Button Content="Cancel" Command="{Binding CancelDeleteCommand}"/>
@@ -264,7 +270,10 @@
     <Grid Grid.RowSpan="6" Margin="-12,-16,-12,0" Background="#80000000" IsVisible="{Binding ConfirmVisible}">
       <Border Classes="panel" Width="560" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
         <StackPanel Spacing="12">
-          <TextBlock Classes="h2" Text="{Binding ConfirmTitle}" TextWrapping="Wrap"/>
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <TextBlock Classes="h2" Text="{Binding ConfirmTitle}" TextWrapping="Wrap"/>
+            <Button Grid.Column="1" Classes="close" Command="{Binding CancelCreateCommand}" ToolTip.Tip="Cancel"><Path Data="M0,0 L10,10 M10,0 L0,10" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.6" StrokeLineCap="Round" Width="10" Height="10"/></Button>
+          </Grid>
           <TextBlock Classes="muted" Text="{Binding ConfirmText}" TextWrapping="Wrap"/>
           <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,8,0,0">
             <Button Content="Cancel" Command="{Binding CancelCreateCommand}"/>

@@ -481,7 +481,10 @@
     <Grid Grid.ColumnSpan="2" Margin="-12,-16,-12,-12" Background="#80000000" IsVisible="{Binding ConfirmVisible}">
       <Border Classes="panel" Width="560" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
         <StackPanel Spacing="12">
-          <TextBlock Classes="h2" Text="{Binding ConfirmTitle}" TextWrapping="Wrap"/>
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <TextBlock Classes="h2" Text="{Binding ConfirmTitle}" TextWrapping="Wrap"/>
+            <Button Grid.Column="1" Classes="close" Command="{Binding CancelUpdateCommand}" ToolTip.Tip="Cancel" IsEnabled="{Binding !Updating}"><Path Data="M0,0 L10,10 M10,0 L0,10" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.6" StrokeLineCap="Round" Width="10" Height="10"/></Button>
+          </Grid>
           <TextBlock Classes="muted" Text="{Binding ConfirmText}" TextWrapping="Wrap"/>
           <StackPanel Spacing="6" IsVisible="{Binding Updating}">
             <TextBlock Text="{Binding UpdateStep}"/>
