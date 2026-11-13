@@ -2,6 +2,7 @@
 @implements IDisposable
 @inject AppController App
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <PageTitle>Review duplicates</PageTitle>
 
@@ -110,13 +111,16 @@
                                     <Strip VideoId="m.Id" Title="Click to select or unselect" OnClick="() => Toggle(m.Id)" />
                                     <button class="icon" @onclick="() => playing = m" title="Play" aria-label="Play @m.FileName">@VideoPlayer.Icon</button>
                                     <div class="info">
-                                        <div class="name">@m.FileName @if (doomed) { <span class="doomed-tag" title="Every copy of this video is selected: deleting removes all of them. Unselect one to keep it.">Every copy will be deleted</span> }</div>
+                                        <div class="name">@m.FileName <span class="marks"><span class="keep-tag">Keep</span><span class="doomed-tag" title="Every copy of this video is selected: deleting removes all of them. Unselect one to keep it.">Every copy will be deleted</span></span></div>
                                         <div class="folderline">
                                             <button class="link folderlink" @onclick="() => FilterFolder(m.Folder)" title="Show only this folder">@m.Folder</button>
                                             <button class="small" @onclick="() => ExcludeFolder(m.Folder)" title="Skip this folder in later scans (added to the paths to skip) and take its files out of the matches">Exclude this folder</button>
+                                            <button class="copy-icon" @onclick="() => CopyFolder(m.Folder)" title="Copy the folder path to the clipboard: @m.Folder" aria-label="Copy the folder path">
+                                                <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M5 1.5h7.5V10M2 4.5h7.5V14H2z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+                                            </button>
                                         </div>
                                         <div class="meta"><span>@Fmt.Size(m.SizeBytes)</span><span>@Fmt.Duration(m.DurationSeconds)</span><span>@Fmt.Bitrate(m.Bitrate)</span></div>
-                                        @if (m.Id != keepId && !string.IsNullOrEmpty(m.Reason)) { <div class="reason">@CleanReason(m.Reason)</div> }
+                                        @if (!string.IsNullOrEmpty(m.Reason)) { <div class="reason @(m.Id == keepId ? "unseen" : "")">@CleanReason(m.Reason)</div> }
                                     </div>
                                 </div>
                             }
@@ -144,6 +148,9 @@
                                     <div class="folderline">
                                         <button class="link folderlink" @onclick="() => FilterFolder(b.Folder)" title="Show only this folder">@b.Folder</button>
                                         <button class="small" @onclick="() => ExcludeFolder(b.Folder)" title="Skip this folder in later scans (added to the paths to skip) and take its files out of the matches">Exclude this folder</button>
+                                        <button class="copy-icon" @onclick="() => CopyFolder(b.Folder)" title="Copy the folder path to the clipboard: @b.Folder" aria-label="Copy the folder path">
+                                            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M5 1.5h7.5V10M2 4.5h7.5V14H2z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+                                        </button>
                                     </div>
                                     <div class="meta"><span>@Fmt.Size(b.SizeBytes)</span><span>@Fmt.Duration(b.DurationSeconds)</span></div>
                                     <div class="reason">@CleanReason(b.Reason)</div>
@@ -330,6 +337,16 @@
 
     // Skips the folder in later scans and takes its files out of the matches now
     private void ExcludeFolder() => ExcludeFolder(folderFilter);
+
+    private async Task CopyFolder(string folder)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("dvr.copy", folder);
+            ShowToast("Copied: " + folder);
+        }
+        catch (Exception e) { ShowToast("Could not copy: " + e.Message); }
+    }
 
     private void ExcludeFolder(string? folder)
     {

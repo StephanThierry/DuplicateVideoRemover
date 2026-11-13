@@ -63,7 +63,8 @@
       <Button Content="Select all" Command="{Binding SelectAllCommand}" Margin="0,0,8,6"/>
       <Button Content="Select top 20" Command="{Binding SelectTopCommand}" Margin="0,0,8,6"/>
       <Button Content="Select none" Command="{Binding SelectNoneCommand}" IsEnabled="{Binding HasPicked}" Margin="0,0,8,6"/>
-      <Button Content="{Binding UnhideText}" Command="{Binding UnhideFoldersCommand}" IsVisible="{Binding HasHidden}" Margin="0,0,8,6"/>
+      <Button Content="{Binding ManageHiddenText}" Command="{Binding ManageHiddenCommand}" Margin="0,0,8,6"
+              ToolTip.Tip="See the folders that are hidden here, show them again one by one, or hide a folder (with everything below it)"/>
       <CheckBox Content="Hide videos in the queue" IsChecked="{Binding HideQueued}" IsVisible="{Binding HasQueueSummary}" Margin="0,0,8,6"/>
       <Panel Width="8"/>
       <TextBlock Text="Only above" VerticalAlignment="Center" Margin="0,0,6,6"/>
@@ -195,6 +196,55 @@
             HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="680">
       <TextBlock Text="{Binding Toast}" Foreground="{DynamicResource Sheet}" TextWrapping="Wrap"/>
     </Border>
+
+    <!-- Manage hidden folders: each hidden folder with Unhide, a folder to hide (a parent folder too), and Unhide all -->
+    <Grid Grid.RowSpan="6" Margin="-12,-16,-12,0" Background="#80000000" IsVisible="{Binding HiddenVisible}">
+      <Border Classes="panel" Width="680" MaxHeight="620" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Top" Classes="h2" Text="Hidden folders"/>
+          <TextBlock DockPanel.Dock="Top" Classes="muted" TextWrapping="Wrap" Margin="0,6,0,14"
+                     Text="Videos in these folders, and in the folders below them, are left out of this list. They stay hidden after a restart. Scans still read them (to skip a folder in scans, use the paths to skip in Settings)."/>
+          <!-- Hide another folder: typed, pasted or chosen -->
+          <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,14">
+            <TextBlock Text="Hide a folder" FontWeight="SemiBold"/>
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+              <TextBox Text="{Binding NewHiddenFolder}" PlaceholderText="A folder, e.g. D:\Videos\Archive - the folders below it are hidden too">
+                <TextBox.KeyBindings><KeyBinding Gesture="Enter" Command="{Binding AddHiddenCommand}"/></TextBox.KeyBindings>
+              </TextBox>
+              <Button Grid.Column="1" Content="Browse..." Command="{Binding BrowseHiddenCommand}"/>
+              <Button Grid.Column="2" Classes="primary" Content="Hide" Command="{Binding AddHiddenCommand}"/>
+            </Grid>
+          </StackPanel>
+          <DockPanel DockPanel.Dock="Bottom" Margin="0,16,0,0">
+            <Button DockPanel.Dock="Right" Classes="primary" Content="Done" Command="{Binding CloseHiddenCommand}"/>
+            <Button Content="Unhide all folders" Command="{Binding UnhideAllCommand}" IsEnabled="{Binding HasHiddenFolders}" HorizontalAlignment="Left"/>
+          </DockPanel>
+          <Border BorderBrush="{DynamicResource Rule}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
+            <Panel>
+              <TextBlock Classes="muted" Text="No folders are hidden." Margin="14,12" IsVisible="{Binding !HasHiddenFolders}"/>
+              <ScrollViewer Classes="gutter" IsVisible="{Binding HasHiddenFolders}">
+                <ItemsControl ItemsSource="{Binding HiddenList}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:HiddenFolderRow">
+                      <Border BorderBrush="{DynamicResource Rule}" BorderThickness="0,0,0,1" Padding="14,8">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                          <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Folder}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                            <TextBlock Text="{Binding Videos}" Classes="muted small"/>
+                          </StackPanel>
+                          <Button Grid.Column="1" Classes="small" Content="Unhide" Command="{Binding UnhideCommand}" VerticalAlignment="Center"
+                                  ToolTip.Tip="{Binding Folder, StringFormat='Show the videos in {0} again'}"/>
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </Panel>
+          </Border>
+        </DockPanel>
+      </Border>
+    </Grid>
 
     <!-- Confirmation before deleting one video -->
     <Grid Grid.RowSpan="6" Margin="-12,-16,-12,0" Background="#80000000" IsVisible="{Binding DeleteVisible}">

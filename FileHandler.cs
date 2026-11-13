@@ -21,6 +21,8 @@ namespace deepduplicates
         /// with the size the database row was made from: a different size means another file is at that path now.
         /// </summary>
         public Dictionary<string, long> allFileSizes { get; private set; } = new(StringComparer.Ordinal);
+        /// <summary>When each found file was last written (UTC), from the same folder listing - no extra disk access.</summary>
+        public Dictionary<string, DateTime> allFileTimes { get; private set; } = new(StringComparer.Ordinal);
 
         /// <summary>Some of the files found most recently (every 16th one), the oldest first: the live pictures on the Scan page are taken from them while the folders are walked.</summary>
         public System.Collections.Concurrent.ConcurrentQueue<string> RecentFound { get; } = new();
@@ -157,7 +159,7 @@ namespace deepduplicates
 
             var queue = new System.Collections.Concurrent.BlockingCollection<string>();
             int pending = 0, dirsDone = 0, dirsKnown = 0, files = 0;
-            var results = new System.Collections.Concurrent.ConcurrentBag<List<(string Path, long Length)>>();
+            var results = new System.Collections.Concurrent.ConcurrentBag<List<(string Path, long Length, DateTime Written)>>();
             string[] exclude = settings.excludePaths ?? Array.Empty<string>();
             var options = new EnumerationOptions
             {
@@ -178,7 +180,7 @@ namespace deepduplicates
 
             void Worker()
             {
-                var mine = new List<(string Path, long Length)>();
+                var mine = new List<(string Path, long Length, DateTime Written)>();
                 results.Add(mine);
                 try
                 {
@@ -186,19 +188,19 @@ namespace deepduplicates
                     {
                         try
                         {
-                            var entries = new System.IO.Enumeration.FileSystemEnumerable<(string Path, bool IsDir, long Length)>(dir,
-                                (ref System.IO.Enumeration.FileSystemEntry e) => (e.ToFullPath(), e.IsDirectory, e.IsDirectory ? 0 : e.Length), options)
+                            var entries = new System.IO.Enumeration.FileSystemEnumerable<(string Path, bool IsDir, long Length, DateTime Written)>(dir,
+                                (ref System.IO.Enumeration.FileSystemEntry e) => (e.ToFullPath(), e.IsDirectory, e.IsDirectory ? 0 : e.Length, e.LastWriteTimeUtc.UtcDateTime), options)
                             {
                                 ShouldIncludePredicate = (ref System.IO.Enumeration.FileSystemEntry e) => e.IsDirectory || IsVideo(e.FileName)
                             };
-                            foreach (var (path, isDir, length) in entries)
+                            foreach (var (path, isDir, length, written) in entries)
                             {
                                 // A path with an excluded text in it: so is everything below it, no need to walk it
                                 if (exclude.Any(x => path.Contains(x))) continue;
                                 if (isDir) Add(path);
                                 else
                                 {
-                                    mine.Add((path, length));
+                                    mine.Add((path, length, written));
                                     int n = Interlocked.Increment(ref files);
                                     if (n == 1 || (n & 15) == 0)
                                     {
@@ -227,8 +229,10 @@ namespace deepduplicates
             Console.WriteLine("Found a total of " + found.Count + " video files in " + dirsDone + " folders.");
             onProgress?.Invoke(new FindProgress(found.Count, dirsDone, dirsKnown));
             var sizes = new Dictionary<string, long>(found.Count, StringComparer.Ordinal);
-            foreach (var (path, length) in found) sizes[path] = length;
+            var times = new Dictionary<string, DateTime>(found.Count, StringComparer.Ordinal);
+            foreach (var (path, length, written) in found) { sizes[path] = length; times[path] = written; }
             this.allFileSizes = sizes;
+            this.allFileTimes = times;
             this.allFiles = found.Select(f => f.Path).ToList();
             this.allFilesCount = found.Count;
             this.allDirsCount = dirsDone;

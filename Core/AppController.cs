@@ -37,6 +37,8 @@ namespace deepduplicates
         /// <summary>The encode queue (Re-encode adds videos, the Re-encode queue screen shows it).</summary>
         public EncodeEngine Encoder { get; }
         public ResultSession Session { get; private set; }
+        /// <summary>Folders hidden in Re-encode planning; kept between runs.</summary>
+        public HiddenFolders HiddenFolders { get; }
 
         /// <summary>Raised when there is a new review session (after a scan, or new results).</summary>
         public event Action SessionReplaced;
@@ -57,6 +59,7 @@ namespace deepduplicates
             catch (Exception e) { Console.WriteLine("Could not update the rules to the main names: " + e.Message); }
             Session = new ResultSession(ResultSet.LoadSaved());
             Encoder = new EncodeEngine(Path.Combine(FileHandler.AppFolder, "output", "encodequeue.json"), PrepareFFmpeg);
+            HiddenFolders = new HiddenFolders(Path.Combine(FileHandler.AppFolder, "output", "hiddenfolders.json"));
             HookSession(Session);
             // In the background, so the screens load at once and the queue is updated as it goes: first which finished files have been
             // deleted since (marked as deleted), then the new files that were never checked get their check

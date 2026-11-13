@@ -68,10 +68,7 @@
             <button @onclick="SelectVisible">Select all</button>
             <button @onclick="() => SelectTop(20)">Select top 20</button>
             <button @onclick="() => picked.Clear()" disabled="@(picked.Count == 0)">Select none</button>
-            @if (hidden.Count > 0)
-            {
-                <button @onclick="() => { hidden.Clear(); ResetPaging(); }" title="@string.Join("\n", hidden)">Unhide folders (@hidden.Count)</button>
-            }
+            <button @onclick="() => managingHidden = true" title="See the folders that are hidden here, show them again one by one, or hide a folder (with everything below it)">Manage hidden folders@(hidden.Count > 0 ? $" ({hidden.Count})" : "")</button>
             @if (queueMap.Count > 0)
             {
                 <label class="inline"><input type="checkbox" checked="@hideQueued" @onchange="e => { hideQueued = (bool)e.Value!; ResetPaging(); }" /> Hide videos in the queue</label>
@@ -154,6 +151,38 @@
     </div>
 }
 
+@if (managingHidden)
+{
+    <div class="dialog-backdrop" @onclick="() => managingHidden = false">
+        <div class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="hidden-title" @onclick:stopPropagation="true">
+            <h2 id="hidden-title">Hidden folders</h2>
+            <p>Videos in these folders, and in the folders below them, are left out of this list. They stay hidden after a restart. Scans still read them (to skip a folder in scans, use the paths to skip in Settings).</p>
+            <form class="hide-add" @onsubmit="AddHidden" @onsubmit:preventDefault="true">
+                <label for="hide-folder"><strong>Hide a folder</strong></label>
+                <div class="row-inline">
+                    <input id="hide-folder" type="text" @bind="newHidden" @bind:event="oninput" placeholder="A folder, e.g. D:\Videos\Archive - the folders below it are hidden too" />
+                    <button class="primary" type="submit" disabled="@string.IsNullOrWhiteSpace(newHidden)">Hide</button>
+                </div>
+            </form>
+            <div class="hidden-list">
+                @if (hidden.Count == 0) { <div class="muted empty">No folders are hidden.</div> }
+                @foreach (var f in hidden.List)
+                {
+                    int n = (candidates ?? new()).Count(c => HiddenFolders.Covers(f, c.Folder));
+                    <div class="hidden-row">
+                        <div><strong>@f</strong><div class="muted small">@(n == 0 ? "no videos in the list" : Fmt.Plural(n, "video", "videos") + " hidden")</div></div>
+                        <button class="small" @onclick="() => Unhide(f)" title="Show the videos in @f again">Unhide</button>
+                    </div>
+                }
+            </div>
+            <div class="buttons spread">
+                <button @onclick="UnhideAll" disabled="@(hidden.Count == 0)">Unhide all folders</button>
+                <button class="primary" @onclick="() => managingHidden = false">Done</button>
+            </div>
+        </div>
+    </div>
+}
+
 @if (deleting != null)
 {
     <div class="dialog-backdrop" @onclick="() => deleting = null">
@@ -177,7 +206,10 @@
 
 @code {
     [Inject] private IJSRuntime JS { get; set; } = default!;
-    private readonly HashSet<string> hidden = new(StringComparer.OrdinalIgnoreCase);   // folders hidden with "Exclude folder"
+    // Folders hidden with "Exclude folder" or on the Manage hidden folders screen (kept between runs, shared with the desktop app)
+    private HiddenFolders hidden => App.HiddenFolders;
+    private bool managingHidden;
+    private string newHidden = "";
     private EncodeCandidate? deleting;
     private VideoEntry? playing;
 
@@ -212,6 +244,7 @@
     {
         App.DataChanged += OnDataChanged;
         App.Encoder.ProgressChanged += OnQueue;
+        App.HiddenFolders.Changed += OnHiddenChanged;
         RefreshQueue();
         await Load();
     }
@@ -260,7 +293,7 @@
     {
         var query = SearchQuery.Parse(search);
         var shown = (candidates ?? new()).Where(c =>
-            !(hideQueued && queueMap.ContainsKey(c.Path)) && c.AverageKbps >= minKbps && c.SizeBytes >= (long)minMb * 1024 * 1024 && !hidden.Contains(c.Folder) &&
+            !(hideQueued && queueMap.ContainsKey(c.Path)) && c.AverageKbps >= minKbps && c.SizeBytes >= (long)minMb * 1024 * 1024 && !hidden.Hides(c.Folder) &&
             query.Matches(c.Path));
         return FileSorting.Order(shown, sort, c => c.Path, c => c.SizeBytes, c => c.AverageKbps);
     }
@@ -307,12 +340,37 @@
     private void ResetPaging() => shown = 100;
 
     // Hidden videos are unpicked too, so the script only holds what can be seen
-    private void HideFolder(string folder)
+    private bool HideFolder(string folder)
     {
-        hidden.Add(folder);
-        foreach (var c in (candidates ?? new()).Where(c => string.Equals(c.Folder, folder, StringComparison.OrdinalIgnoreCase))) picked.Remove(c.Id);
-        ShowToast($"Hid the videos in {folder}.");
+        if (!hidden.Add(folder)) { ShowToast($"{folder} is hidden already."); return false; }
+        int n = 0;
+        foreach (var c in (candidates ?? new()).Where(c => HiddenFolders.Covers(folder, c.Folder))) { picked.Remove(c.Id); n++; }
+        ResetPaging();
+        ShowToast($"Hid {Fmt.Plural(n, "video", "videos")} in {folder} and its subfolders.");
+        return true;
     }
+
+    private void AddHidden()
+    {
+        string folder = newHidden.Trim().Trim('"');
+        if (folder.Length > 0 && HideFolder(folder)) newHidden = "";
+    }
+
+    private void Unhide(string folder)
+    {
+        if (hidden.Remove(folder)) { ResetPaging(); ShowToast($"{folder} is shown again."); }
+    }
+
+    private void UnhideAll()
+    {
+        int n = hidden.Count;
+        hidden.Clear();
+        ResetPaging();
+        if (n > 0) ShowToast($"Showing all folders again ({Fmt.Plural(n, "folder was", "folders were")} hidden).");
+    }
+
+    // Hidden or shown in another tab or window: show the same here
+    private void OnHiddenChanged() => InvokeAsync(StateHasChanged);
 
     private async Task CopyPath(EncodeCandidate c)
     {
@@ -388,6 +446,7 @@
     {
         App.DataChanged -= OnDataChanged;
         App.Encoder.ProgressChanged -= OnQueue;
+        App.HiddenFolders.Changed -= OnHiddenChanged;
         toastTimer?.Cancel();
     }
 }

@@ -47,6 +47,27 @@ namespace deepduplicates
         public static bool IsStale(VideoInfo item, long? sizeOnDisk) =>
             item.fileSize is long was && was > 0 && sizeOnDisk is long now && now > 0 && now != was;
 
+        /// <summary>
+        /// True when the file was written after its pictures were made: it was not finished when it was read. A download that reserves the
+        /// whole file at once keeps its size, so <see cref="IsStale"/> does not see it; the pictures then show a broken frame for ever.
+        /// A minute of slack covers clocks that differ a little between the NAS and this computer.
+        /// </summary>
+        public static bool WrittenAfterPictures(DateTime? fileWrittenUtc, DateTime? picturesMadeUtc) =>
+            fileWrittenUtc is DateTime f && picturesMadeUtc is DateTime p && f > p.AddMinutes(1);
+
+        /// <summary>
+        /// True when the row's pictures were left over from a read that failed: an earlier version took them again on the next scan
+        /// without making new ones, so the row looks read but its pictures (and hashes) are of a broken file.
+        /// </summary>
+        public static bool HasPicturesFromFailedRead(VideoInfo item) =>
+            item.image1Checksum != null && item.formatNotSupported != true && item.reason != null && item.reason.StartsWith("Screenshot failed");
+
+        private DateTime? PicturesMadeUtc(VideoInfo item)
+        {
+            try { var shot = new System.IO.FileInfo(fileHandler.screenshotPath(item, 1)); return shot.Exists ? shot.LastWriteTimeUtc : null; }
+            catch { return null; }
+        }
+
         // Forgets everything read from the old file, so the row is read again: its pictures too (they are kept by row id and reused)
         public void ForgetWhatWasRead(VideoInfo item)
         {
@@ -103,16 +124,23 @@ namespace deepduplicates
                         from subItem in tmp.DefaultIfEmpty()
                         select new VideoInfoWrapper { path = path, item = subItem }).ToList();
 
-            // A file that is not the one that was read any more (another size than the row says) is read again
+            // A file that is not the one that was read any more (another size than the row says, or written after its pictures were
+            // made), or whose pictures are left over from a failed read, is read again
             int changedFiles = 0;
             foreach (var w in query)
             {
-                if (w.item != null && fileHandler.allFileSizes.TryGetValue(w.path, out long sizeNow) && IsStale(w.item, sizeNow))
-                {
-                    Console.WriteLine($"Changed since it was read ({Fmt.Size(w.item.fileSize ?? 0)} then, {Fmt.Size(sizeNow)} now) - reading again: {w.path}");
-                    ForgetWhatWasRead(w.item);
-                    changedFiles++;
-                }
+                if (w.item == null) continue;
+                string why = null;
+                if (fileHandler.allFileSizes.TryGetValue(w.path, out long sizeNow) && IsStale(w.item, sizeNow))
+                    why = $"changed since it was read ({Fmt.Size(w.item.fileSize ?? 0)} then, {Fmt.Size(sizeNow)} now)";
+                else if (HasPicturesFromFailedRead(w.item))
+                    why = "its pictures are from a read that failed";
+                else if (w.item.image1Checksum != null && fileHandler.allFileTimes.TryGetValue(w.path, out var written) && WrittenAfterPictures(written, PicturesMadeUtc(w.item)))
+                    why = "written after its pictures were made";
+                if (why == null) continue;
+                Console.WriteLine($"Reading again, {why}: {w.path}");
+                ForgetWhatWasRead(w.item);
+                changedFiles++;
             }
             if (changedFiles > 0) Console.WriteLine($"{changedFiles} files changed since they were read and are read again.");
 
@@ -197,6 +225,7 @@ namespace deepduplicates
 
                     wrapper.item.path = wrapper.path;
                     wrapper.item.duration = -1;
+                    wrapper.item.reason = null;   // what an earlier, failed read said no longer holds
 
                     //Console.WriteLine("Reading video duration...");
                     IMediaInfo info = null;
@@ -267,9 +296,12 @@ namespace deepduplicates
             return (mediaList);
         }
 
+        // Always a new picture: one already there is left over from a read that failed or was stopped (this only runs for a row without
+        // pictures), and reusing it gave the row a broken frame for good
         private async Task<rgb[]> saveScreenshotReturnChecksumAsync(IMediaInfo info, string screenshotPath, ImageHandler imageHandler, int point)
         {
-            if (!File.Exists(screenshotPath)) await imageHandler.takeScreenshot(info, screenshotPath, TimeSpan.FromSeconds(point), 240, 160).Start();
+            try { if (File.Exists(screenshotPath)) File.Delete(screenshotPath); } catch (IOException) { /* in use: FFmpeg writes over it */ }
+            await imageHandler.takeScreenshot(info.FileInfo.FullName, screenshotPath, point, 240, 160);
             return (imageHandler.imageChecksum(screenshotPath));
         }
 

@@ -173,9 +173,10 @@ namespace deepduplicates
         /// <summary>
         /// The FFmpeg arguments for one video. With <paramref name="partOutput"/> (the app's own encoding) the video is
         /// written there with its container named explicitly, always overwriting (the caller has already decided about
-        /// an existing result), and FFmpeg reports its progress on standard output.
+        /// an existing result), and FFmpeg reports its progress on standard output. <paramref name="subtitleCodecs"/> are the
+        /// input's subtitle kinds when known (see <see cref="Subtitles"/>).
         /// </summary>
-        public static List<string> Arguments(string input, EncodeSettings e, string partOutput)
+        public static List<string> Arguments(string input, EncodeSettings e, string partOutput, IReadOnlyList<string> subtitleCodecs = null)
         {
             var codec = EncodeOptions.Codec(e.codec);
             // Scale to the target height keeping the aspect ratio (width divisible by 2); never enlarge.
@@ -186,10 +187,16 @@ namespace deepduplicates
             var args = new List<string>();
             if (partOutput != null) args.AddRange(new[] { "-hide_banner", "-nostdin", "-progress", "pipe:1", "-nostats" });
             args.AddRange(new[] { partOutput != null ? "-y" : e.neverOverwrite ? "-n" : "-y", "-i", input, "-map", "0:v:0", "-map", "0:a?",
-                "-c:v", codec.Encoder, "-crf", e.crf.ToString(), "-preset", e.preset, "-vf", filter, "-pix_fmt", "yuv420p" });
+                "-c:v", codec.Encoder, "-crf", e.crf.ToString(), "-preset", e.preset, "-vf", filter, "-pix_fmt", "yuv420p",
+                // Every frame at its own time, in the original's time base: the new file's frames sit exactly where the original's
+                // do, so the scan's pictures of both are the same frames (by default MP4 gets a constant frame rate, which drops or
+                // repeats frames of a variable-rate video and rounds every time to its grid). "-1" (the demuxer's time base) is
+                // also understood by older FFmpeg versions than "demux".
+                "-fps_mode", "passthrough", "-enc_time_base:v", "-1" });
             if (codec.Id == "x265" && e.container == "mp4" && e.appleCompatible) args.AddRange(new[] { "-tag:v", "hvc1" });
             if (e.audio == "aac") args.AddRange(new[] { "-c:a", "aac", "-b:a", "160k" });
             else args.AddRange(new[] { "-c:a", "copy" });
+            args.AddRange(Subtitles.Arguments(input, e.container, subtitleCodecs));
             if (e.container == "mp4") args.AddRange(new[] { "-movflags", "+faststart" });
             if (partOutput != null) args.AddRange(new[] { "-f", FormatName(e), partOutput });
             else args.Add(OutputPath(input, e));

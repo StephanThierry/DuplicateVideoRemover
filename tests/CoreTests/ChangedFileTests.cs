@@ -75,5 +75,33 @@ public class ChangedFileTests : IDisposable
         File.WriteAllBytes(Path.Combine(dir, "a.mp4"), new byte[5000]);
         handler.FindFiles(null, default);
         Assert.True(VideoHandler.IsStale(new VideoInfo { fileSize = 10 }, handler.allFileSizes[Path.Combine(dir, "a.mp4")]));
+
+        // ... and the listing knows when each file was written, without opening it
+        var written = new DateTime(2026, 11, 6, 22, 35, 14, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(Path.Combine(dir, "a.mp4"), written);
+        handler.FindFiles(null, default);
+        Assert.Equal(written, handler.allFileTimes[Path.Combine(dir, "a.mp4")]);
+    }
+
+    [Fact]
+    public void AFileWrittenAfterItsPicturesWereMade_IsReadAgain()
+    {
+        var made = new DateTime(2026, 11, 5, 19, 57, 10, DateTimeKind.Utc);
+        // A download that reserved the whole file: same size, finished a day after the scan read it
+        Assert.True(VideoHandler.WrittenAfterPictures(made.AddDays(1), made));
+        Assert.False(VideoHandler.WrittenAfterPictures(made.AddHours(-3), made));     // written before: the pictures are of the real file
+        Assert.False(VideoHandler.WrittenAfterPictures(made.AddSeconds(40), made));   // clocks that differ a little
+        Assert.False(VideoHandler.WrittenAfterPictures(null, made));
+        Assert.False(VideoHandler.WrittenAfterPictures(made, null));                   // no pictures: it is read anyway
+    }
+
+    [Fact]
+    public void PicturesLeftOverFromAFailedRead_AreRecognised()
+    {
+        const string failed = "Screenshot failed! ConversionException. Most likely caused by an invalid or incomplete video.";
+        Assert.True(VideoHandler.HasPicturesFromFailedRead(new VideoInfo { reason = failed, image1Checksum = new rgb[1] }));
+        Assert.False(VideoHandler.HasPicturesFromFailedRead(new VideoInfo { reason = failed }));   // failed, no pictures: read again anyway
+        Assert.False(VideoHandler.HasPicturesFromFailedRead(new VideoInfo { reason = "Too short", image1Checksum = new rgb[1] }));
+        Assert.False(VideoHandler.HasPicturesFromFailedRead(new VideoInfo { reason = failed, image1Checksum = new rgb[1], formatNotSupported = true }));
     }
 }

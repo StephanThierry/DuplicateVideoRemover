@@ -28,11 +28,19 @@
     <Style Selector="Border.video.selected">
       <Setter Property="Background" Value="{DynamicResource GreaseWash}"/>
     </Style>
-    <!-- Every copy of the video is selected for removal: nothing of it will be left -->
+    <!-- Every copy of the video is selected for removal: nothing of it will be left.
+         The thicker border takes its pixel from the padding, so the card keeps its size. -->
     <Style Selector="Border.video.doomed">
       <Setter Property="Background" Value="{DynamicResource GreaseStrong}"/>
       <Setter Property="BorderBrush" Value="{DynamicResource Grease}"/>
       <Setter Property="BorderThickness" Value="2"/>
+      <Setter Property="Padding" Value="11,9"/>
+    </Style>
+    <!-- Hidden but still taking its space: selecting a copy moves the keep mark and the red state between cards, and a card
+         that changed height would make the list jump (the clicked card could even scroll out of view) -->
+    <Style Selector=":is(Control).unseen">
+      <Setter Property="Opacity" Value="0"/>
+      <Setter Property="IsHitTestVisible" Value="False"/>
     </Style>
     <Style Selector="Button.folder">
       <Setter Property="HorizontalAlignment" Value="Stretch"/>
@@ -52,6 +60,13 @@
     <ContainerQuery Name="cards" Query="max-width:760">
       <Style Selector="Image.shot"><Setter Property="Width" Value="96"/><Setter Property="Height" Value="64"/></Style>
     </ContainerQuery>
+    <!-- The little copy button next to "Exclude this folder": no bigger than that button -->
+    <Style Selector="Button.icon.copy">
+      <Setter Property="Width" Value="26"/>
+      <Setter Property="Height" Value="26"/>
+      <Setter Property="CornerRadius" Value="5"/>
+      <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
+    </Style>
     <Style Selector="Button.folder.active">
       <Setter Property="Background" Value="{DynamicResource Sheet}"/>
       <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
@@ -175,13 +190,16 @@
                   <StackPanel Grid.Column="3" VerticalAlignment="Center" Spacing="2">
                     <WrapPanel Orientation="Horizontal" ItemSpacing="8">
                       <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                      <Border IsVisible="{Binding IsKept}" Background="{DynamicResource KeepWash}" CornerRadius="9" Padding="8,1" VerticalAlignment="Center">
-                        <TextBlock Text="Keep" Foreground="{DynamicResource Keep}" FontSize="11" FontWeight="SemiBold"/>
-                      </Border>
-                      <Border IsVisible="{Binding IsDoomed}" Background="{DynamicResource Grease}" CornerRadius="9" Padding="8,1" VerticalAlignment="Center"
-                              ToolTip.Tip="Every copy of this video is selected: deleting removes all of them. Unselect one to keep it.">
-                        <TextBlock Text="Every copy will be deleted" Foreground="White" FontSize="11" FontWeight="SemiBold"/>
-                      </Border>
+                      <!-- Both marks share one place that is always there (in a group), so the name wraps the same way whichever shows -->
+                      <Panel IsVisible="{Binding InGroup}" VerticalAlignment="Center">
+                        <Border Classes.unseen="{Binding !IsKept}" Background="{DynamicResource KeepWash}" CornerRadius="9" Padding="8,1" HorizontalAlignment="Left">
+                          <TextBlock Text="Keep" Foreground="{DynamicResource Keep}" FontSize="11" FontWeight="SemiBold"/>
+                        </Border>
+                        <Border Classes.unseen="{Binding !IsDoomed}" Background="{DynamicResource Grease}" CornerRadius="9" Padding="8,1" HorizontalAlignment="Left"
+                                ToolTip.Tip="Every copy of this video is selected: deleting removes all of them. Unselect one to keep it.">
+                          <TextBlock Text="Every copy will be deleted" Foreground="White" FontSize="11" FontWeight="SemiBold"/>
+                        </Border>
+                      </Panel>
                     </WrapPanel>
                     <WrapPanel Orientation="Horizontal" ItemSpacing="10" LineSpacing="4">
                       <Button Classes="link" Command="{Binding ShowFolderCommand}" ToolTip.Tip="Show only this folder">
@@ -189,9 +207,15 @@
                       </Button>
                       <Button Classes="small" Content="Exclude this folder" Command="{Binding ExcludeFolderCommand}"
                               ToolTip.Tip="Skip this folder in later scans (added to the paths to skip) and take its files out of the matches"/>
+                      <Button Classes="icon copy" Command="{Binding CopyFolderCommand}" VerticalAlignment="Center"
+                              ToolTip.Tip="{Binding Folder, StringFormat='Copy the folder path to the clipboard: {0}'}">
+                        <!-- Two sheets: the copy in front of the original -->
+                        <Path Data="M5,1.5 H12.5 V10 M2,4.5 H9.5 V14 H2 Z" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.4"
+                              StrokeJoin="Round" Width="15" Height="16" Stretch="None"/>
+                      </Button>
                     </WrapPanel>
                     <TextBlock Classes="muted small" Text="{Binding Meta}"/>
-                    <TextBlock Classes="muted small" Text="{Binding Reason}" IsVisible="{Binding ShowReason}" TextWrapping="Wrap"/>
+                    <TextBlock Classes="muted small" Text="{Binding Reason}" IsVisible="{Binding HasReason}" Classes.unseen="{Binding IsKept}" TextWrapping="Wrap"/>
                   </StackPanel>
                 </Grid>
               </Border>
