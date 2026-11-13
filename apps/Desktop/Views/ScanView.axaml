@@ -3,6 +3,7 @@
              xmlns:vm="using:DuplicateVideoRemover.Desktop.ViewModels"
              xmlns:img="using:Avalonia.Media.Imaging"
              xmlns:sys="using:System"
+             xmlns:core="using:deepduplicates"
              x:Class="DuplicateVideoRemover.Desktop.Views.ScanView"
              x:DataType="vm:ScanViewModel">
   <UserControl.DataTemplates>
@@ -41,7 +42,10 @@
     <Style Selector="Button.thumbbtn Border.playbadge"><Setter Property="Background" Value="#99000000"/></Style>
     <Style Selector="Button.thumbbtn:pointerover Border.playbadge"><Setter Property="Background" Value="#E6000000"/></Style>
     <Style Selector="ProgressBar.done"><Setter Property="Foreground" Value="{DynamicResource Keep}"/></Style>
+    <!-- The "i" next to "Could not read" -->
+    <Style Selector="Button.icon.tinyinfo"><Setter Property="Width" Value="22"/><Setter Property="Height" Value="22"/><Setter Property="CornerRadius" Value="11"/></Style>
   </UserControl.Styles>
+  <Panel>
   <ScrollViewer Classes="gutter">
     <Grid RowDefinitions="Auto,*" Margin="12,16,12,12">
       <DockPanel Grid.Row="0" Margin="0,0,0,16">
@@ -96,15 +100,29 @@
                 <StackPanel Margin="0,0,0,12"><TextBlock Classes="muted small" Text="Videos found"/><TextBlock Text="{Binding Found}" FontSize="17" FontWeight="SemiBold"/></StackPanel>
                 <StackPanel Margin="0,0,0,12"><TextBlock Classes="muted small" Text="Already read before"/><TextBlock Text="{Binding AlreadyRead}" FontSize="17" FontWeight="SemiBold"/></StackPanel>
                 <StackPanel Margin="0,0,0,12"><TextBlock Classes="muted small" Text="New videos read"/><TextBlock Text="{Binding NewRead}" FontSize="17" FontWeight="SemiBold"/></StackPanel>
-                <StackPanel><TextBlock Classes="muted small" Text="Could not read"/><TextBlock Text="{Binding Failed}" FontSize="17" FontWeight="SemiBold"/></StackPanel>
+                <StackPanel>
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <TextBlock Classes="muted small" Text="Could not read" VerticalAlignment="Center"/>
+                    <!-- Which files, and why -->
+                    <Button Classes="icon tinyinfo" Command="{Binding ShowFailedCommand}" IsVisible="{Binding HasFailedFiles}" ToolTip.Tip="Show the files that could not be read, and why">
+                      <Panel Width="16" Height="16">
+                        <Ellipse Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.4"/>
+                        <TextBlock Text="i" FontSize="11" FontWeight="Bold" Foreground="{Binding $parent[Button].Foreground}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                      </Panel>
+                    </Button>
+                  </StackPanel>
+                  <TextBlock Text="{Binding Failed}" FontSize="17" FontWeight="SemiBold"/>
+                </StackPanel>
                 <StackPanel><TextBlock Classes="muted small" Text="Time so far"/><TextBlock Text="{Binding Elapsed}" FontSize="17" FontWeight="SemiBold"/></StackPanel>
                 <StackPanel><TextBlock Classes="muted small" Text="Per new video"/><TextBlock Text="{Binding PerVideo}" FontSize="17" FontWeight="SemiBold"/></StackPanel>
               </UniformGrid>
 
               <TextBlock Classes="muted small" Text="{Binding CurrentFile}" TextWrapping="Wrap"/>
 
-              <TextBlock Classes="muted small" TextWrapping="Wrap" IsVisible="{Binding HasRecent}"
-                         Text="Scan status"/>
+              <StackPanel Spacing="2" Margin="0,6,0,0" IsVisible="{Binding HasRecent}">
+                <TextBlock Text="Scan status" FontSize="14" FontWeight="SemiBold"/>
+                <TextBlock Classes="muted small" TextWrapping="Wrap" Text="White frame: a new or changed video, being read now. No frame: known from an earlier scan."/>
+              </StackPanel>
               <Border Background="{DynamicResource Frame}" CornerRadius="3" Padding="4" ClipToBounds="True" HorizontalAlignment="Left" IsVisible="{Binding HasRecent}">
                 <ItemsControl ItemsSource="{Binding Recent}">
                   <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="3"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
@@ -174,4 +192,38 @@
       </Grid>
     </Grid>
   </ScrollViewer>
+
+  <!-- The files that could not be read in this scan, and why -->
+  <Grid Background="#80000000" IsVisible="{Binding FailedVisible}">
+    <Border Classes="panel" Width="760" MaxHeight="560" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Top" Classes="h2" Text="{Binding FailedTitle}"/>
+        <TextBlock DockPanel.Dock="Top" Classes="muted" TextWrapping="Wrap" Margin="0,8,0,12"
+                   Text="These are left out of the comparison. Try opening one in a video player: a file that is still being copied or downloaded is read again by the next scan."/>
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,*" ColumnSpacing="16" Margin="0,0,0,6">
+          <TextBlock Classes="muted small" Text="File" FontWeight="SemiBold"/>
+          <TextBlock Grid.Column="1" Classes="muted small" Text="Reason" FontWeight="SemiBold"/>
+        </Grid>
+        <Button DockPanel.Dock="Bottom" Classes="primary" Content="Close" Command="{Binding CloseFailedCommand}" HorizontalAlignment="Right" Margin="0,12,0,0"/>
+        <ScrollViewer Classes="gutter">
+          <ItemsControl ItemsSource="{Binding FailedFiles}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="core:FailedRead">
+                <Border BorderBrush="{DynamicResource Rule}" BorderThickness="0,1,0,0" Padding="0,6">
+                  <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                    <StackPanel>
+                      <SelectableTextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                      <SelectableTextBlock Text="{Binding Folder}" Classes="muted small" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" Text="{Binding Reason}" TextWrapping="Wrap"/>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+  </Grid>
+  </Panel>
 </UserControl>

@@ -4,6 +4,28 @@ namespace deepduplicates
 {
     public enum ScanPhase { Idle, Preparing, FindingFiles, ReadingVideos, Comparing, Done, Cancelled, Failed }
 
+    /// <summary>A video the scan could not read, and why (in plain words).</summary>
+    public sealed record FailedRead(string Path, string Reason)
+    {
+        public string FileName => System.IO.Path.GetFileName(Path);
+        public string Folder => System.IO.Path.GetDirectoryName(Path) ?? "";
+
+        /// <summary>True for a read that failed (not for a video that was read but is too short or too small).</summary>
+        public static bool IsFailure(int? duration, string reason) =>
+            duration == -1 || (reason ?? "").StartsWith("Screenshot failed") || reason == "Can't read videofile";
+
+        /// <summary>The database's reason, shortened for the list.</summary>
+        public static string Describe(string reason)
+        {
+            reason ??= "";
+            if (reason.Contains("ConversionException")) return "Its pictures could not be made: the file looks broken or incomplete";
+            if (reason.Contains("UnknownDecoderException")) return "FFmpeg does not support this video format";
+            if (reason.StartsWith("Screenshot failed! Generic error")) return "Its pictures could not be made";
+            if (reason == "Can't read videofile" || reason.Length == 0) return "The file could not be opened as a video";
+            return System.Text.RegularExpressions.Regex.Replace(reason, "<!--.*?-->", "").Trim();
+        }
+    }
+
     /// <summary>A snapshot of a running scan, reported to the interfaces.</summary>
     public record ScanProgress
     {
@@ -20,6 +42,9 @@ namespace deepduplicates
         public int NewTotal { get; init; }
         public int NewDone { get; init; }
         public int Failed { get; init; }
+
+        /// <summary>The videos counted in <see cref="Failed"/>, with the reason for each.</summary>
+        public System.Collections.Generic.IReadOnlyList<FailedRead> FailedFiles { get; init; } = Array.Empty<FailedRead>();
 
         public string CurrentFile { get; init; } = "";
 

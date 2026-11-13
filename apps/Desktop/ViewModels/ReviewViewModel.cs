@@ -95,12 +95,14 @@ public partial class ReviewViewModel : ObservableObject
         if (groups.Count > 0)
         {
             Rows.Add(new SectionRow("Duplicates", Fmt.Plural(groups.Count, "group", "groups")));
+            int n = 0;
             foreach (var g in groups.Take(shownGroups))
             {
-                Rows.Add(new GroupHeaderRow($"{g.Members.Count} copies, {Fmt.Duration(g.Members[0].DurationSeconds)} long"));
+                bool shade = n++ % 2 == 1;   // every second set on a slightly darker band, so a new set stands out
+                Rows.Add(new GroupHeaderRow($"{g.Members.Count} copies, {Fmt.Duration(g.Members[0].DurationSeconds)} long", shade));
                 for (int i = 0; i < g.Members.Count; i++)
                 {
-                    var row = new VideoRow(g.Members[i], this, inGroup: true);
+                    var row = new VideoRow(g.Members[i], this, inGroup: true) { Shade = shade };
                     // Each copy was matched with the first video: the divider takes the copy below out of the group
                     if (i > 0) Rows.Add(new MatchDividerRow(row));
                     Rows.Add(row);
@@ -295,12 +297,13 @@ public partial class ReviewViewModel : ObservableObject
 }
 
 public sealed record SectionRow(string Title, string Subtitle);
-public sealed record GroupHeaderRow(string Text);
+public sealed record GroupHeaderRow(string Text, bool Shade);
 
 /// <summary>The line between two matched copies, with "False positive" for the copy below it.</summary>
 public sealed class MatchDividerRow
 {
     public VideoRow Below { get; }
+    public bool Shade => Below.Shade;
     public string Tip { get; }
     public IRelayCommand Command { get; }
     public MatchDividerRow(VideoRow below)
@@ -362,6 +365,8 @@ public partial class VideoRow : ObservableObject
 
     public VideoEntry Entry { get; }
     public bool InGroup { get; }
+    /// <summary>In every second set: drawn on a slightly darker band.</summary>
+    public bool Shade { get; init; }
     public string FileName => Entry.FileName;
     public string Folder => Entry.Folder;
     public string Meta { get; }

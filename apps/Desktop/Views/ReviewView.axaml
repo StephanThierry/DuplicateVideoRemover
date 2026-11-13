@@ -8,8 +8,18 @@
   <UserControl.Styles>
     <!-- The list is for reading and ticking boxes, not for selecting rows -->
     <Style Selector="ListBox.rows ListBoxItem">
-      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Padding" Value="8,0"/>
       <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <!-- Every second set on a slightly darker band (set in ReviewView.axaml.cs), so a new set stands out -->
+    <Style Selector="ListBox.rows ListBoxItem.shade">
+      <Setter Property="Background" Value="{DynamicResource Band}"/>
+    </Style>
+    <Style Selector="ListBox.rows ListBoxItem.shade:selected /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Band}"/>
+    </Style>
+    <Style Selector="ListBox.rows ListBoxItem.shade:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Band}"/>
     </Style>
     <Style Selector="ListBox.rows ListBoxItem:selected /template/ ContentPresenter">
       <Setter Property="Background" Value="Transparent"/>
@@ -23,7 +33,7 @@
       <Setter Property="BorderThickness" Value="1"/>
       <Setter Property="CornerRadius" Value="10"/>
       <Setter Property="Padding" Value="12,10"/>
-      <Setter Property="Margin" Value="0,0,0,6"/>
+      <Setter Property="Margin" Value="0,0,0,4"/>
     </Style>
     <Style Selector="Border.video.selected">
       <Setter Property="Background" Value="{DynamicResource GreaseWash}"/>
@@ -139,7 +149,8 @@
           </WrapPanel>
         </Border>
 
-        <ListBox Classes="rows" ItemsSource="{Binding Rows}" Background="Transparent" SelectionMode="Single" Container.Name="cards" Container.Sizing="Width">
+        <ListBox Classes="rows" ItemsSource="{Binding Rows}" Background="Transparent" SelectionMode="Single" Container.Name="cards" Container.Sizing="Width"
+                 ContainerPrepared="Rows_ContainerPrepared">
           <ListBox.DataTemplates>
             <DataTemplate DataType="vm:SectionRow">
               <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,18,0,8">
@@ -148,18 +159,18 @@
               </StackPanel>
             </DataTemplate>
             <DataTemplate DataType="vm:GroupHeaderRow">
-              <TextBlock Classes="muted small" Text="{Binding Text}" Margin="2,10,0,4"/>
+              <TextBlock Classes="muted small" Text="{Binding Text}" Margin="2,12,0,4"/>
             </DataTemplate>
             <DataTemplate DataType="vm:MoreRow">
               <Button Content="{Binding Text}" Command="{Binding Command}" HorizontalAlignment="Center" Margin="0,12"/>
             </DataTemplate>
-            <!-- Between two matched copies: "False positive" takes the copy below out of the group -->
+            <!-- Between two matched copies: "False positive" takes the copy below out of the group. It takes no room of its
+                 own: it sits on the seam between the two cards (drawn above them, see ReviewView.axaml.cs) -->
             <DataTemplate DataType="vm:MatchDividerRow">
-              <Grid ColumnDefinitions="*,Auto,*" ColumnSpacing="10" Margin="0,-2,0,4">
-                <Border Height="1" Background="{DynamicResource Rule}" VerticalAlignment="Center"/>
-                <Button Grid.Column="1" Classes="small" Content="False positive" Command="{Binding Command}" ToolTip.Tip="{Binding Tip}" CornerRadius="12"/>
-                <Border Grid.Column="2" Height="1" Background="{DynamicResource Rule}" VerticalAlignment="Center"/>
-              </Grid>
+              <Panel Height="0" Margin="0,-2,0,0" ClipToBounds="False">
+                <Button Classes="small" Content="False positive" Command="{Binding Command}" ToolTip.Tip="{Binding Tip}" CornerRadius="12"
+                        HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-12,0,-12"/>
+              </Panel>
             </DataTemplate>
             <DataTemplate DataType="vm:VideoRow">
               <Border Classes="video" Classes.selected="{Binding IsSelected}" Classes.doomed="{Binding IsDoomed}">

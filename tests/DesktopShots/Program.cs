@@ -64,6 +64,14 @@ if (Environment.GetEnvironmentVariable("SHOT_JUMP") == "1")
         Console.WriteLine($"[jump] {what}: card moved {y1 - y0:+0.0;-0.0;0}px (y {y0:0} -> {y1:0}), list height {lh0:0} -> {lh1:0}, " +
             $"card heights {string.Join("/", h0.Select(h => h.ToString("0")))} -> {string.Join("/", h1.Select(h => h.ToString("0")))}, toast: {vm.Review.Toast ?? "-"}");
     }
+    if (Environment.GetEnvironmentVariable("SHOT_PROBE") == "1")
+    {
+        var dividerItem = list.GetRealizedContainers().First(c => c.DataContext is MatchDividerRow);
+        var button = dividerItem.GetVisualDescendants().OfType<Avalonia.Controls.Button>().First();
+        Console.WriteLine($"[probe] divider item bounds {dividerItem.Bounds}, z {dividerItem.ZIndex}, button bounds {button.Bounds}, visible {button.IsEffectivelyVisible}");
+        foreach (var v in button.GetVisualAncestors().TakeWhile(a => a != list)) Console.WriteLine($"[probe]   {v.GetType().Name} clip={v.ClipToBounds} bounds={v.Bounds}");
+        Console.WriteLine($"[probe] colours: see App.axaml");
+    }
     Shot("j_before");
     Step("select the kept copy (keep moves to the copy above)", () => target.IsSelected = true);
     Step("unselect it again", () => target.IsSelected = false);
@@ -124,6 +132,43 @@ if (Environment.GetEnvironmentVariable("SHOT_HIDDEN") == "1")
     vm.Encode.CloseHiddenCommand.Execute(null);
     return;
 }
+// SHOT_FAILED=1 (with SHOT_FFMPEG=<folder with ffmpeg and ffprobe>, and an empty data folder): a scan with files that cannot be read -
+// text named .mp4, a cut-off video - and a short one that can (it is not "could not read"); the list behind the "i"
+if (Environment.GetEnvironmentVariable("SHOT_FAILED") == "1")
+{
+    string ff5 = Environment.GetEnvironmentVariable("SHOT_FFMPEG")!;
+    if (!File.Exists(FileHandler.FFmpegPath))
+    {
+        Directory.CreateDirectory(Path.Combine(FileHandler.AppFolder, "ffmpeg"));
+        foreach (var f in Directory.GetFiles(ff5)) File.Copy(f, Path.Combine(FileHandler.AppFolder, "ffmpeg", Path.GetFileName(f)), true);
+    }
+    string dir5 = Path.Combine(FileHandler.AppFolder, "videos");
+    Directory.CreateDirectory(dir5);
+    var maker5 = new ProcessEncodeRunner();
+    void Make(string name, string src, int seconds) => Task.Run(() => maker5.RunAsync(FileHandler.FFmpegPath, new[] { "-hide_banner", "-y", "-f", "lavfi", "-i", $"{src}=duration={seconds}:size=640x360:rate=25",
+        "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", Path.Combine(dir5, name) }, _ => { }, _ => { }, CancellationToken.None)).GetAwaiter().GetResult();
+    Make("Good one.mp4", "testsrc", 30); Make("Good two.mp4", "smptebars", 30); Make("Short.mp4", "testsrc2", 2);
+    Make("whole.mp4", "testsrc2", 30);
+    var whole = File.ReadAllBytes(Path.Combine(dir5, "whole.mp4"));
+    File.WriteAllBytes(Path.Combine(dir5, "Cut off download.mp4"), whole[..(whole.Length / 3)]);
+    File.Delete(Path.Combine(dir5, "whole.mp4"));
+    File.WriteAllText(Path.Combine(dir5, "Not really a video.mp4"), "This is a text file with a video extension.");
+    foreach (var f in Directory.GetFiles(dir5)) File.SetLastWriteTime(f, DateTime.Now.AddHours(-2));
+    var st5 = controller.Settings.Clone();
+    st5.contentFolders = new[] { dir5 };
+    controller.SaveSettings(st5, PathMapper.Mappings);
+    vm.SelectedTab = MainViewModel.ScanTab;
+    vm.Scan.StartCommand.Execute(null);
+    var t5 = DateTime.UtcNow;
+    while ((controller.Scanner.IsRunning || controller.Scanner.Current.Phase == ScanPhase.Idle) && DateTime.UtcNow - t5 < TimeSpan.FromMinutes(3)) Pump(200);
+    Pump(800);
+    Console.WriteLine($"[failed] could not read: {vm.Scan.Failed}, icon shown: {vm.Scan.HasFailedFiles}");
+    foreach (var f in vm.Scan.FailedFiles) Console.WriteLine($"[failed]   {f.FileName}: {f.Reason}");
+    Shot("f_scan");
+    vm.Scan.ShowFailedCommand.Execute(null); Shot("f_list");
+    vm.Scan.CloseFailedCommand.Execute(null);
+    return;
+}
 // SHOT_DRAG=1 (with a data folder that SHOT_HIDDEN has scanned): the waiting videos are reordered by dragging their grip with the
 // mouse, in the full and in the compact view; prints the engine's order after each drag
 if (Environment.GetEnvironmentVariable("SHOT_DRAG") == "1")
@@ -148,7 +193,8 @@ if (Environment.GetEnvironmentVariable("SHOT_DRAG") == "1")
         window.MouseDown(start, Avalonia.Input.MouseButton.Left); Pump(50);
         for (int s = 1; s <= 8; s++) { window.MouseMove(new Point(start.X, start.Y + (end.Y - start.Y) * s / 8)); Pump(30); }
         Shot(shot);
-        Console.WriteLine($"[drag] line shown: {string.Join(", ", vm.EncodeQueue.Waiting.Select(r => r.FileName + (r.DropAbove ? " (line above)" : r.DropBelow ? " (line below)" : "") + (r.IsDragged ? " (dragged)" : "")))}");
+        Pump(300);   // the cards that make room glide there
+        Console.WriteLine($"[drag] while dragging: {string.Join(", ", list.GetRealizedContainers().Select(c => Path.GetFileNameWithoutExtension(((EncodeQueueRow)c.DataContext!).FileName) + ((c.RenderTransform as Avalonia.Media.TranslateTransform)?.Y is double y && Math.Abs(y) > 0.5 ? $" ({y:+0;-0})" : "") + (((EncodeQueueRow)c.DataContext!).IsDragged ? " [dragged]" : "")))}");
         window.MouseUp(end, Avalonia.Input.MouseButton.Left); Pump(400);
         Console.WriteLine($"[drag] row {from + 1} to {(below ? "below" : "above")} row {to + 1}: {Order()} | shown: {string.Join(", ", vm.EncodeQueue.Waiting.Select(r => Path.GetFileNameWithoutExtension(r.FileName)))}");
     }

@@ -282,10 +282,8 @@ public partial class EncodeQueueRow : ObservableObject
     public string Summary { get; }
 
     [ObservableProperty] private string statusText = "";
-    // While a waiting video is dragged: the row being moved, and where it would land (a line above or below this row)
+    // While a waiting video is dragged: the card being moved (lifted)
     [ObservableProperty] private bool isDragged;
-    [ObservableProperty] private bool dropAbove;
-    [ObservableProperty] private bool dropBelow;
     [ObservableProperty] private string detail = "";
     [ObservableProperty] private string resultText = "";
     [ObservableProperty] private double percent;

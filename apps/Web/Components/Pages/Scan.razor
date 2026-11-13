@@ -57,7 +57,7 @@
                     {
                         <div><dt>Already read before</dt><dd>@Math.Max(p.FilesFound - p.NewTotal, 0).ToString("N0")</dd></div>
                         <div><dt>New videos read</dt><dd>@p.NewDone.ToString("N0") of @p.NewTotal.ToString("N0")</dd></div>
-                        <div><dt>Could not read</dt><dd>@p.Failed.ToString("N0")</dd></div>
+                        <div><dt>Could not read @if (p.FailedFiles.Count > 0) { <button class="info-icon" @onclick="() => showFailed = true" title="Show the files that could not be read, and why" aria-label="Show the files that could not be read">i</button> }</dt><dd>@p.Failed.ToString("N0")</dd></div>
                     }
                     <div><dt>Time so far</dt><dd>@Fmt.Time(p.Elapsed)</dd></div>
                     @if (p.SecondsPerNewFile is double s)
@@ -73,7 +73,8 @@
 
                 @if (recent.Count > 0)
                 {
-                    <p class="muted small" style="margin:18px 0 4px">Scan status</p>
+                    <h3 class="minihead">Scan status</h3>
+                    <p class="muted small" style="margin:2px 0 6px">White frame: a new or changed video, being read now. No frame: known from an earlier scan.</p>
                     <div class="recent" style="margin-top:0" aria-label="Pictures of the latest videos read">
                         @foreach (var v in recent)
                         {
@@ -142,7 +143,28 @@
 
 <VideoPlayer Video="playing" OnClose="() => playing = null" />
 
+@if (showFailed && p.FailedFiles.Count > 0)
+{
+    <div class="dialog-backdrop" @onclick="() => showFailed = false">
+        <div class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="failed-title" @onclick:stopPropagation="true">
+            <h2 id="failed-title">@Fmt.Plural(p.FailedFiles.Count, "video could not be read", "videos could not be read")</h2>
+            <p>These are left out of the comparison. Try opening one in a video player: a file that is still being copied or downloaded is read again by the next scan.</p>
+            <div class="hidden-list">
+                @foreach (var f in p.FailedFiles)
+                {
+                    <div class="hidden-row failed-row">
+                        <div><strong>@f.FileName</strong><div class="muted small">@f.Folder</div></div>
+                        <div>@f.Reason</div>
+                    </div>
+                }
+            </div>
+            <div class="buttons"><button class="primary" @onclick="() => showFailed = false">Close</button></div>
+        </div>
+    </div>
+}
+
 @code {
+    private bool showFailed;
     private ScanProgress p = new();
     private readonly List<VideoEntry> recent = new();
     private VideoEntry? playing;

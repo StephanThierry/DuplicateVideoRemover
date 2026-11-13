@@ -136,10 +136,12 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
   background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius-sheet);
   margin-bottom: 14px; overflow: hidden;
 }
+/* Every second set slightly darker, so a new set stands out */
+.group:nth-of-type(even) { background: var(--table); }
 .group-head { padding: 8px 14px; color: var(--muted); font-size: .85rem; border-bottom: 1px solid var(--rule); }
 .row {
   display: grid; grid-template-columns: 28px auto 34px 1fr; gap: 14px; align-items: center;
-  padding: 10px 14px;
+  padding: 8px 14px;
 }
 .row + .row { border-top: 1px solid var(--rule); }
 .row.is-selected { background: var(--grease-wash); }
@@ -239,6 +241,12 @@ button.copy-icon:hover { color: var(--accent); border-color: var(--accent); }
 .recent .thumbbtn { position: relative; flex: 0 0 auto; padding: 0; border: 0; border-radius: 0; background: none; cursor: pointer; line-height: 0; }
 .recent .thumbbtn .playbadge { position: absolute; right: 5px; bottom: 5px; width: 22px; height: 22px; border-radius: 50%; background: rgba(0,0,0,.6); color: #fff; display: grid; place-items: center; padding-left: 2px; }
 .recent .thumbbtn:hover .playbadge, .recent .thumbbtn:focus-visible .playbadge { background: rgba(0,0,0,.9); }
+/* The "i" next to "Could not read" */
+.info-icon { display: inline-grid; place-items: center; width: 18px; height: 18px; padding: 0; margin-left: 4px; border-radius: 50%; font: 700 11px/1 Georgia, serif; vertical-align: 1px; color: var(--accent); border: 1.4px solid currentColor; background: transparent; }
+.info-icon:hover { background: var(--table); }
+.failed-row { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
+.failed-row strong { word-break: break-all; }
+.minihead { font-size: .95rem; font-weight: 600; margin: 18px 0 0; }
 .recent .thumbbtn.isnew { border: 4px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
 .recent .thumbbtn:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .scope li { word-break: break-all; }
@@ -357,7 +365,9 @@ button.icon:hover:not(:disabled) { border-color: var(--accent); background: var(
 @media (max-width: 960px) { .strip-missing { width: 100%; } }
 
 /* Between two matched copies: "False positive" takes the copy below out of the group */
-.match-divider { display: flex; align-items: center; gap: 10px; padding: 2px 14px; }
+/* "False positive" takes no room of its own: it sits on the line between the two copies, over both */
+.match-divider { display: flex; align-items: center; gap: 10px; padding: 0 14px; height: 0; position: relative; z-index: 1; }
+.match-divider button { background: var(--sheet); }
 .match-divider::before, .match-divider::after { content: ""; flex: 1; border-top: 1px solid var(--rule); }
 .match-divider button { border-radius: 12px; color: var(--muted); }
 .match-divider button:hover:not(:disabled) { color: var(--grease); border-color: var(--grease); }
