@@ -14,3 +14,6 @@ runhistory.json
 
 # Output of dotnet publish (see the readme)
 publish/
+
+# The web app's Data Protection keys (made per data folder on first start; never shared)
+.keys/
