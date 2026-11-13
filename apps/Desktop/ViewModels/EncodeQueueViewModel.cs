@@ -407,14 +407,8 @@ public partial class EncodeQueueRow : ObservableObject
         Bitmap? Load(int n)
         {
             if (key.Length == 0) return null;
-            try
-            {
-                string path = owner.NewShotPath(Id, n);
-                if (!System.IO.File.Exists(path)) return null;
-                using var stream = System.IO.File.OpenRead(path);
-                return Bitmap.DecodeToWidth(stream, 240);
-            }
-            catch { return null; }
+            // The new file has the original's shape
+            return Shots.Load(owner.NewShotPath(Id, n), VideoShapes.Of(VideoId));
         }
         NewShot1 = Load(1); NewShot2 = Load(2); NewShot3 = Load(3);
     }

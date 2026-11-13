@@ -461,6 +461,34 @@ public class EncodeEngineTests : IDisposable
     }
 
     [Fact]
+    public async Task WaitingVideosWhoseFileIsDeleted_LeaveTheQueue()
+    {
+        var runner = new FakeRunner { Behavior = FakeRunner.Hang };
+        var engine = NewEngine(runner);
+        var a = Video("a.mp4"); var b = Video("b.mp4", 2); var c = Video("c.mp4", 3); var d = Video("d.mp4", 4);
+        string away = Path.Combine(dir + "-share", "e.mp4");   // on a share that is off
+        engine.Enqueue(new[] { a, b, c, d, new EncodeCandidate { Id = 5, Path = away, SizeBytes = 1000, DurationSeconds = 60 } }, EncodeSettings.CreateDefault());
+        WaitFor(() => engine.Current.Current?.Fraction > 0, "a is running");
+
+        File.Delete(a.Path);   // the running one: not touched (the encode finds out itself)
+        File.Delete(c.Path);
+        File.Delete(d.Path);
+        var seen = new List<int>();
+        engine.ProgressChanged += p => { lock (seen) seen.Add(p.Items.Count); };
+        Assert.Equal(2, await engine.RemoveDeletedWaitingAsync());
+
+        Assert.Equal(new[] { a.Path, b.Path, away }, engine.Current.Items.Select(i => i.Path));
+        Assert.Contains(4, seen); Assert.Contains(3, seen);                     // each one was published as soon as it was known
+        Assert.Contains(engine.Current.Log, l => l.Contains("Took 2 waiting videos out of the queue") && l.Contains("c.mp4"));
+        engine.Stop();
+        Assert.Equal(3, NewEngine(new FakeRunner { Behavior = FakeRunner.Hang }).Current.Items.Count);   // saved
+        // Stopped, the one that was running waits again - and its file is gone too
+        Assert.Equal(1, await engine.RemoveDeletedWaitingAsync());
+        Assert.Equal(new[] { b.Path, away }, engine.Current.Items.Select(i => i.Path));
+        Assert.Equal(0, await engine.RemoveDeletedWaitingAsync());
+    }
+
+    [Fact]
     public async Task AFolderThatCannotBeReachedIsNotTakenForDeletedFiles()
     {
         var engine = NewEngine(new FakeRunner());

@@ -11,16 +11,6 @@
       <Setter Property="Padding" Value="8,0"/>
       <Setter Property="Background" Value="Transparent"/>
     </Style>
-    <!-- Every second set on a slightly darker band (set in ReviewView.axaml.cs), so a new set stands out -->
-    <Style Selector="ListBox.rows ListBoxItem.shade">
-      <Setter Property="Background" Value="{DynamicResource Band}"/>
-    </Style>
-    <Style Selector="ListBox.rows ListBoxItem.shade:selected /template/ ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource Band}"/>
-    </Style>
-    <Style Selector="ListBox.rows ListBoxItem.shade:pointerover /template/ ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource Band}"/>
-    </Style>
     <Style Selector="ListBox.rows ListBoxItem:selected /template/ ContentPresenter">
       <Setter Property="Background" Value="Transparent"/>
     </Style>
@@ -34,6 +24,10 @@
       <Setter Property="CornerRadius" Value="10"/>
       <Setter Property="Padding" Value="12,10"/>
       <Setter Property="Margin" Value="0,0,0,4"/>
+    </Style>
+    <!-- The cards of every second set are tinted, so a new set stands out (before the selected styles, so being selected still shows) -->
+    <Style Selector="Border.video.shade">
+      <Setter Property="Background" Value="{DynamicResource BandSheet}"/>
     </Style>
     <Style Selector="Border.video.selected">
       <Setter Property="Background" Value="{DynamicResource GreaseWash}"/>
@@ -173,7 +167,7 @@
               </Panel>
             </DataTemplate>
             <DataTemplate DataType="vm:VideoRow">
-              <Border Classes="video" Classes.selected="{Binding IsSelected}" Classes.doomed="{Binding IsDoomed}">
+              <Border Classes="video" Classes.shade="{Binding Shade}" Classes.selected="{Binding IsSelected}" Classes.doomed="{Binding IsDoomed}">
                 <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="14">
                   <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Center"/>
                   <!-- Film strip, crossed out with grease pencil when picked for removal -->

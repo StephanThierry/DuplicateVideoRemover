@@ -91,8 +91,15 @@ app.MapGet("/shots/{name}", (string name) =>
 {
     if (!shotName.IsMatch(name)) return Results.NotFound();
     var path = Path.Combine(DataLocation.ScreenshotFolder, name);
-    return File.Exists(path) ? Results.File(path, "image/png", enableRangeProcessing: false) : Results.NotFound();
+    return Shot(path, int.Parse(name[..name.IndexOf('_')]));
 });
+
+// A screenshot drawn at its video's own shape (the files are all 3:2, see VideoShape). Not kept by the browser: the shape of a video
+// read before shapes were stored arrives with the next scan.
+static IResult Shot(string path, int videoId) =>
+    VideoShape.ReadFitted(path, VideoShapes.Of(videoId)) is byte[] png
+        ? Results.Bytes(png, "image/png")
+        : Results.NotFound();
 
 // A video from the review, for the player: /video/123. Only videos in the current results are served.
 var videoTypes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -116,7 +123,7 @@ app.MapGet("/encodecheck/{name}", (string name) =>
     var m = checkShotName.Match(name);
     if (!m.Success) return Results.NotFound();
     var path = controller.Encoder.CheckShotPath(m.Groups[1].Value, int.Parse(m.Groups[2].Value));
-    return File.Exists(path) ? Results.File(path, "image/png", enableRangeProcessing: false) : Results.NotFound();
+    return Shot(path, controller.Encoder.Find(m.Groups[1].Value)?.VideoId ?? 0);   // the new file has the original's shape
 });
 
 // A new (re-encoded) file from the Re-encode queue page, for the player: /encodevideo/<queue item id>. Only the new file of a queue item.

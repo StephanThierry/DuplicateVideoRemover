@@ -76,7 +76,7 @@ namespace deepduplicates
                 try { string shot = fileHandler.screenshotPath(item, n); if (File.Exists(shot)) File.Delete(shot); }
                 catch (Exception) { /* in use: it is made again over the old one */ }
             }
-            item.duration = -1; item.bitrate = null; item.reason = null; item.formatNotSupported = false;
+            item.duration = -1; item.bitrate = null; item.reason = null; item.formatNotSupported = false; item.aspect = null;
             item.image1Checksum = item.image2Checksum = item.image3Checksum = null;
             item.image1hash_blob = item.image2hash_blob = item.image3hash_blob = null;
             item.image1hash = item.image2hash = item.image3hash = null;
@@ -241,6 +241,8 @@ namespace deepduplicates
 
                         }
                         wrapper.item.duration = duration;
+                        // The picture's shape, to show the screenshots (which are all 3:2) at the video's own shape
+                        wrapper.item.aspect = await VideoShape.ProbeAsync(FileHandler.FFmpegPath, wrapper.path, ct);
                         //ShowTimeStamp(stopWatch, "Get metadata: ");
                         fullProcessedItems++;
                     }
@@ -284,7 +286,8 @@ namespace deepduplicates
                             failed++;
                             failedFiles.Add(new FailedRead(wrapper.path, FailedRead.Describe(wrapper.item.reason)));
                         }
-                        if (wrapper.item.remove != true && wrapper.item.duration != -1 && wrapper.item.id != 0) OnRead?.Invoke(wrapper.item);   // a new video was read: its picture is shown at once   // a new video was read: its picture is shown at once
+                        if (wrapper.item.aspect is double shape) VideoShapes.Remember(wrapper.item.id, shape);
+                        if (wrapper.item.remove != true && wrapper.item.duration != -1 && wrapper.item.id != 0) OnRead?.Invoke(wrapper.item);   // a new video was read: its picture is shown at once
                         Report(wrapper.path, true);
                     }
                 }

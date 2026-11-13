@@ -12,7 +12,7 @@
           <SolidColorBrush x:Key="Table" Color="#F3F4F8"/>
           <SolidColorBrush x:Key="Sidebar" Color="#EBEDF3"/>
           <!-- Behind every second set in Review: between the page and the cards -->
-          <SolidColorBrush x:Key="Band" Color="#E8EBF2"/>
+          <SolidColorBrush x:Key="BandSheet" Color="#E6ECF8"/>
           <SolidColorBrush x:Key="Sheet" Color="#FFFFFF"/>
           <SolidColorBrush x:Key="Raised" Color="#E4E7EF"/>
           <SolidColorBrush x:Key="Ink" Color="#161A22"/>
@@ -35,7 +35,7 @@
         <ResourceDictionary x:Key="Dark">
           <SolidColorBrush x:Key="Table" Color="#0E1116"/>
           <SolidColorBrush x:Key="Sidebar" Color="#12161D"/>
-          <SolidColorBrush x:Key="Band" Color="#141820"/>
+          <SolidColorBrush x:Key="BandSheet" Color="#252E42"/>
           <SolidColorBrush x:Key="Sheet" Color="#171B23"/>
           <SolidColorBrush x:Key="Raised" Color="#212732"/>
           <SolidColorBrush x:Key="Ink" Color="#E7EAF0"/>

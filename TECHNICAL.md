@@ -52,12 +52,30 @@ compares it with `fileSize` of the row (`VideoHandler.IsStale`). A different siz
 including its pictures (`ForgetWhatWasRead`), and read again like a new file. Rows with no size (never read, -1, 0) are read anyway.
 Stored sizes were checked against the disk for 67,000 rows: only the stale ones differed.
 
+### Screenshots are 3:2; they are shown at the video's own shape
+
+The three screenshots are always 240 x 160, whatever the video's shape: the comparison works on pictures of one size, and a picture
+squeezed to fill the frame has no black bars, which would match between any two videos. On screen they are drawn back at the video's
+own shape inside the same 3:2 frame (`VideoShape.FitPng`, the rest of the frame transparent), so the layout does not change.
+
+The shape is the `aspect` column (width / height as played: the pixel shape of anamorphic DVDs and a phone's quarter turn included;
+FFmpeg turns the picture upright when it takes a screenshot). `null` = not read yet, `0` = ffprobe could not tell (shown as it is).
+`VideoInfoContext.EnsureSchema` adds the column to an older database; it is nullable, so an older app on the same database still works.
+New videos get it while they are read. Videos read before get it from `ShapeFiller`, in the background of the desktop and web app:
+only while no scan runs, the videos in the current results first, 4 at a time (about 10 a second over the NAS share: a couple of hours
+for 80,000 videos, once). Files this machine cannot reach are left for the machine that can. `VideoShapes` keeps the shapes in memory
+for the pictures; the desktop app draws them in `Shots`, the web app in the `/shots` and `/encodecheck` endpoints.
+
 ## The encode queue
 
 `EncodeEngine` (Core/EncodeEngine.cs) is owned by `AppController.Encoder`, so there is one queue per process and
 the web and desktop screens only subscribe to it (`ProgressChanged`, an `EncodeProgress` snapshot, a few times a
 second from a background thread - screens coalesce it onto their UI thread).
 
+- **Files deleted while the program was closed.** At start-up, in the background: waiting videos whose file is gone leave the
+  queue (`RemoveDeletedWaitingAsync`, written in the log), then finished videos whose original or new file is gone are marked
+  deleted and stay in the list (`VerifyFinishedFilesAsync`). Both use `IsMissing`: a file counts as gone only when its folder can
+  be reached, so a NAS that is off at start-up does not empty the queue.
 - **One video at a time.** Videos are added at any time (`Enqueue`, also while it runs) and run in order.
   Statuses: Queued, Running, Done, Failed, Skipped. `Stop` puts the running video back as Queued and halts;
   `Start` resumes; `SkipCurrent` marks the running one Skipped; `Remove` / `ClearQueued` / `ClearFinished` / `Retry`.

@@ -403,6 +403,38 @@ namespace deepduplicates
             return changed;
         }
 
+        /// <summary>
+        /// Takes the waiting videos whose file has been deleted (outside the program, or while it was closed) out of the queue, one video
+        /// at a time in the background, each change published at once. A file on a share or disk that can't be reached is not taken for
+        /// deleted (see <see cref="IsMissing"/>): the video stays. Returns how many were taken out.
+        /// </summary>
+        public async Task<int> RemoveDeletedWaitingAsync(CancellationToken ct = default)
+        {
+            List<(string Id, string Path)> todo;
+            lock (sync) todo = items.Where(i => i.Status == EncodeItemStatus.Queued).Select(i => (i.Id, i.Path)).ToList();
+            var removed = new List<string>();
+            try
+            {
+                foreach (var (id, path) in todo)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    if (!await Task.Run(() => IsMissing(path), ct)) continue;   // a share can be slow to answer: never on the caller's thread
+                    lock (sync)
+                    {
+                        // Only while it still waits (it may have started, or been removed, meanwhile)
+                        if (items.RemoveAll(i => i.Id == id && i.Status == EncodeItemStatus.Queued) == 0) continue;
+                        Save();
+                    }
+                    removed.Add(System.IO.Path.GetFileName(path));
+                    Publish();
+                }
+            }
+            catch (OperationCanceledException) { }
+            if (removed.Count > 0)
+                AddLog($"Took {removed.Count:N0} waiting video{(removed.Count == 1 ? "" : "s")} out of the queue: the file was deleted ({string.Join(", ", removed.Take(5))}{(removed.Count > 5 ? ", ..." : "")}).");
+            return removed.Count;
+        }
+
         private void Forget(EncodeItem item) => EncodeChecker.DeleteShots(checksFolder, item.Id);
 
         // Finished videos with a new file that was never checked: made before checks existed (a Done item, or one that was
