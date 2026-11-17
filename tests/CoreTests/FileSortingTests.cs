@@ -68,5 +68,17 @@ public class OrderAnyListTests
     [Fact] public void SizeLargestFirst() => Assert.Equal(new[] { "zeta.mp4", "mid.mp4", "alpha.mp4" }, Names(FileSort.SizeDown));
     [Fact] public void FilenameZToA() => Assert.Equal(new[] { "zeta.mp4", "mid.mp4", "alpha.mp4" }, Names(FileSort.NameDown));
     [Fact] public void FolderAToZ() => Assert.Equal(new[] { "alpha.mp4", "zeta.mp4", "mid.mp4" }, Names(FileSort.FolderUp));
+
+    [Fact]
+    public void SavingsLargestFirst_ByWhatReEncodingSaves()
+    {
+        // Saved = size × (1 − 500 / kbps): zeta 300×0.5 = 150, alpha 100×0.83 = 83, mid 200×0.75 = 150 (tie: by path)
+        long Saved(Item i) => (long)(i.Size * (1 - 500 / i.Kbps));
+        var names = FileSorting.Order(Items, FileSort.SavingsDown, i => i.Path, i => i.Size, i => i.Kbps, Saved).Select(i => System.IO.Path.GetFileName(i.Path));
+        Assert.Equal(new[] { "zeta.mp4", "mid.mp4", "alpha.mp4" }, names);
+        Assert.Equal(new[] { "alpha.mp4", "zeta.mp4", "mid.mp4" }, Names(FileSort.SavingsDown));   // no estimate given: by path
+        Assert.Contains(FileSorting.EncodeChoices, c => c.Sort == FileSort.SavingsDown);
+        Assert.DoesNotContain(FileSorting.Choices, c => c.Sort == FileSort.SavingsDown);          // not in All files: it has no estimate
+    }
     [Fact] public void PathIsByTheFullPath() => Assert.Equal(new[] { "alpha.mp4", "zeta.mp4", "mid.mp4" }, Names(FileSort.Path));
 }

@@ -121,8 +121,8 @@ public partial class EncodeViewModel : ObservableObject
 
     partial void OnScriptPathChanged(string? value) => OnPropertyChanged(nameof(HasResult));
     /// <summary>The sort drop-down (same choices as All files): the labels, and which one is chosen. Highest bitrate first at the start.</summary>
-    public string[] SortLabels { get; } = FileSorting.Choices.Select(c => c.Label).ToArray();
-    [ObservableProperty] private int sortIndex = Array.FindIndex(FileSorting.Choices, c => c.Sort == FileSort.BitrateDown);
+    public string[] SortLabels { get; } = FileSorting.EncodeChoices.Select(c => c.Label).ToArray();
+    [ObservableProperty] private int sortIndex = Array.FindIndex(FileSorting.EncodeChoices, c => c.Sort == FileSort.BitrateDown);
     partial void OnSortIndexChanged(int value) => Filter();
 
     partial void OnSearchChanged(string value) => Filter();
@@ -155,8 +155,9 @@ public partial class EncodeViewModel : ObservableObject
         var shown = all.Where(r =>
             !(HideQueued && r.IsQueued) && r.Candidate.AverageKbps >= (double)MinKbps && r.Candidate.SizeBytes >= (double)MinMb * 1024 * 1024 && !hidden.Hides(r.Candidate.Folder) &&
             query.Matches(r.Candidate.Path));
-        var sort = FileSorting.Choices[Math.Clamp(SortIndex, 0, FileSorting.Choices.Length - 1)].Sort;
-        return FileSorting.Order(shown, sort, r => r.Candidate.Path, r => r.Candidate.SizeBytes, r => r.Candidate.AverageKbps);
+        var sort = FileSorting.EncodeChoices[Math.Clamp(SortIndex, 0, FileSorting.EncodeChoices.Length - 1)].Sort;
+        return FileSorting.Order(shown, sort, r => r.Candidate.Path, r => r.Candidate.SizeBytes, r => r.Candidate.AverageKbps,
+            r => r.Candidate.SizeBytes - r.EstimatedBytes);
     }
 
     private void Filter()
