@@ -103,7 +103,8 @@ namespace deepduplicates
     }
 
     /// <summary>How the All files list is ordered.</summary>
-    public enum FileSort { Path, NameUp, NameDown, FolderUp, FolderDown, SizeUp, SizeDown, BitrateUp, BitrateDown }
+    /// <summary>How the All files list is ordered. SavingsDown is for the Re-encode planning list only (it needs an estimate).</summary>
+    public enum FileSort { Path, NameUp, NameDown, FolderUp, FolderDown, SizeUp, SizeDown, BitrateUp, BitrateDown, SavingsDown }
 
     public static class FileSorting
     {
@@ -117,12 +118,17 @@ namespace deepduplicates
             ("Bitrate, lowest first", FileSort.BitrateUp), ("Bitrate, highest first", FileSort.BitrateDown),
         };
 
+        /// <summary>The Re-encode planning list's choices: the same, plus the largest estimated saving first.</summary>
+        public static readonly (string Label, FileSort Sort)[] EncodeChoices =
+            Choices.Append(("Savings, largest first", FileSort.SavingsDown)).ToArray();
+
         /// <summary>
         /// Any list of videos in the chosen order (ties by path). Used by the Re-encode planning list, which has candidates, not entries.
-        /// Path sorts by the full path.
+        /// Path sorts by the full path. SavingsDown needs <paramref name="savings"/> (bytes saved by re-encoding); without it, it sorts by path.
         /// </summary>
-        public static List<T> Order<T>(IEnumerable<T> items, FileSort sort, Func<T, string> path, Func<T, long> size, Func<T, double> bitrate)
+        public static List<T> Order<T>(IEnumerable<T> items, FileSort sort, Func<T, string> path, Func<T, long> size, Func<T, double> bitrate, Func<T, long>? savings = null)
         {
+            if (sort == FileSort.SavingsDown && savings == null) sort = FileSort.Path;
             var cmp = StringComparer.OrdinalIgnoreCase;
             string Name(T t) => System.IO.Path.GetFileName(path(t));
             string Folder(T t) => System.IO.Path.GetDirectoryName(path(t)) ?? "";
@@ -137,6 +143,7 @@ namespace deepduplicates
                 FileSort.SizeDown => list.OrderByDescending(size).ThenBy(path, cmp),
                 FileSort.BitrateUp => list.OrderBy(bitrate).ThenBy(path, cmp),
                 FileSort.BitrateDown => list.OrderByDescending(bitrate).ThenBy(path, cmp),
+                FileSort.SavingsDown => list.OrderByDescending(savings!).ThenBy(path, cmp),
                 _ => list.OrderBy(path, cmp)
             };
             return ordered.ToList();

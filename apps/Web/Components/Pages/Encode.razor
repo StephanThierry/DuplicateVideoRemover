@@ -77,7 +77,7 @@
             <label class="inline">and above <input type="number" min="0" step="50" @bind="minMb" @bind:after="ResetPaging" aria-label="Minimum file size in MB" /> MB</label>
             <label class="sortpick">Sort by
                 <select @bind="sort" @bind:after="ResetPaging" aria-label="Sort the videos by">
-                    @foreach (var (label, value) in FileSorting.Choices)
+                    @foreach (var (label, value) in FileSorting.EncodeChoices)
                     {
                         <option value="@value">@label</option>
                     }
@@ -295,7 +295,8 @@
         var shown = (candidates ?? new()).Where(c =>
             !(hideQueued && queueMap.ContainsKey(c.Path)) && c.AverageKbps >= minKbps && c.SizeBytes >= (long)minMb * 1024 * 1024 && !hidden.Hides(c.Folder) &&
             query.Matches(c.Path));
-        return FileSorting.Order(shown, sort, c => c.Path, c => c.SizeBytes, c => c.AverageKbps);
+        return FileSorting.Order(shown, sort, c => c.Path, c => c.SizeBytes, c => c.AverageKbps,
+            c => c.SizeBytes - EncodeEstimator.EstimatedBytes(c, enc, targetKbps));
     }
 
     private long PickedBytes => candidates?.Where(c => picked.Contains(c.Id)).Sum(c => c.SizeBytes) ?? 0;
