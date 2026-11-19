@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,7 +13,7 @@ namespace deepduplicates
     /// Inside quotes a regular expression works: "night.?drive" finds nightdrive and night3drive. The quoted text
     /// is also tried as plain text, so "file (1)" still finds exactly that.
     /// </summary>
-    public sealed record SearchQuery(string[] Include, string[] Exclude, Regex[] IncludeRx = null, Regex[] ExcludeRx = null)
+    public sealed record SearchQuery(string[] Include, string[] Exclude, Regex[]? IncludeRx = null, Regex[]? ExcludeRx = null)
     {
         private static readonly Regex[] None = Array.Empty<Regex>();
         public Regex[] IncludeRx { get; init; } = IncludeRx ?? None;
@@ -153,7 +154,7 @@ namespace deepduplicates
         public static List<VideoEntry> Apply(List<VideoEntry> list, FileSort sort)
         {
             var cmp = StringComparer.OrdinalIgnoreCase;
-            IOrderedEnumerable<VideoEntry> ordered = sort switch
+            IOrderedEnumerable<VideoEntry>? ordered = sort switch
             {
                 FileSort.NameUp => list.OrderBy(e => e.FileName, cmp).ThenBy(e => e.Folder, cmp),
                 FileSort.NameDown => list.OrderByDescending(e => e.FileName, cmp).ThenBy(e => e.Folder, cmp),
@@ -188,7 +189,7 @@ namespace deepduplicates
         }
 
         /// <summary>The videos whose path contains every include term and none of the exclude terms.</summary>
-        public List<VideoEntry> Search(SearchQuery query, Func<VideoEntry, bool> alsoKeep = null)
+        public List<VideoEntry> Search(SearchQuery query, Func<VideoEntry, bool>? alsoKeep = null)
         {
             var found = new List<VideoEntry>();
             var include = query.Include;
@@ -205,6 +206,6 @@ namespace deepduplicates
             return found;
         }
 
-        public List<VideoEntry> Search(string text, Func<VideoEntry, bool> alsoKeep = null) => Search(SearchQuery.Parse(text), alsoKeep);
+        public List<VideoEntry> Search(string text, Func<VideoEntry, bool>? alsoKeep = null) => Search(SearchQuery.Parse(text), alsoKeep);
     }
 }
